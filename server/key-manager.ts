@@ -19,7 +19,11 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 export async function storeProjectKeys(projectId: string, keys: SetProjectKeys): Promise<void> {
   // Validate keys before storing
   if (!validatePrivateKey(keys.treasuryPrivateKey)) {
-    throw new Error("Invalid treasury private key format");
+    const keyLength = keys.treasuryPrivateKey.length;
+    const firstChars = keys.treasuryPrivateKey.substring(0, 3);
+    const lastChars = keys.treasuryPrivateKey.substring(keys.treasuryPrivateKey.length - 3);
+    console.error(`Treasury key validation failed - Length: ${keyLength}, Format: ${firstChars}...${lastChars}`);
+    throw new Error(`Invalid treasury private key format (length: ${keyLength}, expected 32-128 characters in base58)`);
   }
   
   if (keys.pumpfunPrivateKey && !validatePrivateKey(keys.pumpfunPrivateKey)) {
