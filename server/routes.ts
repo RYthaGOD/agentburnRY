@@ -362,6 +362,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { WHITELISTED_WALLETS } = await import("@shared/config");
       const isWhitelisted = WHITELISTED_WALLETS.includes(project.ownerWalletAddress);
 
+      console.log(`Manual buyback - Project owner: ${project.ownerWalletAddress}`);
+      console.log(`Manual buyback - Is whitelisted: ${isWhitelisted}`);
+      console.log(`Manual buyback - Whitelist contains ${WHITELISTED_WALLETS.length} wallets`);
+
       if (!isWhitelisted) {
         const now = new Date();
         const payments = await storage.getPaymentsByProject(project.id);
