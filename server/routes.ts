@@ -518,10 +518,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Check current token balance
+      console.log(`Checking token balance for treasury: ${project.treasuryWalletAddress}, token: ${project.tokenMintAddress}`);
       const currentBalance = await getTokenBalance(
         project.tokenMintAddress,
         project.treasuryWalletAddress
       );
+      console.log(`Current token balance: ${currentBalance}`);
+
+      if (currentBalance === 0) {
+        return res.status(400).json({ 
+          message: `No tokens found in treasury wallet. Please verify:
+• Treasury Wallet Address: ${project.treasuryWalletAddress}
+• Token Mint Address: ${project.tokenMintAddress}
+• The wallet has received these tokens (associated token account must exist)` 
+        });
+      }
 
       if (currentBalance < burnAmount) {
         return res.status(400).json({ 
