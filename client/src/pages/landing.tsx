@@ -5,6 +5,7 @@ import { WalletButton } from "@/components/wallet-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowRight, Zap, Shield, Clock, BarChart3, Check } from "lucide-react";
 import { Link } from "wouter";
+import { PRICING } from "@shared/config";
 import heroImage from "@assets/generated_images/Solana_network_hero_background_019c57ba.png";
 
 export default function Landing() {
@@ -150,7 +151,7 @@ export default function Landing() {
               {
                 step: "02",
                 title: "Configure Your Project",
-                description: "Enter your token mint address, treasury wallet, and burn address. Set your buyback amount and schedule.",
+                description: "Enter your token mint address and treasury wallet. Burns automatically route through the Solana incinerator. Set your buyback amount and schedule.",
               },
               {
                 step: "03",
@@ -193,57 +194,15 @@ export default function Landing() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {[
-              {
-                name: "Starter",
-                price: "0.5",
-                currency: "SOL",
-                period: "month",
-                features: [
-                  "1 Active Project",
-                  "Daily or Weekly Burns",
-                  "Basic Transaction History",
-                  "Email Support",
-                ],
-                recommended: false,
-              },
-              {
-                name: "Pro",
-                price: "1.5",
-                currency: "SOL",
-                period: "month",
-                features: [
-                  "5 Active Projects",
-                  "Hourly, Daily, or Weekly Burns",
-                  "Advanced Analytics",
-                  "Priority Support",
-                  "Custom Schedules",
-                ],
-                recommended: true,
-              },
-              {
-                name: "Enterprise",
-                price: "5",
-                currency: "SOL",
-                period: "month",
-                features: [
-                  "Unlimited Projects",
-                  "Custom Burn Schedules",
-                  "API Access",
-                  "Dedicated Support",
-                  "Custom Integrations",
-                ],
-                recommended: false,
-              },
-            ].map((tier, index) => (
+            {Object.entries(PRICING).map(([key, tier], index) => (
               <Card
-                key={index}
+                key={key}
                 className={`relative hover-elevate transition-all duration-200 ${
-                  tier.recommended ? "border-primary shadow-lg scale-105" : "border-card-border"
+                  key === "PRO" ? "border-primary shadow-lg scale-105" : "border-card-border"
                 }`}
                 data-testid={`card-pricing-${tier.name.toLowerCase()}`}
               >
-                {tier.recommended && (
+                {key === "PRO" && (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary" data-testid="badge-recommended">
                     Recommended
                   </Badge>
@@ -251,9 +210,10 @@ export default function Landing() {
                 <CardHeader>
                   <CardTitle className="text-2xl">{tier.name}</CardTitle>
                   <div className="mt-4">
-                    <span className="text-4xl font-bold">{tier.price}</span>
-                    <span className="text-muted-foreground ml-2">{tier.currency}/{tier.period}</span>
+                    <span className="text-4xl font-bold">{tier.priceSOL}</span>
+                    <span className="text-muted-foreground ml-2">SOL/month</span>
                   </div>
+                  <p className="text-sm text-muted-foreground">or {tier.priceUSDC} USDC</p>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-3">
@@ -268,8 +228,8 @@ export default function Landing() {
                 <CardFooter>
                   <Link href="/dashboard" className="w-full">
                     <Button
-                      className={`w-full ${tier.recommended ? "bg-accent" : ""}`}
-                      variant={tier.recommended ? "default" : "outline"}
+                      className={`w-full ${key === "PRO" ? "bg-accent" : ""}`}
+                      variant={key === "PRO" ? "default" : "outline"}
                       data-testid={`button-select-${tier.name.toLowerCase()}`}
                     >
                       Get Started

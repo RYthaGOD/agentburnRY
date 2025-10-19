@@ -1,7 +1,9 @@
 // Scheduler for automated buyback and burn execution
 // Note: node-cron package needs to be installed for this to work
+// Burns are routed through the Solana incinerator: 1nc1nerator11111111111111111111111111111111
 
 import { storage } from "./storage";
+import { SOLANA_INCINERATOR_ADDRESS } from "@shared/config";
 
 interface SchedulerConfig {
   enabled: boolean;
@@ -46,7 +48,9 @@ class BuybackScheduler {
 
         if (shouldExecute) {
           console.log(`Executing buyback for project: ${project.name}`);
-          // TODO: Call buyback execution API
+          // TODO: Implement Jupiter swap to buyback tokens
+          // Then transfer tokens to Solana incinerator for permanent burn
+          // Burn address: ${SOLANA_INCINERATOR_ADDRESS}
           // await executeBuyback(project.id);
         }
       }

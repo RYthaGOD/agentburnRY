@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { insertProjectSchema, type InsertProject } from "@shared/schema";
+import { SOLANA_INCINERATOR_ADDRESS } from "@shared/config";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -37,7 +38,7 @@ export default function NewProject() {
       name: "",
       tokenMintAddress: "",
       treasuryWalletAddress: "",
-      burnAddress: "",
+      burnAddress: SOLANA_INCINERATOR_ADDRESS,
       schedule: "daily",
       customCronExpression: "",
       buybackAmountSol: "",
@@ -176,13 +177,17 @@ export default function NewProject() {
                     <FormLabel>Burn Address</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Enter burn address"
-                        className="font-mono text-sm"
+                        placeholder="Solana incinerator address"
+                        className="font-mono text-sm bg-muted"
                         {...field}
+                        readOnly
                         data-testid="input-burn-address"
                       />
                     </FormControl>
-                    <FormDescription>Address where tokens will be permanently burned</FormDescription>
+                    <FormDescription>
+                      <Flame className="inline h-3 w-3 mr-1 text-orange-500" />
+                      Tokens are burned via the official Solana incinerator (permanent destruction)
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
