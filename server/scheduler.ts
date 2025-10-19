@@ -97,8 +97,9 @@ class BuybackScheduler {
       let claimedRewardsSOL = 0;
       let pumpfunClaimPending = false;
       
-      // Get creator private key from environment if available
-      const creatorPrivateKey = process.env[`PUMPFUN_CREATOR_KEY_${project.id}`] || null;
+      // Get creator private key from encrypted database storage
+      const { getPumpFunKey } = await import("./key-manager");
+      const creatorPrivateKey = await getPumpFunKey(project.id);
       
       if (project.isPumpfunToken && project.pumpfunCreatorWallet) {
         console.log(`Checking PumpFun rewards for ${project.name}...`);
@@ -222,7 +223,9 @@ class BuybackScheduler {
       console.log(`Fee: ${swapOrder.feeBps / 100}%`);
 
       // STEP 4: Execute swap and burn
-      const treasuryPrivateKey = process.env[`TREASURY_KEY_${project.id}`] || null;
+      // Get treasury private key from encrypted database storage
+      const { getTreasuryKey } = await import("./key-manager");
+      const treasuryPrivateKey = await getTreasuryKey(project.id);
       
       if (treasuryPrivateKey) {
         try {

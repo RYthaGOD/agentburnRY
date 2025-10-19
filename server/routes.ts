@@ -1,10 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertProjectSchema, insertTransactionSchema, insertPaymentSchema } from "@shared/schema";
+import { insertProjectSchema, insertTransactionSchema, insertPaymentSchema, setProjectKeysSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
 import { verifyPayment, getWalletBalance, isValidSolanaAddress } from "./solana";
 import { PRICING } from "@shared/config";
+import { storeProjectKeys, getKeyMetadata, deleteProjectKeys, getTreasuryKey } from "./key-manager";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Project routes
@@ -351,11 +352,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check if treasury private key is configured
-      const treasuryPrivateKey = process.env[`TREASURY_KEY_${project.id}`];
+      // Check if treasury private key is configured in encrypted storage
+      const treasuryPrivateKey = await getTreasuryKey(project.id);
       if (!treasuryPrivateKey) {
         return res.status(400).json({
-          message: "Treasury private key not configured. Set TREASURY_KEY_" + project.id + " in environment variables.",
+          message: "Treasury private key not configured. Please add your automation keys in Settings.",
         });
       }
 
@@ -392,6 +393,254 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Manual buyback execution error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============ SECURE KEY MANAGEMENT ENDPOINTS ============
+  // All key management endpoints require wallet signature authentication
+  
+  // Get key metadata (never returns actual keys - only status info)
+  app.get("/api/projects/:id/keys/metadata", async (req, res) => {
+    try {
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      const metadata = await getKeyMetadata(project.id);
+      res.json(metadata);
+    } catch (error: any) {
+      console.error("Get key metadata error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Set/update private keys (requires wallet signature authentication)
+  app.post("/api/projects/:id/keys", async (req, res) => {
+    try {
+      const { ownerWalletAddress, signature, message, keys } = req.body;
+      
+      if (!ownerWalletAddress || !signature || !message || !keys) {
+        return res.status(400).json({ 
+          message: "Missing required fields: ownerWalletAddress, signature, message, and keys are required" 
+        });
+      }
+
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Verify ownership
+      if (project.ownerWalletAddress !== ownerWalletAddress) {
+        return res.status(403).json({ message: "Unauthorized: You don't own this project" });
+      }
+
+      // Create a hash of the signature for replay attack prevention
+      const crypto = require("crypto");
+      const signatureHash = crypto.createHash("sha256").update(signature).digest("hex");
+
+      // Check if this signature has already been used
+      const isUsed = await storage.isSignatureUsed(signatureHash);
+      if (isUsed) {
+        return res.status(400).json({ 
+          message: "Signature already used: Please sign a new message" 
+        });
+      }
+
+      // Verify wallet signature to prove ownership
+      const { verifyWalletSignature } = await import("./solana-sdk");
+      const isValidSignature = await verifyWalletSignature(
+        ownerWalletAddress,
+        message,
+        signature
+      );
+
+      if (!isValidSignature) {
+        return res.status(403).json({ 
+          message: "Invalid signature: Could not verify wallet ownership" 
+        });
+      }
+
+      // Verify message contains the project ID and is recent (within 5 minutes)
+      const expectedMessagePrefix = `Set keys for project ${project.id}`;
+      if (!message.startsWith(expectedMessagePrefix)) {
+        return res.status(400).json({ 
+          message: "Invalid message format" 
+        });
+      }
+
+      // Extract timestamp from message
+      const timestampMatch = message.match(/at (\d+)$/);
+      if (!timestampMatch) {
+        return res.status(400).json({ 
+          message: "Message must include timestamp" 
+        });
+      }
+
+      const messageTimestamp = parseInt(timestampMatch[1]);
+      const nowTimestamp = Date.now();
+      const fiveMinutesInMs = 5 * 60 * 1000;
+
+      if (Math.abs(nowTimestamp - messageTimestamp) > fiveMinutesInMs) {
+        return res.status(400).json({ 
+          message: "Signature expired: Please sign a new message" 
+        });
+      }
+
+      // Validate keys schema
+      const validatedKeys = setProjectKeysSchema.parse(keys);
+
+      // Record the signature as used to prevent replay attacks
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      try {
+        await storage.recordUsedSignature({
+          projectId: project.id,
+          signatureHash,
+          messageTimestamp: new Date(messageTimestamp),
+          expiresAt,
+        });
+      } catch (error: any) {
+        if (error.code === '23505' || error.message?.includes('unique')) {
+          return res.status(400).json({ 
+            message: "Signature already used: This request has already been processed" 
+          });
+        }
+        throw error;
+      }
+
+      // Store encrypted keys
+      await storeProjectKeys(project.id, validatedKeys);
+
+      // NEVER log or return the actual keys
+      console.log(`Private keys updated for project ${project.id}`);
+      
+      res.json({
+        success: true,
+        message: "Private keys stored securely",
+        projectId: project.id,
+      });
+    } catch (error: any) {
+      // Don't log the full error as it might contain keys
+      console.error("Set keys error:", error.message);
+      
+      if (error.name === "ZodError") {
+        const validationError = fromZodError(error);
+        return res.status(400).json({ message: validationError.message });
+      }
+      
+      res.status(500).json({ message: "Failed to store keys" });
+    }
+  });
+
+  // Delete private keys (requires wallet signature authentication)
+  app.delete("/api/projects/:id/keys", async (req, res) => {
+    try {
+      const { ownerWalletAddress, signature, message } = req.body;
+      
+      if (!ownerWalletAddress || !signature || !message) {
+        return res.status(400).json({ 
+          message: "Missing required fields: ownerWalletAddress, signature, and message are required" 
+        });
+      }
+
+      const project = await storage.getProject(req.params.id);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Verify ownership
+      if (project.ownerWalletAddress !== ownerWalletAddress) {
+        return res.status(403).json({ message: "Unauthorized: You don't own this project" });
+      }
+
+      // Create a hash of the signature for replay attack prevention
+      const crypto = require("crypto");
+      const signatureHash = crypto.createHash("sha256").update(signature).digest("hex");
+
+      // Check if this signature has already been used
+      const isUsed = await storage.isSignatureUsed(signatureHash);
+      if (isUsed) {
+        return res.status(400).json({ 
+          message: "Signature already used: Please sign a new message" 
+        });
+      }
+
+      // Verify wallet signature to prove ownership
+      const { verifyWalletSignature } = await import("./solana-sdk");
+      const isValidSignature = await verifyWalletSignature(
+        ownerWalletAddress,
+        message,
+        signature
+      );
+
+      if (!isValidSignature) {
+        return res.status(403).json({ 
+          message: "Invalid signature: Could not verify wallet ownership" 
+        });
+      }
+
+      // Verify message contains the project ID and is recent (within 5 minutes)
+      const expectedMessagePrefix = `Delete keys for project ${project.id}`;
+      if (!message.startsWith(expectedMessagePrefix)) {
+        return res.status(400).json({ 
+          message: "Invalid message format" 
+        });
+      }
+
+      // Extract timestamp from message
+      const timestampMatch = message.match(/at (\d+)$/);
+      if (!timestampMatch) {
+        return res.status(400).json({ 
+          message: "Message must include timestamp" 
+        });
+      }
+
+      const messageTimestamp = parseInt(timestampMatch[1]);
+      const nowTimestamp = Date.now();
+      const fiveMinutesInMs = 5 * 60 * 1000;
+
+      if (Math.abs(nowTimestamp - messageTimestamp) > fiveMinutesInMs) {
+        return res.status(400).json({ 
+          message: "Signature expired: Please sign a new message" 
+        });
+      }
+
+      // Record the signature as used to prevent replay attacks
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      try {
+        await storage.recordUsedSignature({
+          projectId: project.id,
+          signatureHash,
+          messageTimestamp: new Date(messageTimestamp),
+          expiresAt,
+        });
+      } catch (error: any) {
+        if (error.code === '23505' || error.message?.includes('unique')) {
+          return res.status(400).json({ 
+            message: "Signature already used: This request has already been processed" 
+          });
+        }
+        throw error;
+      }
+
+      // Delete all keys for this project
+      const success = await deleteProjectKeys(project.id);
+      
+      if (!success) {
+        return res.status(404).json({ message: "No keys found to delete" });
+      }
+
+      console.log(`Private keys deleted for project ${project.id}`);
+      
+      res.json({
+        success: true,
+        message: "Private keys deleted successfully",
+        projectId: project.id,
+      });
+    } catch (error: any) {
+      console.error("Delete keys error:", error);
       res.status(500).json({ message: error.message });
     }
   });
