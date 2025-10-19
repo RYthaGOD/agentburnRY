@@ -2,7 +2,7 @@
 
 ## Design Approach
 
-**Hybrid Approach:** Marketing pages draw from modern crypto/SaaS leaders (Phantom, Uniswap, Stripe, Linear) while dashboard follows a systematic utility-focused design for clarity and efficiency.
+**Hybrid Approach:** Marketing pages draw from modern crypto/SaaS leaders (Phantom, Uniswap, Linear) while dashboard follows a systematic utility-focused design for clarity and efficiency.
 
 **Key Principles:**
 - Trust & credibility through professional polish
@@ -142,10 +142,10 @@
 - Visual flow indicators between steps
 
 **Pricing Tiers:**
-- 3-tier card layout
+- 2-tier card layout (Starter/Pro)
 - Highlighted recommended tier with badge
 - Clear feature comparison
-- Stripe integration prominent
+- Solana SOL payment integration (treasury wallet)
 
 **Social Proof:**
 - Transaction stats: Total burned, Total value, Active users

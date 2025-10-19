@@ -63,8 +63,11 @@ The system features full automation with secure encrypted key management. This i
 - @solana/wallet-adapter-react for wallet connection (planned)
 
 **Payment Processing:**
-- Direct Solana wallet payments in SOL to the treasury wallet: `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`
+- **100% Solana-native payments** - All payments in SOL only
+- Direct Solana wallet payments to treasury wallet: `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`
 - On-chain payment verification for SOL payments
+- Tier pricing: Starter (0.2 SOL), Pro (0.4 SOL)
+- **No Stripe integration** - Fully removed from codebase
 
 **Third-Party Services:**
 - Neon Database (PostgreSQL hosting)
