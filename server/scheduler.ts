@@ -80,7 +80,7 @@ class BuybackScheduler {
     }
   }
 
-  private async executeBuyback(projectId: string) {
+  async executeBuyback(projectId: string) {
     try {
       const project = await storage.getProject(projectId);
       if (!project) {
@@ -329,9 +329,27 @@ class BuybackScheduler {
         return now.getDay() === 0 && hour === 0 && minute === 0; // Execute Sunday midnight
       case "custom":
         if (customCron) {
-          // For custom cron, we check if the schedule matches
-          // This is a simplified check - real implementation would use cron parsing
-          return true; // Placeholder
+          try {
+            // Validate and parse the cron expression using node-cron
+            if (!cron.validate(customCron)) {
+              console.warn(`Invalid cron expression for custom schedule: ${customCron}`);
+              return false;
+            }
+            
+            // Use cron-parser to check if current time matches the schedule
+            // For simplicity, we check if we're within the current minute
+            // A more sophisticated approach would track last execution time
+            const cronParser = require('cron-parser');
+            const interval = cronParser.parseExpression(customCron);
+            const nextRun = interval.next().toDate();
+            
+            // Check if we should execute now (within current minute)
+            const timeDiff = Math.abs(nextRun.getTime() - now.getTime());
+            return timeDiff < 60000; // Within 1 minute
+          } catch (error) {
+            console.error(`Error parsing custom cron expression: ${error}`);
+            return false;
+          }
         }
         return false;
       default:

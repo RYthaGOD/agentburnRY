@@ -256,26 +256,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Placeholder for buyback execution
+  // Manual buyback execution (requires private keys configured in environment)
   app.post("/api/execute-buyback/:projectId", async (req, res) => {
     try {
+      const { ownerWalletAddress } = req.body;
+      
+      if (!ownerWalletAddress) {
+        return res.status(400).json({ message: "Owner wallet address required" });
+      }
+
       const project = await storage.getProject(req.params.projectId);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // TODO: Implement buyback execution
-      // 1. Connect to Solana network
-      // 2. Use Jupiter API to get best swap route
-      // 3. Execute swap from SOL to token
-      // 4. Transfer tokens to burn address
-      // 5. Log transaction
+      // Verify ownership
+      if (project.ownerWalletAddress !== ownerWalletAddress) {
+        return res.status(403).json({ message: "Unauthorized: You don't own this project" });
+      }
+
+      // Verify project is active
+      if (!project.isActive) {
+        return res.status(400).json({ message: "Project is not active" });
+      }
+
+      // Check for valid payment
+      const now = new Date();
+      const payments = await storage.getPaymentsByProject(project.id);
+      const validPayments = payments.filter(p => 
+        p.verified && new Date(p.expiresAt) > now
+      );
+      
+      const validPayment = validPayments.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
+
+      if (!validPayment) {
+        return res.status(400).json({ 
+          message: "No active subscription found. Please make a payment first." 
+        });
+      }
+
+      // Check if treasury private key is configured
+      const treasuryPrivateKey = process.env[`TREASURY_KEY_${project.id}`];
+      if (!treasuryPrivateKey) {
+        return res.status(400).json({
+          message: "Treasury private key not configured. Set TREASURY_KEY_" + project.id + " in environment variables.",
+        });
+      }
+
+      // Import the scheduler to execute buyback
+      const { scheduler } = await import("./scheduler");
+      
+      // Execute buyback immediately (bypassing schedule check)
+      await (scheduler as any).executeBuyback(project.id);
 
       res.json({
-        message: "Buyback execution will be implemented with Solana Web3.js and Jupiter API",
+        success: true,
+        message: "Buyback execution initiated",
         projectId: project.id,
       });
     } catch (error: any) {
+      console.error("Manual buyback execution error:", error);
       res.status(500).json({ message: error.message });
     }
   });

@@ -276,10 +276,17 @@ export async function verifyTransactionSignature(signature: string): Promise<boo
 }
 
 /**
- * Check if a wallet address is valid
+ * Check if a wallet address is valid using PublicKey validation
+ * This is more robust than regex-based validation
  */
 export function isValidSolanaAddress(address: string): boolean {
-  // Solana addresses are base58 encoded and 32-44 characters long
-  const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
-  return base58Regex.test(address);
+  try {
+    // Use Solana's PublicKey to validate the address
+    // This ensures the address is a valid base58-encoded 32-byte public key
+    const { PublicKey } = require("@solana/web3.js");
+    new PublicKey(address);
+    return true;
+  } catch {
+    return false;
+  }
 }
