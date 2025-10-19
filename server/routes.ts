@@ -259,10 +259,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Manual buyback execution (requires private keys configured in environment)
   app.post("/api/execute-buyback/:projectId", async (req, res) => {
     try {
-      const { ownerWalletAddress } = req.body;
+      const { ownerWalletAddress, signature, message } = req.body;
       
-      if (!ownerWalletAddress) {
-        return res.status(400).json({ message: "Owner wallet address required" });
+      if (!ownerWalletAddress || !signature || !message) {
+        return res.status(400).json({ 
+          message: "Missing required fields: ownerWalletAddress, signature, and message are required" 
+        });
       }
 
       const project = await storage.getProject(req.params.projectId);
@@ -273,6 +275,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify ownership
       if (project.ownerWalletAddress !== ownerWalletAddress) {
         return res.status(403).json({ message: "Unauthorized: You don't own this project" });
+      }
+
+      // Create a hash of the signature for replay attack prevention
+      const crypto = require("crypto");
+      const signatureHash = crypto.createHash("sha256").update(signature).digest("hex");
+
+      // Check if this signature has already been used (replay attack prevention)
+      const isUsed = await storage.isSignatureUsed(signatureHash);
+      if (isUsed) {
+        return res.status(400).json({ 
+          message: "Signature already used: This request has already been processed" 
+        });
+      }
+
+      // Verify wallet signature to prove ownership
+      const { verifyWalletSignature } = await import("./solana-sdk");
+      const isValidSignature = await verifyWalletSignature(
+        ownerWalletAddress,
+        message,
+        signature
+      );
+
+      if (!isValidSignature) {
+        return res.status(403).json({ 
+          message: "Invalid signature: Could not verify wallet ownership" 
+        });
+      }
+
+      // Verify message contains the project ID and is recent (within 5 minutes)
+      const expectedMessagePrefix = `Execute buyback for project ${project.id}`;
+      if (!message.startsWith(expectedMessagePrefix)) {
+        return res.status(400).json({ 
+          message: "Invalid message format" 
+        });
+      }
+
+      // Extract timestamp from message (format: "Execute buyback for project {id} at {timestamp}")
+      const timestampMatch = message.match(/at (\d+)$/);
+      if (!timestampMatch) {
+        return res.status(400).json({ 
+          message: "Message must include timestamp" 
+        });
+      }
+
+      const messageTimestamp = parseInt(timestampMatch[1]);
+      const nowTimestamp = Date.now();
+      const fiveMinutesInMs = 5 * 60 * 1000;
+
+      if (Math.abs(nowTimestamp - messageTimestamp) > fiveMinutesInMs) {
+        return res.status(400).json({ 
+          message: "Signature expired: Please sign a new message" 
+        });
       }
 
       // Verify project is active
@@ -303,6 +357,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({
           message: "Treasury private key not configured. Set TREASURY_KEY_" + project.id + " in environment variables.",
         });
+      }
+
+      // Record the signature as used to prevent replay attacks
+      // Set expiration to 10 minutes from now (signature timeout + buffer)
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      try {
+        await storage.recordUsedSignature({
+          projectId: project.id,
+          signatureHash,
+          messageTimestamp: new Date(messageTimestamp),
+          expiresAt,
+        });
+      } catch (error: any) {
+        // Handle unique constraint violation (signature already used)
+        if (error.code === '23505' || error.message?.includes('unique')) {
+          return res.status(400).json({ 
+            message: "Signature already used: This request has already been processed" 
+          });
+        }
+        throw error; // Re-throw other errors
       }
 
       // Import the scheduler to execute buyback

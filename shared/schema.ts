@@ -46,9 +46,20 @@ export const payments = pgTable("payments", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Table to prevent replay attacks on manual buyback executions
+export const usedSignatures = pgTable("used_signatures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id").notNull().references(() => projects.id),
+  signatureHash: text("signature_hash").notNull().unique(),
+  messageTimestamp: timestamp("message_timestamp").notNull(),
+  expiresAt: timestamp("expires_at").notNull(), // Auto-cleanup after expiry
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 export const projectsRelations = relations(projects, ({ many }) => ({
   transactions: many(transactions),
   payments: many(payments),
+  usedSignatures: many(usedSignatures),
 }));
 
 export const transactionsRelations = relations(transactions, ({ one }) => ({
@@ -61,6 +72,13 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
 export const paymentsRelations = relations(payments, ({ one }) => ({
   project: one(projects, {
     fields: [payments.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const usedSignaturesRelations = relations(usedSignatures, ({ one }) => ({
+  project: one(projects, {
+    fields: [usedSignatures.projectId],
     references: [projects.id],
   }),
 }));
@@ -88,9 +106,16 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   createdAt: true,
 });
 
+export const insertUsedSignatureSchema = createInsertSchema(usedSignatures).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type UsedSignature = typeof usedSignatures.$inferSelect;
+export type InsertUsedSignature = z.infer<typeof insertUsedSignatureSchema>;

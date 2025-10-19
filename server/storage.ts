@@ -2,12 +2,15 @@ import {
   projects,
   transactions,
   payments,
+  usedSignatures,
   type Project,
   type InsertProject,
   type Transaction,
   type InsertTransaction,
   type Payment,
   type InsertPayment,
+  type UsedSignature,
+  type InsertUsedSignature,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -33,6 +36,10 @@ export interface IStorage {
   getPaymentsByProject(projectId: string): Promise<Payment[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   verifyPayment(id: string): Promise<Payment | undefined>;
+
+  // Used signature operations (for replay attack prevention)
+  isSignatureUsed(signatureHash: string): Promise<boolean>;
+  recordUsedSignature(signature: InsertUsedSignature): Promise<UsedSignature>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -148,6 +155,23 @@ export class DatabaseStorage implements IStorage {
       .where(eq(payments.id, id))
       .returning();
     return payment || undefined;
+  }
+
+  // Used signature operations (for replay attack prevention)
+  async isSignatureUsed(signatureHash: string): Promise<boolean> {
+    const [signature] = await db
+      .select()
+      .from(usedSignatures)
+      .where(eq(usedSignatures.signatureHash, signatureHash));
+    return !!signature;
+  }
+
+  async recordUsedSignature(insertSignature: InsertUsedSignature): Promise<UsedSignature> {
+    const [signature] = await db
+      .insert(usedSignatures)
+      .values(insertSignature)
+      .returning();
+    return signature;
   }
 }
 

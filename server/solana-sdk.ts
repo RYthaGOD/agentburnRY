@@ -363,3 +363,39 @@ export async function waitForConfirmation(
 
   throw new Error(`Transaction confirmation timeout after ${timeoutMs}ms`);
 }
+
+/**
+ * Verify a wallet signature to prove ownership
+ * Used for authenticating manual buyback requests
+ */
+export async function verifyWalletSignature(
+  walletAddress: string,
+  message: string,
+  signatureBase58: string
+): Promise<boolean> {
+  try {
+    // Import nacl for signature verification
+    const nacl = require("tweetnacl");
+    
+    // Convert the wallet address to a PublicKey
+    const publicKey = new PublicKey(walletAddress);
+    
+    // Decode the signature from base58
+    const signatureBytes = bs58.decode(signatureBase58);
+    
+    // Convert message to bytes
+    const messageBytes = new TextEncoder().encode(message);
+    
+    // Verify the signature using nacl
+    const isValid = nacl.sign.detached.verify(
+      messageBytes,
+      signatureBytes,
+      publicKey.toBytes()
+    );
+    
+    return isValid;
+  } catch (error) {
+    console.error("Error verifying wallet signature:", error);
+    return false;
+  }
+}
