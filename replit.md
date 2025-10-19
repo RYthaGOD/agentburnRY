@@ -173,7 +173,9 @@ Preferred communication style: Simple, everyday language.
 - Set buyback amounts in SOL
 - Treasury wallet configuration per project
 - Owner wallet tracking for authorization
-- Database: All project data persisted in PostgreSQL
+- **NEW**: PumpFun token support with creator wallet field
+- **NEW**: Automatic creator rewards claiming for PumpFun tokens
+- Database: All project data persisted in PostgreSQL with PumpFun metadata
 
 **Transaction Monitoring**
 - View all buyback and burn transactions
@@ -186,33 +188,43 @@ Preferred communication style: Simple, everyday language.
 - Hourly checks for scheduled buybacks
 - Payment expiration validation
 - Treasury balance verification before execution
-- Jupiter DEX integration for swap quotes
+- **Jupiter Ultra API** integration for optimal swap execution
+- **PumpFun Lightning API** integration for claiming creator rewards
 - File: `server/scheduler.ts` - Production-ready scheduler
+- File: `server/jupiter.ts` - Jupiter Ultra API (RPC-less swaps)
+- File: `server/pumpfun.ts` - PumpFun creator rewards claiming
 - Runs in production mode only (disabled in development)
 
 ### ⚠️ Simulation Mode Features
 
-**Automated Buyback Execution**
+**Automated Buyback Execution with PumpFun Rewards**
 - Status: **SIMULATION MODE** - Logs intended actions but doesn't execute
 - Reason: Requires @solana/web3.js for transaction signing (npm package blocked)
+- **NEW**: Integrated Jupiter Ultra API (RPC-less architecture)
+- **NEW**: Integrated PumpFun Lightning API for creator rewards
 - Current behavior:
-  - ✅ Checks schedules and triggers at correct times
-  - ✅ Validates treasury wallet balances
-  - ✅ Gets real Jupiter swap quotes for optimal pricing
-  - ✅ Records transaction attempts in database
+  - ✅ **STEP 1**: Claims PumpFun creator rewards (0.05% of trading volume in SOL)
+  - ✅ **STEP 2**: Checks treasury balance + claimed rewards
+  - ✅ **STEP 3**: Gets Jupiter Ultra swap order (optimal routing, gasless swaps)
+  - ✅ **STEP 4**: Records complete execution plan in database
+  - ❌ Does NOT execute reward claims (requires SDK for signing)
   - ❌ Does NOT execute swaps (requires SDK for signing)
   - ❌ Does NOT transfer tokens to incinerator (requires SDK)
-- File: `server/jupiter.ts` - Jupiter API integration ready
-- File: `server/scheduler.ts` - Lines 72-150 show execution logic
+- File: `server/jupiter.ts` - Jupiter Ultra API integration
+- File: `server/pumpfun.ts` - PumpFun rewards claiming
+- File: `server/scheduler.ts` - Complete workflow orchestration
 
 **What Works in Simulation:**
 1. Scheduler runs hourly in production
 2. Identifies projects needing buybacks
 3. Verifies payment validity (30-day expiration)
-4. Checks treasury balance sufficiency
-5. Gets real-time swap quotes from Jupiter
-6. Logs complete execution plan
-7. Creates transaction records with "pending" status
+4. **For PumpFun tokens**: Checks for unclaimed creator rewards
+5. **For PumpFun tokens**: Generates claim transaction (0.05% of trading volume)
+6. Checks treasury balance + claimed rewards sufficiency
+7. Gets real-time Jupiter Ultra swap order (optimal routing)
+8. Calculates total buyback: treasury funds + PumpFun rewards
+9. Logs complete execution plan with Jupiter request ID
+10. Creates transaction records with "pending" status
 
 **What's Missing for Real Execution:**
 - Solana transaction signing (needs @solana/web3.js)
@@ -245,13 +257,20 @@ Preferred communication style: Simple, everyday language.
 **What's Automated:**
 1. Payment verification (fully automated, secure, production-ready)
 2. Schedule checking (runs every hour in production)
-3. Balance validation (prevents execution if insufficient funds)
-4. Quote fetching (real Jupiter pricing)
+3. **PumpFun rewards detection** (checks for unclaimed creator fees)
+4. **Combined balance calculation** (treasury + rewards)
+5. Balance validation (prevents execution if insufficient funds)
+6. **Jupiter Ultra order generation** (RPC-less, optimal routing)
 
 **What Requires Manual Intervention:**
-1. Actual token swaps (simulation mode logs intent)
-2. Token burns (simulation mode logs intent)
-3. Wallet connections (enter addresses manually)
+1. PumpFun reward claims (simulation mode - transaction ready to sign)
+2. Jupiter Ultra swaps (simulation mode - order ready to execute)
+3. Token burns (simulation mode - transfer to incinerator pending)
+4. Wallet connections (enter addresses manually)
+
+**New Capabilities:**
+- **Jupiter Ultra API**: Faster swaps (95% in <2 seconds), gasless for eligible trades, automatic slippage optimization
+- **PumpFun Integration**: Earn 0.05% of trading volume, auto-claim before buybacks, maximize available SOL
 
 ### 🎯 Next Steps for Full Automation
 

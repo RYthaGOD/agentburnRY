@@ -15,6 +15,8 @@ export const projects = pgTable("projects", {
   buybackAmountSol: decimal("buyback_amount_sol", { precision: 18, scale: 9 }),
   isActive: boolean("is_active").notNull().default(false),
   ownerWalletAddress: text("owner_wallet_address").notNull(),
+  isPumpfunToken: boolean("is_pumpfun_token").notNull().default(false),
+  pumpfunCreatorWallet: text("pumpfun_creator_wallet"), // Wallet to claim PumpFun rewards
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -73,6 +75,7 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
   burnAddress: z.string().min(32, "Invalid Solana address"),
   ownerWalletAddress: z.string().min(32, "Invalid Solana address"),
   buybackAmountSol: z.string().optional(),
+  pumpfunCreatorWallet: z.string().min(32, "Invalid Solana address").optional(),
 });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({

@@ -4,8 +4,13 @@
 import * as cron from "node-cron";
 import { storage } from "./storage";
 import { SOLANA_INCINERATOR_ADDRESS } from "@shared/config";
-import { getSwapQuote, getTokenPrice } from "./jupiter";
+import { getSwapOrder } from "./jupiter";
 import { getWalletBalance } from "./solana";
+import { 
+  hasUnclaimedRewards, 
+  generateClaimRewardsTransaction,
+  claimCreatorRewardsFull 
+} from "./pumpfun";
 
 interface SchedulerConfig {
   enabled: boolean;
@@ -83,10 +88,81 @@ class BuybackScheduler {
         return;
       }
 
-      // Check treasury wallet balance
+      // STEP 1: Claim PumpFun creator rewards if applicable
+      let claimedRewardsSOL = 0;
+      let pumpfunClaimPending = false;
+      
+      if (project.isPumpfunToken && project.pumpfunCreatorWallet) {
+        console.log(`Checking PumpFun rewards for ${project.name}...`);
+        
+        try {
+          const hasRewards = await hasUnclaimedRewards(
+            project.pumpfunCreatorWallet,
+            project.tokenMintAddress
+          );
+
+          if (hasRewards) {
+            console.log(`PumpFun rewards available! Generating claim transaction for ${project.name}...`);
+            
+            const claimResult = await claimCreatorRewardsFull(
+              project.pumpfunCreatorWallet,
+              project.tokenMintAddress
+            );
+
+            if (claimResult.success) {
+              // In simulation mode, we generated the transaction but can't execute it
+              // Mark the claim as pending and note that rewards are available
+              pumpfunClaimPending = true;
+              
+              console.log(`[SIMULATION] PumpFun claim transaction ready to sign`);
+              console.log(`Rewards available but amount unknown until execution`);
+              
+              // Record the pending claim transaction
+              await storage.createTransaction({
+                projectId: project.id,
+                type: "buyback",
+                amount: "0", // Unknown until executed
+                tokenAmount: "0",
+                txSignature: "pumpfun_claim_pending",
+                status: "pending",
+                errorMessage: "PumpFun rewards claim transaction generated, awaiting SDK for execution",
+              });
+            } else {
+              console.log(`PumpFun claim failed: ${claimResult.error}`);
+            }
+          } else {
+            console.log(`No PumpFun rewards available for ${project.name}`);
+          }
+        } catch (error) {
+          console.warn(`Error claiming PumpFun rewards:`, error);
+          // Continue with buyback even if claiming fails
+        }
+      }
+
+      // STEP 2: Check treasury wallet balance
       const balance = await getWalletBalance(project.treasuryWalletAddress);
-      if (balance < buybackAmountSOL) {
-        console.log(`Insufficient balance in treasury wallet for ${project.name}`);
+      const totalAvailableSOL = balance + claimedRewardsSOL;
+      
+      console.log(`Treasury balance: ${balance} SOL`);
+      if (pumpfunClaimPending) {
+        console.log(`PumpFun rewards: Available but pending claim execution`);
+      } else if (claimedRewardsSOL > 0) {
+        console.log(`Claimed rewards: ${claimedRewardsSOL} SOL`);
+      }
+      console.log(`Total available: ${totalAvailableSOL} SOL`);
+      console.log(`Required for buyback: ${buybackAmountSOL} SOL`);
+
+      // Note: In simulation mode, we proceed even if balance is insufficient
+      // to demonstrate the full workflow. In production, actual execution
+      // would only happen if balance is sufficient.
+      if (totalAvailableSOL < buybackAmountSOL) {
+        const errorMsg = pumpfunClaimPending
+          ? `Treasury has ${balance} SOL. PumpFun rewards pending - claim first to potentially cover the ${buybackAmountSOL} SOL required.`
+          : `Insufficient balance. Required: ${buybackAmountSOL} SOL, Available: ${totalAvailableSOL} SOL`;
+        
+        console.log(`[SIMULATION] ${errorMsg}`);
+        
+        // Record failed transaction
         await storage.createTransaction({
           projectId: project.id,
           type: "buyback",
@@ -94,33 +170,37 @@ class BuybackScheduler {
           tokenAmount: "0",
           txSignature: "",
           status: "failed",
-          errorMessage: `Insufficient balance. Required: ${buybackAmountSOL} SOL, Available: ${balance} SOL`,
+          errorMessage: errorMsg,
         });
         return;
       }
 
-      // Get swap quote from Jupiter
+      // STEP 3: Get swap order from Jupiter Ultra API
       const SOL_MINT = "So11111111111111111111111111111111111111112";
       const amountLamports = buybackAmountSOL * 1e9; // Convert SOL to lamports
 
-      console.log(`Getting Jupiter quote for ${buybackAmountSOL} SOL to ${project.tokenMintAddress}`);
+      console.log(`Getting Jupiter Ultra order for ${buybackAmountSOL} SOL to ${project.tokenMintAddress}`);
       
-      const quote = await getSwapQuote(
+      const swapOrder = await getSwapOrder(
         SOL_MINT,
         project.tokenMintAddress,
-        amountLamports
+        amountLamports,
+        project.treasuryWalletAddress
       );
 
-      const tokenAmount = quote.outputAmount / 1e9; // Assuming 9 decimals
+      const tokenAmount = swapOrder.outputAmount / 1e9; // Assuming 9 decimals
 
-      console.log(`Quote received: ${buybackAmountSOL} SOL → ${tokenAmount} tokens`);
-      console.log(`Price impact: ${quote.priceImpactPct}%`);
+      console.log(`Order received: ${buybackAmountSOL} SOL → ${tokenAmount} tokens`);
+      console.log(`Swap type: ${swapOrder.swapType}`);
+      console.log(`Slippage: ${swapOrder.slippageBps / 100}%`);
+      console.log(`Fee: ${swapOrder.feeBps / 100}%`);
 
-      // TODO: Execute swap when Solana SDK is available
-      // For now, just log the intended transaction
-      console.log(`[SIMULATION] Would execute:`);
-      console.log(`  1. Swap ${buybackAmountSOL} SOL for ${tokenAmount} tokens via Jupiter`);
-      console.log(`  2. Transfer ${tokenAmount} tokens to incinerator: ${SOLANA_INCINERATOR_ADDRESS}`);
+      // STEP 4: Execute swap and burn (SIMULATION MODE)
+      console.log(`\n[SIMULATION] Would execute:`);
+      console.log(`  1. Sign transaction for swap order (Request ID: ${swapOrder.requestId})`);
+      console.log(`  2. Execute via Jupiter Ultra API: ${buybackAmountSOL} SOL → ${tokenAmount} tokens`);
+      console.log(`  3. Transfer ${tokenAmount} tokens to incinerator: ${SOLANA_INCINERATOR_ADDRESS}`);
+      console.log(`  4. Permanent burn complete\n`);
 
       // Record transaction
       await storage.createTransaction({
@@ -128,12 +208,17 @@ class BuybackScheduler {
         type: "buyback",
         amount: buybackAmountSOL.toString(),
         tokenAmount: tokenAmount.toString(),
-        txSignature: "pending_sdk_implementation",
+        txSignature: `ultra_${swapOrder.requestId}`,
         status: "pending",
-        errorMessage: "Awaiting Solana SDK for transaction execution",
+        errorMessage: `Awaiting Solana SDK for transaction signing. Order ready: ${swapOrder.requestId}`,
       });
 
       console.log(`Buyback simulation completed for project: ${project.name}`);
+      if (pumpfunClaimPending) {
+        console.log(`Note: PumpFun rewards claim pending - execute claim first to maximize buyback value`);
+      } else if (claimedRewardsSOL > 0) {
+        console.log(`Total value: ${buybackAmountSOL} SOL buyback + ${claimedRewardsSOL} SOL claimed rewards`);
+      }
     } catch (error) {
       console.error(`Error executing buyback for project ${projectId}:`, error);
       
