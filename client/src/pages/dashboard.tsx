@@ -16,6 +16,7 @@ export default function Dashboard() {
   });
 
   const activeProjects = projects?.filter(p => p.isActive) || [];
+  const allProjects = projects || [];
 
   const stats = [
     {
@@ -123,7 +124,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {activeProjects.map((project) => (
+                {allProjects.map((project) => (
                   <div
                     key={project.id}
                     className="flex items-center justify-between p-4 border border-border rounded-md hover-elevate"
