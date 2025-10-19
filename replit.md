@@ -80,6 +80,10 @@ The system features full automation with secure encrypted key management. This i
 - Direct Solana wallet payments to treasury wallet: `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`
 - On-chain payment verification for SOL payments
 - Tier pricing: Starter (0.2 SOL), Pro (0.4 SOL)
+- **Payment Enforcement:** Projects cannot be activated without valid payment (unless whitelisted)
+  - Frontend shows payment modal when non-paying users try to activate
+  - Backend validates payment on project update (PATCH /api/projects/:id)
+  - Scheduler only runs for whitelisted or paid projects
 - **Whitelisted Wallets:** Owner wallets can be whitelisted in `shared/config.ts` for free platform access (bypasses payment requirements)
   - Current whitelisted wallets: `4D5a61DsihdeEV2SbfkpYsZemTrrczxAwyBfR47xF5uS`, `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`
   - Whitelisted projects display "Free Access" badge with crown icon in UI

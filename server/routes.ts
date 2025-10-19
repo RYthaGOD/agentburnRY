@@ -57,6 +57,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/projects/:id", async (req, res) => {
     try {
       const updates = insertProjectSchema.partial().parse(req.body);
+      
+      // Get the existing project first
+      const existingProject = await storage.getProject(req.params.id);
+      if (!existingProject) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // If trying to activate a project, verify payment first (unless whitelisted)
+      if (updates.isActive === true && !existingProject.isActive) {
+        const { WHITELISTED_WALLETS } = await import("@shared/config");
+        const isWhitelisted = WHITELISTED_WALLETS.includes(existingProject.ownerWalletAddress);
+
+        if (!isWhitelisted) {
+          // Check for valid payment
+          const payments = await storage.getPaymentsByProject(req.params.id);
+          const now = new Date();
+          const validPayment = payments.find(p => 
+            p.verified && new Date(p.expiresAt) > now
+          );
+
+          if (!validPayment) {
+            return res.status(403).json({ 
+              message: "Payment required to activate project. Please complete payment first." 
+            });
+          }
+        }
+      }
+
       const project = await storage.updateProject(req.params.id, updates);
       if (!project) {
         return res.status(404).json({ message: "Project not found" });

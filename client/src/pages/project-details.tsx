@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { insertProjectSchema, type InsertProject, type Project } from "@shared/schema";
 import { SOLANA_INCINERATOR_ADDRESS, WHITELISTED_WALLETS } from "@shared/config";
+import { PaymentModal } from "@/components/payment-modal";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +47,8 @@ export default function ProjectDetails() {
   const queryClient = useQueryClient();
   const [, navigate] = useLocation();
   const [, params] = useRoute("/dashboard/projects/:id");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [pendingUpdates, setPendingUpdates] = useState<InsertProject | null>(null);
 
   const projectId = params?.id;
 
@@ -143,14 +146,46 @@ export default function ProjectDetails() {
     },
   });
 
-  const onSubmit = (data: InsertProject) => {
+  const onSubmit = async (data: InsertProject) => {
     const processedData = {
       ...data,
       buybackAmountSol: data.buybackAmountSol === "" ? undefined : data.buybackAmountSol,
       customCronExpression: data.customCronExpression === "" ? undefined : data.customCronExpression,
       pumpfunCreatorWallet: data.pumpfunCreatorWallet === "" ? undefined : data.pumpfunCreatorWallet,
     };
+
+    // If trying to activate and not whitelisted, check for payment first
+    if (data.isActive && !project?.isActive && project && !WHITELISTED_WALLETS.includes(project.ownerWalletAddress)) {
+      // Check if there's a valid payment
+      try {
+        const response = await fetch(`/api/payments/project/${projectId}`);
+        const payments = await response.json();
+        const now = new Date();
+        const hasValidPayment = payments.some((p: any) => 
+          p.verified && new Date(p.expiresAt) > now
+        );
+
+        if (!hasValidPayment) {
+          // Show payment modal instead of submitting
+          setPendingUpdates(processedData);
+          setShowPaymentModal(true);
+          return;
+        }
+      } catch (error) {
+        console.error("Error checking payment status:", error);
+      }
+    }
+
     updateProjectMutation.mutate(processedData);
+  };
+
+  const handlePaymentSuccess = () => {
+    // After successful payment, submit the pending updates
+    if (pendingUpdates) {
+      updateProjectMutation.mutate(pendingUpdates);
+      setPendingUpdates(null);
+    }
+    queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
   };
 
   const schedule = form.watch("schedule");
@@ -503,7 +538,10 @@ export default function ProjectDetails() {
                         Project Active
                       </FormLabel>
                       <FormDescription>
-                        Enable or pause automated buyback execution
+                        {WHITELISTED_WALLETS.includes(project.ownerWalletAddress) 
+                          ? "Enable or pause automated buyback execution (Free Access)" 
+                          : "Enable or pause automated buyback execution. Payment required to activate."
+                        }
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -546,6 +584,16 @@ export default function ProjectDetails() {
           </div>
         </form>
       </Form>
+
+      {/* Payment Modal */}
+      <PaymentModal
+        open={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        projectId={projectId!}
+        tier="STARTER"
+        ownerWalletAddress={project.ownerWalletAddress}
+        onSuccess={handlePaymentSuccess}
+      />
     </div>
   );
 }
