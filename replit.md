@@ -20,7 +20,16 @@ The backend uses an Express.js server with TypeScript, employing an ESM module s
 
 ### Scheduling System
 
-A dedicated scheduler service (`server/scheduler.ts`) automates buyback execution using `node-cron`. It performs hourly checks, validates payments, verifies treasury balances, integrates with Jupiter Ultra API for optimal token swaps, and claims PumpFun creator rewards. All token burns are routed through the official Solana incinerator (`1nc1nerator11111111111111111111111111111111`). The system supports both production mode with real transaction execution and a simulation mode for testing.
+A dedicated scheduler service (`server/scheduler.ts`) automates buyback execution using `node-cron`. It performs hourly checks, validates payments (unless wallet is whitelisted), verifies treasury balances, integrates with Jupiter Ultra API for optimal token swaps, and claims PumpFun creator rewards. All token burns are routed through the official Solana incinerator (`1nc1nerator11111111111111111111111111111111`). The system supports both production mode with real transaction execution and a simulation mode for testing.
+
+**Schedule Intervals:** The platform supports minute-based to weekly scheduling:
+- Every 5 minutes: Executes at 0, 5, 10, 15, 20, etc.
+- Every 10 minutes: Executes at 0, 10, 20, 30, 40, 50
+- Every 30 minutes: Executes at 0 and 30 minutes
+- Hourly: Top of every hour
+- Daily: Midnight UTC
+- Weekly: Sunday midnight UTC
+- Custom cron: User-defined patterns
 
 ### Data Storage
 
@@ -71,6 +80,9 @@ The system features full automation with secure encrypted key management. This i
 - Direct Solana wallet payments to treasury wallet: `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`
 - On-chain payment verification for SOL payments
 - Tier pricing: Starter (0.2 SOL), Pro (0.4 SOL)
+- **Whitelisted Wallets:** Owner wallets can be whitelisted in `shared/config.ts` for free platform access (bypasses payment requirements)
+  - Current whitelisted wallets: `4D5a61DsihdeEV2SbfkpYsZemTrrczxAwyBfR47xF5uS`, `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`
+  - Whitelisted projects display "Free Access" badge with crown icon in UI
 - **No Stripe integration** - Fully removed from codebase
 
 **Third-Party Services:**

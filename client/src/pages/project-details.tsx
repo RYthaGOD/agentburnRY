@@ -2,8 +2,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { useEffect } from "react";
 import { insertProjectSchema, type InsertProject, type Project } from "@shared/schema";
-import { SOLANA_INCINERATOR_ADDRESS } from "@shared/config";
+import { SOLANA_INCINERATOR_ADDRESS, WHITELISTED_WALLETS } from "@shared/config";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
@@ -27,7 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
-import { Flame, ArrowLeft, Save, Zap, Trash2 } from "lucide-react";
+import { Flame, ArrowLeft, Save, Zap, Trash2, Crown } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -192,9 +193,17 @@ export default function ProjectDetails() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Button>
-          <h1 className="text-3xl font-bold" data-testid="heading-project-details">
-            Edit Project
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold" data-testid="heading-project-details">
+              Edit Project
+            </h1>
+            {WHITELISTED_WALLETS.includes(project.ownerWalletAddress) && (
+              <Badge variant="outline" className="gap-1">
+                <Crown className="h-3 w-3" />
+                Free Access
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">Update your buyback and burn settings</p>
         </div>
         <AlertDialog>

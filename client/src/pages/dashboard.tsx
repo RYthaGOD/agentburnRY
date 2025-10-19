@@ -1,11 +1,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Flame, Clock, Wallet as WalletIcon, Activity, TrendingUp, ArrowRight } from "lucide-react";
+import { Flame, Clock, Wallet as WalletIcon, Activity, TrendingUp, ArrowRight, Crown } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Project, Transaction } from "@shared/schema";
 import { formatSchedule } from "@/lib/schedule-utils";
+import { WHITELISTED_WALLETS } from "@shared/config";
 
 export default function Dashboard() {
   const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
@@ -137,6 +138,12 @@ export default function Dashboard() {
                         <Badge variant={project.isActive ? "default" : "secondary"} className="text-xs">
                           {project.isActive ? "Active" : "Paused"}
                         </Badge>
+                        {WHITELISTED_WALLETS.includes(project.ownerWalletAddress) && (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <Crown className="h-3 w-3" />
+                            Free Access
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground font-mono">
                         {project.tokenMintAddress.slice(0, 8)}...{project.tokenMintAddress.slice(-6)}

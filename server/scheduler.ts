@@ -51,20 +51,28 @@ class BuybackScheduler {
       for (const project of activeProjects) {
         if (!project.isActive) continue;
 
-        // Check if payment is still valid - get the most recent valid payment
-        const payments = await storage.getPaymentsByProject(project.id);
-        const validPayments = payments.filter(p => 
-          p.verified && new Date(p.expiresAt) > now
-        );
-        
-        // Sort by creation date descending to get the most recent payment
-        const validPayment = validPayments.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )[0];
+        // Check if wallet is whitelisted for free access
+        const { WHITELISTED_WALLETS } = await import("@shared/config");
+        const isWhitelisted = WHITELISTED_WALLETS.includes(project.ownerWalletAddress);
 
-        if (!validPayment) {
-          console.log(`Project ${project.name} has no valid payment - skipping`);
-          continue;
+        if (!isWhitelisted) {
+          // Check if payment is still valid - get the most recent valid payment
+          const payments = await storage.getPaymentsByProject(project.id);
+          const validPayments = payments.filter(p => 
+            p.verified && new Date(p.expiresAt) > now
+          );
+          
+          // Sort by creation date descending to get the most recent payment
+          const validPayment = validPayments.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0];
+
+          if (!validPayment) {
+            console.log(`Project ${project.name} has no valid payment - skipping`);
+            continue;
+          }
+        } else {
+          console.log(`Project ${project.name} - owner wallet is whitelisted, bypassing payment check`);
         }
 
         // Determine if it's time to execute based on schedule
