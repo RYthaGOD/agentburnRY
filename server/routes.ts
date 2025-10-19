@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { storage } from "./storage";
 import { insertProjectSchema, insertTransactionSchema, insertPaymentSchema, setProjectKeysSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
@@ -280,7 +280,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create a hash of the signature for replay attack prevention
-      const crypto = require("crypto");
       const signatureHash = crypto.createHash("sha256").update(signature).digest("hex");
 
       // Check if this signature has already been used (replay attack prevention)
@@ -439,7 +438,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create a hash of the signature for replay attack prevention
-      const crypto = require("crypto");
       const signatureHash = crypto.createHash("sha256").update(signature).digest("hex");
 
       // Check if this signature has already been used
@@ -557,7 +555,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create a hash of the signature for replay attack prevention
-      const crypto = require("crypto");
       const signatureHash = crypto.createHash("sha256").update(signature).digest("hex");
 
       // Check if this signature has already been used

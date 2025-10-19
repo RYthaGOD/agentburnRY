@@ -19,6 +19,7 @@ import {
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import bs58 from "bs58";
+import nacl from "tweetnacl";
 
 // Solana RPC endpoint
 const SOLANA_RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com";
@@ -374,9 +375,6 @@ export async function verifyWalletSignature(
   signatureBase58: string
 ): Promise<boolean> {
   try {
-    // Import nacl for signature verification
-    const nacl = require("tweetnacl");
-    
     // Convert the wallet address to a PublicKey
     const publicKey = new PublicKey(walletAddress);
     

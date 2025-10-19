@@ -16,6 +16,10 @@ const keypair = nacl.sign.keyPair();
 const publicKey = new PublicKey(keypair.publicKey);
 const walletAddress = publicKey.toBase58();
 
+// Generate a second keypair for PumpFun key testing
+const pumpfunKeypair = nacl.sign.keyPair();
+const pumpfunPrivateKey = bs58.encode(pumpfunKeypair.secretKey);
+
 console.log('🔑 Generated test wallet:', walletAddress);
 console.log('');
 
@@ -89,8 +93,8 @@ async function runTests() {
       signature: saveSignature,
       message: saveMessage,
       keys: {
-        treasuryPrivateKey: '5J3mKySWGWU8WzEVYKdJWX7cZGBGPnJQzQmEkbfRPrBFZpAn5w1',
-        pumpfunPrivateKey: 'PumpFunTestKey123456789012345678901234',
+        treasuryPrivateKey: bs58.encode(keypair.secretKey),
+        pumpfunPrivateKey: pumpfunPrivateKey,
       },
     });
     
