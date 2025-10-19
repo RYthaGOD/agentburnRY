@@ -199,17 +199,6 @@ export default function Settings() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {import.meta.env.DEV && (
-            <Alert variant="destructive" data-testid="alert-wallet-integration">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                <strong>Development Mode:</strong> Using simulated wallet signatures for testing.
-                Solana Wallet Adapter integration required before production deployment.
-                See <code>WALLET_INTEGRATION_GUIDE.md</code> for integration steps.
-              </AlertDescription>
-            </Alert>
-          )}
-
           <Alert data-testid="alert-security-info">
             <Lock className="h-4 w-4" />
             <AlertDescription className="text-sm">
