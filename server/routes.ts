@@ -3,6 +3,8 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertProjectSchema, insertTransactionSchema, insertPaymentSchema } from "@shared/schema";
 import { fromZodError } from "zod-validation-error";
+import { verifyPayment, getWalletBalance, isValidSolanaAddress } from "./solana";
+import { PRICING } from "@shared/config";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Project routes
@@ -158,24 +160,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Placeholder for Solana blockchain integration
-  // Will be implemented once @solana/web3.js package is installed
+  // Verify payment on Solana blockchain
   app.post("/api/verify-payment-onchain", async (req, res) => {
     try {
-      const { txSignature } = req.body;
+      const { txSignature, projectId, tier, ownerWalletAddress } = req.body;
       
-      // TODO: Implement Solana transaction verification
-      // 1. Connect to Solana network
-      // 2. Fetch transaction details using signature
-      // 3. Verify it's a payment to the treasury address
-      // 4. Verify the amount matches the tier price
-      // 5. Create payment record if valid
+      if (!txSignature || !projectId || !tier || !ownerWalletAddress) {
+        return res.status(400).json({
+          message: "Missing required fields: txSignature, projectId, tier, ownerWalletAddress",
+        });
+      }
+
+      // Verify the project exists and belongs to the user
+      const project = await storage.getProject(projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      if (project.ownerWalletAddress !== ownerWalletAddress) {
+        return res.status(403).json({
+          message: "Unauthorized: You don't own this project",
+        });
+      }
+
+      // Check if this transaction signature has already been used
+      const existingPayments = await storage.getPaymentsByProject(projectId);
+      const duplicatePayment = existingPayments.find(p => p.txSignature === txSignature);
       
+      if (duplicatePayment) {
+        return res.status(400).json({
+          message: "This transaction has already been used for payment",
+        });
+      }
+
+      // Check if project is already active with a valid payment
+      const now = new Date();
+      const activePayment = existingPayments.find(p => 
+        p.verified && new Date(p.expiresAt) > now
+      );
+
+      if (activePayment) {
+        return res.status(400).json({
+          message: "Project already has an active subscription",
+          expiresAt: activePayment.expiresAt,
+        });
+      }
+
+      // Get expected amount based on tier
+      const tierData = PRICING[tier as keyof typeof PRICING];
+      if (!tierData) {
+        return res.status(400).json({ message: "Invalid tier" });
+      }
+
+      const expectedAmount = tierData.priceSOL;
+
+      // Verify the payment on Solana blockchain
+      const verification = await verifyPayment(txSignature, expectedAmount);
+
+      if (!verification.verified) {
+        return res.status(400).json({
+          message: verification.error || "Payment verification failed",
+        });
+      }
+
+      // Verify the payment came from the project owner's wallet
+      if (verification.fromAddress && verification.fromAddress !== ownerWalletAddress) {
+        return res.status(400).json({
+          message: "Payment must come from the project owner's wallet address",
+        });
+      }
+
+      // Create payment record in database
+      const payment = await storage.createPayment({
+        projectId,
+        walletAddress: verification.fromAddress || ownerWalletAddress,
+        amount: verification.amount!.toString(),
+        currency: "SOL",
+        txSignature: txSignature,
+        tier: tier,
+        verified: true,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      });
+
+      // Activate the project
+      await storage.updateProject(projectId, { isActive: true });
+
       res.json({
-        message: "Payment verification will be implemented with Solana Web3.js",
-        txSignature,
+        success: true,
+        payment,
+        message: "Payment verified and project activated",
       });
     } catch (error: any) {
+      console.error("Payment verification error:", error);
       res.status(500).json({ message: error.message });
     }
   });
