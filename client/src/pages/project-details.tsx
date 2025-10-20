@@ -212,6 +212,52 @@ export default function ProjectDetails() {
     },
   });
 
+  const executeAutomatedProcessMutation = useMutation({
+    mutationFn: async () => {
+      if (!project) {
+        throw new Error("Project not found");
+      }
+
+      if (!isConnected) {
+        throw new Error("Please connect your wallet first");
+      }
+
+      // Create message and get wallet signature
+      const message = createMessage("Execute automated process", projectId!);
+      
+      // Sign message with connected wallet
+      const signatureResult = await signMessage(message);
+
+      const response = await apiRequest("POST", `/api/projects/${projectId}/execute-automated-process`, {
+        ownerWalletAddress: signatureResult.publicKey,
+        signature: signatureResult.signature,
+        message: signatureResult.message,
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to execute automated process");
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "wallet-balances"] });
+      toast({
+        title: "Automated Process Executed",
+        description: data.message || "The complete automated buyback and burn process has been executed!",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Execution Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const executeManualBurnMutation = useMutation({
     mutationFn: async () => {
       if (!project) {
@@ -823,12 +869,63 @@ export default function ProjectDetails() {
             </CardContent>
           </Card>
 
+          {/* Automated Process Card */}
+          <Card className="border-2 border-primary/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-5 w-5 text-primary" />
+                Run Complete Automated Process
+              </CardTitle>
+              <CardDescription>
+                Execute the full automated workflow: claim, buyback, and burn
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Run the complete automated process immediately without waiting for the schedule. This will:
+                </p>
+                <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1 ml-2">
+                  <li>Claim available PumpFun creator rewards (if applicable)</li>
+                  <li>Check treasury balance and verify sufficient funds</li>
+                  <li>Execute optimal SOL to token swap via Jupiter Ultra API</li>
+                  <li>Burn acquired tokens to the Solana incinerator</li>
+                  <li>Record all transactions in your history</li>
+                </ul>
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    type="button"
+                    onClick={() => executeAutomatedProcessMutation.mutate()}
+                    disabled={executeAutomatedProcessMutation.isPending || !isConnected}
+                    className="bg-gradient-to-r from-primary to-accent"
+                    data-testid="button-execute-automated-process"
+                  >
+                    {executeAutomatedProcessMutation.isPending ? (
+                      "Running Process..."
+                    ) : (
+                      <>
+                        <Zap className="mr-2 h-4 w-4" />
+                        Run Automated Process
+                      </>
+                    )}
+                  </Button>
+                  {!isConnected && (
+                    <p className="text-sm text-amber-600 dark:text-amber-500 flex items-center">
+                      <AlertTriangle className="mr-1.5 h-4 w-4" />
+                      Connect your wallet to run the automated process
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Manual Controls Card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Zap className="h-5 w-5 text-primary" />
-                Manual Controls
+                <Play className="h-5 w-5 text-primary" />
+                Manual Buyback
               </CardTitle>
               <CardDescription>
                 Trigger a buyback immediately without waiting for the schedule
@@ -837,20 +934,18 @@ export default function ProjectDetails() {
             <CardContent>
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Click the button below to execute a manual buyback right now. This will:
+                  Execute just the buyback portion. This will:
                 </p>
                 <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1 ml-2">
-                  <li>Claim available PumpFun creator rewards (if applicable)</li>
                   <li>Swap SOL for tokens using Jupiter aggregator</li>
-                  <li>Burn tokens to the Solana incinerator</li>
-                  <li>Record the transaction in your history</li>
+                  <li>Record the buyback transaction</li>
                 </ul>
                 <div className="flex gap-3 pt-2">
                   <Button
                     type="button"
                     onClick={() => executeManualBuybackMutation.mutate()}
                     disabled={executeManualBuybackMutation.isPending || !isConnected}
-                    className="bg-primary"
+                    variant="outline"
                     data-testid="button-execute-manual-buyback"
                   >
                     {executeManualBuybackMutation.isPending ? (

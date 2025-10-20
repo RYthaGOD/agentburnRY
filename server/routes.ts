@@ -610,6 +610,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual trigger of automated buyback process
+  app.post("/api/projects/:projectId/execute-automated-process", async (req, res) => {
+    try {
+      const { ownerWalletAddress, signature, message } = req.body;
+      
+      if (!ownerWalletAddress || !signature || !message) {
+        return res.status(400).json({ 
+          message: "Missing required fields: ownerWalletAddress, signature, and message are required" 
+        });
+      }
+
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Verify ownership
+      if (project.ownerWalletAddress !== ownerWalletAddress) {
+        return res.status(403).json({ message: "Unauthorized: You don't own this project" });
+      }
+
+      // Verify wallet signature
+      const { verifyWalletSignature } = await import("./solana-sdk");
+      const isValidSignature = await verifyWalletSignature(
+        ownerWalletAddress,
+        message,
+        signature
+      );
+
+      if (!isValidSignature) {
+        return res.status(401).json({ message: "Invalid signature" });
+      }
+
+      // Extract timestamp from message format: "Execute automated process for project {id} at {timestamp}"
+      const timestampMatch = message.match(/at (\d+)$/);
+      if (!timestampMatch) {
+        return res.status(400).json({ message: "Invalid message format" });
+      }
+
+      const messageTimestamp = parseInt(timestampMatch[1], 10);
+      
+      // Check timestamp (5 minute expiry)
+      const now = Date.now();
+      const fiveMinutesInMs = 5 * 60 * 1000;
+      if (now - messageTimestamp > fiveMinutesInMs) {
+        return res.status(400).json({ message: "Message expired. Please try again." });
+      }
+
+      // Prevent replay attacks
+      const signatureHash = crypto.createHash('sha256').update(signature).digest('hex');
+      try {
+        await storage.recordUsedSignature({
+          projectId: project.id,
+          signatureHash,
+          messageTimestamp: new Date(messageTimestamp),
+          expiresAt: new Date(messageTimestamp + fiveMinutesInMs),
+        });
+      } catch (error: any) {
+        if (error.code === '23505' || error.message?.includes('unique')) {
+          return res.status(400).json({ 
+            message: "Signature already used: This request has already been processed" 
+          });
+        }
+        throw error;
+      }
+
+      console.log(`Manual automated process triggered for ${project.name}`);
+
+      // Execute the automated buyback process using the scheduler
+      const { scheduler } = await import("./scheduler");
+      
+      // Execute the buyback
+      await scheduler.executeBuyback(project.id);
+
+      res.json({
+        success: true,
+        message: `Automated process executed successfully`,
+        projectId: project.id,
+      });
+    } catch (error: any) {
+      console.error("Manual automated process error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get wallet balances for a project
   app.get("/api/projects/:projectId/wallet-balances", async (req, res) => {
     try {
