@@ -244,6 +244,17 @@ class BuybackScheduler {
           const swapResult = await executeSwapOrder(swapOrder, treasuryPrivateKey);
           console.log(`   Swap completed: ${swapResult.transactionId}`);
           
+          // Record successful swap transaction
+          await storage.createTransaction({
+            projectId: project.id,
+            type: "buyback",
+            amount: buybackAmountSOL.toString(),
+            tokenAmount: tokenAmount.toString(),
+            txSignature: swapResult.transactionId,
+            status: "completed",
+            errorMessage: null,
+          });
+
           // Burn the tokens using SPL Token burn instruction
           console.log(`2. Burning ${tokenAmount} tokens (reduces supply permanently)...`);
           const keypair = loadKeypairFromPrivateKey(treasuryPrivateKey);
@@ -255,13 +266,13 @@ class BuybackScheduler {
           );
           console.log(`   Burn completed: ${burnSignature}`);
           
-          // Record successful transaction
+          // Record successful burn transaction
           await storage.createTransaction({
             projectId: project.id,
-            type: "buyback",
-            amount: buybackAmountSOL.toString(),
+            type: "burn",
+            amount: "0",
             tokenAmount: tokenAmount.toString(),
-            txSignature: swapResult.transactionId,
+            txSignature: burnSignature,
             status: "completed",
             errorMessage: null,
           });
