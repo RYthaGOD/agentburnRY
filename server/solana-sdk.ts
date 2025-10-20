@@ -227,15 +227,18 @@ export async function transferToIncinerator(
     const incineratorPublicKey = new PublicKey(SOLANA_INCINERATOR);
     
     console.log(`Transferring ${amount} tokens to incinerator: ${SOLANA_INCINERATOR}`);
+    console.log(`Decimals parameter received: ${decimals} (type: ${typeof decimals})`);
     
     // Get token decimals from the mint if not provided
     let tokenDecimals: number;
     if (decimals !== undefined) {
+      console.log(`Using provided decimals: ${decimals}`);
       tokenDecimals = decimals;
     } else {
+      console.log(`Fetching decimals from mint...`);
       const mintInfo = await getMint(connection, mintPublicKey);
       tokenDecimals = mintInfo.decimals;
-      console.log(`Token decimals detected: ${tokenDecimals}`);
+      console.log(`Token decimals detected from mint: ${tokenDecimals}`);
     }
     
     // Get token accounts
