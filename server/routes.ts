@@ -565,8 +565,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const signature = await transferToIncinerator(
           project.tokenMintAddress,
           walletKeypair,
-          burnAmount,
-          9 // Assuming 9 decimals (standard for most tokens)
+          burnAmount
+          // Decimals will be automatically detected from the token mint
         );
 
         // Log successful burn transaction

@@ -16,6 +16,7 @@ import {
   createTransferInstruction,
   createBurnInstruction,
   createAssociatedTokenAccountIdempotentInstruction,
+  getMint,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import bs58 from "bs58";
@@ -217,7 +218,7 @@ export async function transferToIncinerator(
   tokenMintAddress: string,
   walletKeypair: Keypair,
   amount: number,
-  decimals: number = 9
+  decimals?: number
 ): Promise<string> {
   try {
     const SOLANA_INCINERATOR = "1nc1nerator11111111111111111111111111111111";
@@ -226,6 +227,16 @@ export async function transferToIncinerator(
     const incineratorPublicKey = new PublicKey(SOLANA_INCINERATOR);
     
     console.log(`Transferring ${amount} tokens to incinerator: ${SOLANA_INCINERATOR}`);
+    
+    // Get token decimals from the mint if not provided
+    let tokenDecimals: number;
+    if (decimals !== undefined) {
+      tokenDecimals = decimals;
+    } else {
+      const mintInfo = await getMint(connection, mintPublicKey);
+      tokenDecimals = mintInfo.decimals;
+      console.log(`Token decimals detected: ${tokenDecimals}`);
+    }
     
     // Get token accounts
     const fromTokenAccount = await getAssociatedTokenAddress(
@@ -253,13 +264,16 @@ export async function transferToIncinerator(
       )
     );
 
-    // Create transfer instruction
+    // Create transfer instruction with correct decimals
+    const transferAmount = amount * Math.pow(10, tokenDecimals);
+    console.log(`Transfer amount in base units: ${transferAmount} (${amount} tokens * 10^${tokenDecimals})`);
+    
     transaction.add(
       createTransferInstruction(
         fromTokenAccount,
         incineratorTokenAccount,
         fromPublicKey,
-        amount * Math.pow(10, decimals),
+        transferAmount,
         [],
         TOKEN_PROGRAM_ID
       )
