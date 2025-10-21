@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Shield, Eye, EyeOff, Lock, CheckCircle2, AlertTriangle, Trash2, AlertCircle } from "lucide-react";
 import { useWalletSignature } from "@/hooks/use-wallet-signature";
+import { useWallet } from '@solana/wallet-adapter-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,6 +35,8 @@ export default function Settings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { signMessage, createMessage, isConnected } = useWalletSignature();
+  const { publicKey } = useWallet();
+  const walletAddress = publicKey?.toBase58();
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [treasuryKey, setTreasuryKey] = useState("");
   const [pumpfunKey, setPumpfunKey] = useState("");
@@ -41,7 +44,14 @@ export default function Settings() {
   const [showPumpfunKey, setShowPumpfunKey] = useState(false);
 
   const { data: projects } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
+    queryKey: ["/api/projects", "owner", walletAddress],
+    queryFn: async () => {
+      if (!walletAddress) return [];
+      const response = await fetch(`/api/projects/owner/${walletAddress}`);
+      if (!response.ok) throw new Error('Failed to fetch projects');
+      return response.json();
+    },
+    enabled: !!walletAddress,
   });
 
   const selectedProject = projects?.find((p) => p.id === selectedProjectId);

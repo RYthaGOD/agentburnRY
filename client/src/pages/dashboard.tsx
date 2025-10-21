@@ -7,10 +7,21 @@ import { useQuery } from "@tanstack/react-query";
 import type { Project, Transaction } from "@shared/schema";
 import { formatSchedule } from "@/lib/schedule-utils";
 import { WHITELISTED_WALLETS } from "@shared/config";
+import { useWallet } from '@solana/wallet-adapter-react';
 
 export default function Dashboard() {
+  const { publicKey } = useWallet();
+  const walletAddress = publicKey?.toBase58();
+
   const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
+    queryKey: ["/api/projects", "owner", walletAddress],
+    queryFn: async () => {
+      if (!walletAddress) return [];
+      const response = await fetch(`/api/projects/owner/${walletAddress}`);
+      if (!response.ok) throw new Error('Failed to fetch projects');
+      return response.json();
+    },
+    enabled: !!walletAddress,
   });
 
   const { data: recentTransactions, isLoading: transactionsLoading } = useQuery<Transaction[]>({
