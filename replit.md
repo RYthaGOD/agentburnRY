@@ -55,6 +55,8 @@ The owner wallet address serves as the primary user identifier for project manag
 
 **Wallet Integration:** Solana Wallet Adapter is fully integrated and production-ready. The system uses `@solana/wallet-adapter-react` with WalletProvider for browser wallet connections (Phantom, Solflare) and real cryptographic message signing for authentication.
 
+**Project Privacy & Security:** All projects are filtered by owner wallet address. Users can only view, edit, and manage their own projects. The frontend queries `/api/projects/owner/:walletAddress` which returns only projects where `ownerWalletAddress` matches the connected wallet. This ensures complete data isolation between users.
+
 ### Production Readiness & Automated Workflow
 
 The system features full automation with secure encrypted key management. This includes:
