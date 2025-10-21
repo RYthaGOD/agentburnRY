@@ -81,11 +81,16 @@ The system features full automation with secure encrypted key management. This i
 - **100% Solana-native payments** - All payments in SOL only
 - Direct Solana wallet payments to treasury wallet: `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`
 - On-chain payment verification for SOL payments
-- Tier pricing: Starter (0.2 SOL), Pro (0.4 SOL)
-- **Payment Enforcement:** Projects cannot be activated without valid payment (unless whitelisted)
-  - Frontend shows payment modal when non-paying users try to activate
-  - Backend validates payment on project update (PATCH /api/projects/:id)
-  - Scheduler only runs for whitelisted or paid projects
+- Tier pricing: Starter (0.2 SOL / 30 days), Pro (0.4 SOL / 30 days)
+- **10-Day Trial Period:** First 100 signups automatically receive 10-day free trial
+  - Trial badge displays in UI: "Trial: X days left"
+  - Full platform access during trial (buybacks, burns, claims, scheduling)
+  - Trial tracked via `projects.trialEndsAt` timestamp field
+  - After trial expires, payment required to continue
+- **Payment Enforcement:** Projects cannot be activated without valid payment or active trial (unless whitelisted)
+  - Frontend shows payment modal when users without trial/payment try to activate
+  - Backend validates payment OR trial on project update (PATCH /api/projects/:id)
+  - Scheduler only runs for whitelisted, trial, or paid projects
 - **Whitelisted Wallets:** Owner wallets can be whitelisted in `shared/config.ts` for free platform access (bypasses payment requirements)
   - Current whitelisted wallets: `4D5a61DsihdeEV2SbfkpYsZemTrrczxAwyBfR47xF5uS`, `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`, `5PsB7jYtDy6DP3tt5EUuDBSh8skKNkNJiUuNpPRV3Xrf`, `924yATAEdnrYmncJMX2je7dpiEfVRqCSPmQ2NK3QfoXA`
   - Whitelisted projects display "Free Access" badge with crown icon in UI

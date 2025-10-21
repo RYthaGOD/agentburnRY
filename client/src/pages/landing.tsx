@@ -27,7 +27,7 @@ export default function Landing() {
             <a href="#pricing" className="text-sm font-medium hover-elevate px-3 py-2 rounded-md" data-testid="link-pricing">
               Pricing
             </a>
-            <a href="/BURNBOT_WHITEPAPER.md" target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover-elevate px-3 py-2 rounded-md" data-testid="link-whitepaper">
+            <a href="/whitepaper" className="text-sm font-medium hover-elevate px-3 py-2 rounded-md" data-testid="link-whitepaper">
               White Paper
             </a>
           </nav>
@@ -267,7 +267,7 @@ export default function Landing() {
             <div>
               <h4 className="font-semibold mb-4">Resources</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="/BURNBOT_WHITEPAPER.md" target="_blank" rel="noopener noreferrer" className="hover:text-foreground">White Paper</a></li>
+                <li><a href="/whitepaper" className="hover:text-foreground">White Paper</a></li>
                 <li><a href="#" className="hover:text-foreground">Documentation</a></li>
                 <li><a href="#" className="hover:text-foreground">API</a></li>
                 <li><a href="#" className="hover:text-foreground">Support</a></li>

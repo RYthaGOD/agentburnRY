@@ -11,6 +11,7 @@ import NewProject from "@/pages/new-project";
 import ProjectDetails from "@/pages/project-details";
 import Transactions from "@/pages/transactions";
 import Settings from "@/pages/settings";
+import Whitepaper from "@/pages/whitepaper";
 import DashboardLayout from "@/pages/dashboard-layout";
 import NotFound from "@/pages/not-found";
 
@@ -18,6 +19,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Landing} />
+      <Route path="/whitepaper" component={Whitepaper} />
       <Route path="/dashboard">
         <DashboardLayout>
           <Dashboard />
