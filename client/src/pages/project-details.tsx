@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
-import { Flame, ArrowLeft, Save, Zap, Trash2, Crown, Play, AlertTriangle, DollarSign, Wallet, RefreshCw } from "lucide-react";
+import { Flame, ArrowLeft, Save, Zap, Trash2, Crown, Play, AlertTriangle, DollarSign, Wallet, RefreshCw, Clock } from "lucide-react";
 import { useWalletSignature } from "@/hooks/use-wallet-signature";
 import {
   AlertDialog,
@@ -365,25 +365,30 @@ export default function ProjectDetails() {
       pumpfunCreatorWallet: data.pumpfunCreatorWallet === "" ? undefined : data.pumpfunCreatorWallet,
     };
 
-    // If trying to activate and not whitelisted, check for payment first
+    // If trying to activate and not whitelisted, check for payment or trial first
     if (data.isActive && !project?.isActive && project && !WHITELISTED_WALLETS.includes(project.ownerWalletAddress)) {
-      // Check if there's a valid payment
-      try {
-        const response = await fetch(`/api/payments/project/${projectId}`);
-        const payments = await response.json();
-        const now = new Date();
-        const hasValidPayment = payments.some((p: any) => 
-          p.verified && new Date(p.expiresAt) > now
-        );
+      // Check for active trial first
+      const hasActiveTrial = project.trialEndsAt && new Date(project.trialEndsAt) > new Date();
+      
+      if (!hasActiveTrial) {
+        // Check if there's a valid payment
+        try {
+          const response = await fetch(`/api/payments/project/${projectId}`);
+          const payments = await response.json();
+          const now = new Date();
+          const hasValidPayment = payments.some((p: any) => 
+            p.verified && new Date(p.expiresAt) > now
+          );
 
-        if (!hasValidPayment) {
-          // Show payment modal instead of submitting
-          setPendingUpdates(processedData);
-          setShowPaymentModal(true);
-          return;
+          if (!hasValidPayment) {
+            // Show payment modal instead of submitting
+            setPendingUpdates(processedData);
+            setShowPaymentModal(true);
+            return;
+          }
+        } catch (error) {
+          console.error("Error checking payment status:", error);
         }
-      } catch (error) {
-        console.error("Error checking payment status:", error);
       }
     }
 
@@ -447,6 +452,12 @@ export default function ProjectDetails() {
               <Badge variant="outline" className="gap-1">
                 <Crown className="h-3 w-3" />
                 Free Access
+              </Badge>
+            )}
+            {project.trialEndsAt && new Date(project.trialEndsAt) > new Date() && (
+              <Badge variant="secondary" className="gap-1" data-testid="badge-trial">
+                <Clock className="h-3 w-3" />
+                Trial: {Math.ceil((new Date(project.trialEndsAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))} days left
               </Badge>
             )}
           </div>
