@@ -64,23 +64,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Project not found" });
       }
 
-      // If trying to activate a project, verify payment first (unless whitelisted)
+      // If trying to activate a project, verify payment or trial first (unless whitelisted)
       if (updates.isActive === true && !existingProject.isActive) {
         const { WHITELISTED_WALLETS } = await import("@shared/config");
         const isWhitelisted = WHITELISTED_WALLETS.includes(existingProject.ownerWalletAddress);
 
         if (!isWhitelisted) {
-          // Check for valid payment
-          const payments = await storage.getPaymentsByProject(req.params.id);
           const now = new Date();
-          const validPayment = payments.find(p => 
-            p.verified && new Date(p.expiresAt) > now
-          );
+          
+          // Check for active trial
+          const hasActiveTrial = existingProject.trialEndsAt && new Date(existingProject.trialEndsAt) > now;
+          
+          if (!hasActiveTrial) {
+            // Check for valid payment
+            const payments = await storage.getPaymentsByProject(req.params.id);
+            const validPayment = payments.find(p => 
+              p.verified && new Date(p.expiresAt) > now
+            );
 
-          if (!validPayment) {
-            return res.status(403).json({ 
-              message: "Payment required to activate project. Please complete payment first." 
-            });
+            if (!validPayment) {
+              return res.status(403).json({ 
+                message: "Payment or active trial required to activate project. Please complete payment first." 
+              });
+            }
           }
         }
       }

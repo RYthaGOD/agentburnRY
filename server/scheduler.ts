@@ -56,20 +56,27 @@ class BuybackScheduler {
         const isWhitelisted = WHITELISTED_WALLETS.includes(project.ownerWalletAddress);
 
         if (!isWhitelisted) {
-          // Check if payment is still valid - get the most recent valid payment
-          const payments = await storage.getPaymentsByProject(project.id);
-          const validPayments = payments.filter(p => 
-            p.verified && new Date(p.expiresAt) > now
-          );
+          // Check for active trial first
+          const hasActiveTrial = project.trialEndsAt && new Date(project.trialEndsAt) > now;
           
-          // Sort by creation date descending to get the most recent payment
-          const validPayment = validPayments.sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )[0];
+          if (!hasActiveTrial) {
+            // Check if payment is still valid - get the most recent valid payment
+            const payments = await storage.getPaymentsByProject(project.id);
+            const validPayments = payments.filter(p => 
+              p.verified && new Date(p.expiresAt) > now
+            );
+            
+            // Sort by creation date descending to get the most recent payment
+            const validPayment = validPayments.sort((a, b) => 
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            )[0];
 
-          if (!validPayment) {
-            console.log(`Project ${project.name} has no valid payment - skipping`);
-            continue;
+            if (!validPayment) {
+              console.log(`Project ${project.name} has no valid payment or trial - skipping`);
+              continue;
+            }
+          } else {
+            console.log(`Project ${project.name} - has active trial, executing buyback`);
           }
         } else {
           console.log(`Project ${project.name} - owner wallet is whitelisted, bypassing payment check`);
