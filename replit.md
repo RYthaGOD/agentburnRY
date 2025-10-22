@@ -27,13 +27,26 @@ A dedicated scheduler service automates buyback execution using `node-cron`. It 
 The platform includes automated trading bots with comprehensive configuration interfaces:
 - **Volume Bot:** Executes buy/sell cycles to generate trading volume based on configurable buy amounts, sell percentages, trading intervals, and price guards (min/max SOL thresholds). Configuration UI at `/dashboard/volume-bot` allows users to enable/disable bots and set all parameters via dialog forms.
 - **Buy Bot (Limit Orders):** Monitors token prices and executes buy orders when predefined SOL target prices are met, with configurable limit orders and max slippage protection. Configuration UI at `/dashboard/trading-bot` provides dynamic limit order management (add/remove orders) and max slippage settings.
-- **AI Trading Bot:** AI-powered PumpFun token analysis and automated trading. Scans trending tokens from DexScreener, analyzes market data (volume, holders, price momentum, liquidity) using Groq's free Llama 3.3-70B AI (with xAI Grok fallback), and executes buy orders based on AI recommendations. Configurable parameters include budget per trade, analysis interval, minimum volume/potential thresholds, daily trade limits, and risk tolerance (low/medium/high). Uses PumpPortal API for trading execution. All completely free (Groq + DexScreener).
+- **AI Trading Bot:** AI-powered PumpFun token analysis with strict risk management. Scans trending tokens from DexScreener, analyzes market data (volume, holders, price momentum, liquidity) using Groq's free Llama 3.3-70B AI, and executes buy orders ONLY when:
+  - AI confidence ≥ 60%
+  - Minimum 1.5X (150%) upside potential (hardcoded minimum)
+  - Total budget not exhausted
+  - Daily trade limit not reached
+  
+  **Budget Management:** Total SOL budget allocation with real-time usage tracking. Prevents overspending by checking remaining budget before each trade and updating budget used after execution. Visual progress bars show budget consumption per project.
+  
+  **Configurable Parameters:** Total budget (SOL), budget per trade, analysis interval, minimum volume threshold (USD), minimum potential upside (≥150%), daily trade limit, and risk tolerance (low/medium/high). Uses PumpPortal API for trading execution. All completely free (Groq + DexScreener).
 
 Price fetching for all bots uses Jupiter Price v3 API for SOL-denominated prices.
 
 ### Data Storage
 
 PostgreSQL, accessed via Neon's serverless driver and Drizzle ORM, is used for data persistence. The schema includes `Projects`, `Transactions`, `Payments`, and `UsedSignatures` (for replay attack prevention). Key decisions include UUID primary keys, decimal types for token amounts, automatic timestamps, and boolean flags for status. Trading bot settings are stored directly in the `projects` table.
+
+**AI Bot Budget Tracking Fields:**
+- `aiBotTotalBudget`: Total SOL allocated for AI trading (user-defined)
+- `aiBotBudgetUsed`: Total SOL spent so far (auto-incremented after each trade)
+- Budget validation occurs before every trade execution to prevent overspending
 
 ### Authentication & Authorization
 
