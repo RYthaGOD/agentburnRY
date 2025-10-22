@@ -510,6 +510,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual AI bot execution - scan and trade
+  app.post("/api/execute-ai-bot/:projectId", authRateLimit, validateSolanaAddresses, async (req, res) => {
+    auditLog("Manual AI bot execution attempted", {
+      projectId: req.params.projectId,
+      ip: req.ip,
+    });
+    try {
+      const { ownerWalletAddress, signature, message } = req.body;
+      
+      if (!ownerWalletAddress || !signature || !message) {
+        return res.status(400).json({ 
+          message: "Missing required fields: ownerWalletAddress, signature, and message are required" 
+        });
+      }
+
+      const project = await storage.getProject(req.params.projectId);
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      // Verify ownership
+      if (project.ownerWalletAddress !== ownerWalletAddress) {
+        return res.status(403).json({ message: "Unauthorized: You don't own this project" });
+      }
+
+      // Create a hash of the signature for replay attack prevention
+      const signatureHash = crypto.createHash("sha256").update(signature).digest("hex");
+
+      // Check if this signature has already been used
+      const isUsed = await storage.isSignatureUsed(signatureHash);
+      if (isUsed) {
+        return res.status(400).json({ 
+          message: "Signature already used: This request has already been processed" 
+        });
+      }
+
+      // Verify wallet signature
+      const { verifyWalletSignature } = await import("./solana-sdk");
+      const isValidSignature = await verifyWalletSignature(
+        ownerWalletAddress,
+        message,
+        signature
+      );
+
+      if (!isValidSignature) {
+        return res.status(403).json({ 
+          message: "Invalid signature: Could not verify wallet ownership" 
+        });
+      }
+
+      // Verify message format and timestamp
+      const expectedMessagePrefix = `Execute AI bot for project ${project.id}`;
+      if (!message.startsWith(expectedMessagePrefix)) {
+        return res.status(400).json({ 
+          message: "Invalid message format" 
+        });
+      }
+
+      const timestampMatch = message.match(/at (\d+)$/);
+      if (!timestampMatch) {
+        return res.status(400).json({ 
+          message: "Message must include timestamp" 
+        });
+      }
+
+      const messageTimestamp = parseInt(timestampMatch[1]);
+      const nowTimestamp = Date.now();
+      const fiveMinutesInMs = 5 * 60 * 1000;
+
+      if (Math.abs(nowTimestamp - messageTimestamp) > fiveMinutesInMs) {
+        return res.status(400).json({ 
+          message: "Signature expired: Please sign a new message" 
+        });
+      }
+
+      // Check if AI bot is configured
+      if (!project.aiBotEnabled) {
+        return res.status(400).json({ 
+          message: "AI bot is not enabled for this project. Please enable it first." 
+        });
+      }
+
+      // Check for valid payment (unless whitelisted)
+      const { WHITELISTED_WALLETS } = await import("@shared/config");
+      const isWhitelisted = WHITELISTED_WALLETS.includes(project.ownerWalletAddress);
+
+      if (!isWhitelisted) {
+        const now = new Date();
+        const payments = await storage.getPaymentsByProject(project.id);
+        const validPayments = payments.filter(p => 
+          p.verified && new Date(p.expiresAt) > now
+        );
+        
+        const validPayment = validPayments.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )[0];
+
+        if (!validPayment) {
+          return res.status(400).json({ 
+            message: "No active subscription found. Please make a payment first." 
+          });
+        }
+      }
+
+      // Check if treasury private key is configured
+      const treasuryPrivateKey = await getTreasuryKey(project.id);
+      if (!treasuryPrivateKey) {
+        return res.status(400).json({
+          message: "Treasury private key not configured. Please add your automation keys in Settings.",
+        });
+      }
+
+      // Record signature as used
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      try {
+        await storage.recordUsedSignature({
+          projectId: project.id,
+          signatureHash,
+          messageTimestamp: new Date(messageTimestamp),
+          expiresAt,
+        });
+      } catch (error: any) {
+        if (error.code === '23505' || error.message?.includes('unique')) {
+          return res.status(400).json({ 
+            message: "Signature already used: This request has already been processed" 
+          });
+        }
+        throw error;
+      }
+
+      // Execute AI bot scan and trade
+      const { triggerAIBotManually } = await import("./ai-bot-scheduler");
+      await triggerAIBotManually(project.id);
+
+      res.json({
+        success: true,
+        message: "AI bot scan and trade initiated",
+        projectId: project.id,
+      });
+    } catch (error: any) {
+      console.error("Manual AI bot execution error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Manual burn endpoint - burn tokens already in treasury wallet
   app.post("/api/projects/:projectId/manual-burn", async (req, res) => {
     try {

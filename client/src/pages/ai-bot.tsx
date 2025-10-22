@@ -7,7 +7,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Brain, Loader2, Settings2, Zap, AlertCircle, Play, Power } from "lucide-react";
+import { Brain, Loader2, Settings2, Zap, AlertCircle, Play, Power, Scan } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { Project } from "@shared/schema";
+import bs58 from "bs58";
 
 const aiBotConfigSchema = z.object({
   aiBotEnabled: z.boolean(),
@@ -42,6 +43,85 @@ const aiBotConfigSchema = z.object({
 });
 
 type AIBotConfigFormData = z.infer<typeof aiBotConfigSchema>;
+
+function ScanAndTradeButton({ project }: { project: Project }) {
+  const [isScanning, setIsScanning] = useState(false);
+  const { toast } = useToast();
+  const { publicKey, signMessage } = useWallet();
+
+  const handleScanAndTrade = async () => {
+    if (!publicKey || !signMessage) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsScanning(true);
+    try {
+      // Create message to sign
+      const message = `Execute AI bot for project ${project.id} at ${Date.now()}`;
+      const messageBytes = new TextEncoder().encode(message);
+
+      // Request signature from wallet
+      const signature = await signMessage(messageBytes);
+      const signatureBase58 = bs58.encode(signature);
+
+      toast({
+        title: "Scanning Market...",
+        description: "AI is analyzing trending tokens from DexScreener",
+      });
+
+      // Execute AI bot scan and trade
+      const response = await apiRequest("POST", `/api/execute-ai-bot/${project.id}`, {
+        ownerWalletAddress: publicKey.toString(),
+        signature: signatureBase58,
+        message,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+
+      toast({
+        title: "Scan Complete",
+        description: "AI bot has analyzed the market. Check transactions for results.",
+      });
+    } catch (error: any) {
+      console.error("Scan and trade error:", error);
+      toast({
+        title: "Scan Failed",
+        description: error.message || "Failed to execute AI bot scan",
+        variant: "destructive",
+      });
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      className="w-full"
+      onClick={handleScanAndTrade}
+      disabled={isScanning || !publicKey}
+      data-testid={`button-scan-trade-${project.id}`}
+    >
+      {isScanning ? (
+        <>
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          Scanning Market...
+        </>
+      ) : (
+        <>
+          <Scan className="h-4 w-4 mr-2" />
+          Scan & Trade Now
+        </>
+      )}
+    </Button>
+  );
+}
 
 function AIBotConfigDialog({ project }: { project: Project }) {
   const [open, setOpen] = useState(false);
@@ -319,6 +399,7 @@ function AIBotConfigDialog({ project }: { project: Project }) {
 
 export default function AIBot() {
   const { publicKey, connected } = useWallet();
+  const { toast } = useToast();
   const { data: projects, isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects/owner", publicKey?.toString()],
     enabled: connected && !!publicKey,
@@ -473,63 +554,66 @@ export default function AIBot() {
                   </div>
                 )}
                 
-                <div className="flex gap-2">
-                  {project.aiBotEnabled ? (
-                    <Button
-                      variant="destructive"
-                      className="flex-1"
-                      onClick={async () => {
-                        try {
-                          await apiRequest("PATCH", `/api/projects/${project.id}`, {
-                            aiBotEnabled: false,
-                          });
-                          queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-                          toast({
-                            title: "AI Bot Stopped",
-                            description: "AI trading bot has been disabled",
-                          });
-                        } catch (error) {
-                          toast({
-                            title: "Error",
-                            description: "Failed to stop AI bot",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      data-testid={`button-stop-ai-bot-${project.id}`}
-                    >
-                      <Power className="h-4 w-4 mr-2" />
-                      Stop AI Bot
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="default"
-                      className="flex-1"
-                      onClick={async () => {
-                        try {
-                          await apiRequest("PATCH", `/api/projects/${project.id}`, {
-                            aiBotEnabled: true,
-                          });
-                          queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
-                          toast({
-                            title: "AI Bot Started",
-                            description: "AI trading bot is now active",
-                          });
-                        } catch (error) {
-                          toast({
-                            title: "Error",
-                            description: "Failed to start AI bot",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
-                      data-testid={`button-start-ai-bot-${project.id}`}
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      Start AI Bot
-                    </Button>
-                  )}
-                  <AIBotConfigDialog project={project} />
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    {project.aiBotEnabled ? (
+                      <Button
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={async () => {
+                          try {
+                            await apiRequest("PATCH", `/api/projects/${project.id}`, {
+                              aiBotEnabled: false,
+                            });
+                            queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+                            toast({
+                              title: "AI Bot Stopped",
+                              description: "AI trading bot has been disabled",
+                            });
+                          } catch (error) {
+                            toast({
+                              title: "Error",
+                              description: "Failed to stop AI bot",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        data-testid={`button-stop-ai-bot-${project.id}`}
+                      >
+                        <Power className="h-4 w-4 mr-2" />
+                        Stop AI Bot
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="default"
+                        className="flex-1"
+                        onClick={async () => {
+                          try {
+                            await apiRequest("PATCH", `/api/projects/${project.id}`, {
+                              aiBotEnabled: true,
+                            });
+                            queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+                            toast({
+                              title: "AI Bot Started",
+                              description: "AI trading bot is now active",
+                            });
+                          } catch (error) {
+                            toast({
+                              title: "Error",
+                              description: "Failed to start AI bot",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                        data-testid={`button-start-ai-bot-${project.id}`}
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Start AI Bot
+                      </Button>
+                    )}
+                    <AIBotConfigDialog project={project} />
+                  </div>
+                  {project.aiBotEnabled && <ScanAndTradeButton project={project} />}
                 </div>
               </CardContent>
             </Card>
