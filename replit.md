@@ -4,6 +4,8 @@
 
 BurnBot is a SaaS platform providing automated token buyback and burn functionality for Solana SPL tokens. It enables token creators to schedule and execute buyback operations that automatically purchase tokens from the market and send them to the Solana incinerator, reducing the total supply. The platform offers a no-code solution with a comprehensive dashboard for configuration, scheduling (hourly, daily, weekly, or custom cron), and transaction monitoring. Its core ambition is to offer a streamlined, automated, and verifiable burn mechanism to enhance tokenomics for Solana projects.
 
+**NEW: Trading Bot Features** - Volume Bot for automated buy/sell cycles to generate trading volume, and Buy Bot for limit order execution when price reaches target SOL levels.
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -39,9 +41,37 @@ A dedicated scheduler service (`server/scheduler.ts`) automates buyback executio
 - Weekly: Sunday midnight UTC
 - Custom cron: User-defined patterns
 
+### Trading Bot System
+
+The platform now includes automated trading bots for volume generation and limit order execution (`server/trading-bot.ts`):
+
+**Volume Bot:**
+- Automatically executes buy/sell cycles to generate trading volume
+- Configurable buy amount (SOL), sell percentage (0-100%), and trading interval (minutes)
+- Price guards: Only trades if token price is within configured min/max SOL thresholds
+- Each cycle: Buy tokens with SOL → Wait for interval → Sell configured % back to SOL
+- Records all trades as transactions in the database
+
+**Buy Bot (Limit Orders):**
+- Monitors token price and executes buy orders when price reaches target levels
+- Configurable limit orders as JSON array: `[{"priceSOL": "0.001", "amountSOL": "0.1"}]`
+- Max slippage protection (0-100%)
+- Checks price every scheduler run (hourly) and executes matching orders
+- Uses Jupiter Ultra API for optimal swap execution
+
+**Price Fetching:**
+- Jupiter Price v4 API with `vsToken=So11111111111111111111111111111111111111112` parameter
+- Returns SOL-denominated prices (not USD) for accurate price comparisons
+- Volume bot price guards and buy bot limit orders compare against SOL prices
+
 ### Data Storage
 
 PostgreSQL, accessed via Neon's serverless driver and Drizzle ORM, is used for data persistence. The schema includes `Projects`, `Transactions`, `Payments`, and `UsedSignatures` tables with defined relationships. The `UsedSignatures` table prevents replay attacks on manual buyback executions by storing SHA-256 hashes of used signatures. Key database decisions involve using UUID primary keys, decimal types for token amounts, automatic timestamp fields, and boolean flags for status management.
+
+**Trading Bot Storage:**
+- Volume bot settings: `volumeBotEnabled`, `volumeBotBuyAmountSOL`, `volumeBotSellPercentage`, `volumeBotMinPriceSOL`, `volumeBotMaxPriceSOL`, `volumeBotIntervalMinutes`
+- Buy bot settings: `buyBotEnabled`, `buyBotLimitOrders` (JSON text), `buyBotMaxSlippage`
+- All fields stored directly in `projects` table with appropriate types (boolean, decimal, integer, text)
 
 ### Authentication & Authorization
 
