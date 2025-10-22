@@ -136,14 +136,21 @@ export default function AIBot() {
       });
 
       // Manual AI bot trigger (standalone - no project ID)
-      const response = await apiRequest("POST", `/api/ai-bot/execute`, {
+      const response: any = await apiRequest("POST", `/api/ai-bot/execute`, {
         ownerWalletAddress: publicKey.toString(),
         signature: signatureBase58,
         message,
       });
 
+      // Add backend scan logs to the frontend display
+      if (response.logs && Array.isArray(response.logs)) {
+        response.logs.forEach((log: any) => {
+          addScanLog(log.message, log.type);
+        });
+      }
+
       addScanLog("✅ Market scan completed", "success");
-      addScanLog(`ℹ️ Check results below and Transactions page for details`, "info");
+      addScanLog(`ℹ️ Check Transactions page for trade details`, "info");
 
       queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/config", publicKey.toString()] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });

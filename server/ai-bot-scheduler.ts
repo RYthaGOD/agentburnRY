@@ -463,13 +463,29 @@ export async function triggerAIBotManually(projectId: string) {
   await executeAITradingBot(project);
 }
 
+interface ScanLog {
+  timestamp: number;
+  message: string;
+  type: "info" | "success" | "warning" | "error";
+  tokenData?: any;
+}
+
 /**
  * Execute standalone AI trading bot (no project required)
  * Uses AIBotConfig table instead of project data
  */
-async function executeStandaloneAIBot(ownerWalletAddress: string) {
+async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = false): Promise<ScanLog[]> {
+  const logs: ScanLog[] = [];
+  const addLog = (message: string, type: ScanLog["type"] = "info", tokenData?: any) => {
+    const log = { timestamp: Date.now(), message, type, tokenData };
+    if (collectLogs) {
+      logs.push(log);
+    }
+    console.log(message);
+  };
+
   try {
-    console.log(`[Standalone AI Bot] Running for wallet ${ownerWalletAddress}`);
+    addLog(`[Standalone AI Bot] Running for wallet ${ownerWalletAddress}`, "info");
 
     // Get AI bot config
     const config = await storage.getAIBotConfig(ownerWalletAddress);
@@ -479,14 +495,14 @@ async function executeStandaloneAIBot(ownerWalletAddress: string) {
 
     // Check if AI bot is enabled
     if (!config.enabled) {
-      console.log(`[Standalone AI Bot] Disabled for wallet ${ownerWalletAddress}`);
-      return;
+      addLog(`[Standalone AI Bot] Disabled for wallet ${ownerWalletAddress}`, "warning");
+      return logs;
     }
 
     // Validate Grok API key
     if (!isGrokConfigured()) {
-      console.error("[Standalone AI Bot] XAI_API_KEY not configured");
-      return;
+      addLog("[Standalone AI Bot] XAI_API_KEY not configured", "error");
+      return logs;
     }
 
     // Get or initialize bot state
@@ -506,14 +522,14 @@ async function executeStandaloneAIBot(ownerWalletAddress: string) {
     // Check daily trade limit
     const maxDailyTrades = config.maxDailyTrades || 10;
     if (botState.dailyTradesExecuted >= maxDailyTrades) {
-      console.log(`[Standalone AI Bot] Daily trade limit reached (${maxDailyTrades})`);
-      return;
+      addLog(`[Standalone AI Bot] Daily trade limit reached (${maxDailyTrades})`, "warning");
+      return logs;
     }
 
     // Get wallet keypair from encrypted key in config
     if (!config.treasuryKeyCiphertext || !config.treasuryKeyIv || !config.treasuryKeyAuthTag) {
-      console.error(`[Standalone AI Bot] No treasury key configured for wallet ${ownerWalletAddress}`);
-      return;
+      addLog(`[Standalone AI Bot] No treasury key configured for wallet ${ownerWalletAddress}`, "error");
+      return logs;
     }
 
     const { decrypt } = await import("./crypto");
@@ -531,29 +547,30 @@ async function executeStandaloneAIBot(ownerWalletAddress: string) {
     const budgetPerTrade = parseFloat(config.budgetPerTrade || "0");
 
     if (totalBudget > 0 && remainingBudget <= 0) {
-      console.log(`[Standalone AI Bot] Budget exhausted: ${budgetUsed}/${totalBudget} SOL used`);
-      return;
+      addLog(`💰 Budget exhausted: ${budgetUsed}/${totalBudget} SOL used`, "warning");
+      return logs;
     }
 
     // Reserve 0.01 SOL for transaction fees
     const FEE_RESERVE = 0.01;
     
     if (totalBudget > 0 && remainingBudget < budgetPerTrade + FEE_RESERVE) {
-      console.log(`[Standalone AI Bot] Insufficient budget: ${remainingBudget.toFixed(4)} SOL remaining (need ${budgetPerTrade} SOL + ${FEE_RESERVE} SOL fee reserve)`);
-      return;
+      addLog(`💰 Insufficient budget: ${remainingBudget.toFixed(4)} SOL remaining (need ${budgetPerTrade} SOL + ${FEE_RESERVE} SOL fee reserve)`, "warning");
+      return logs;
     }
 
     // Check SOL balance (with fee reserve)
     const solBalance = await getWalletBalance(treasuryKeypair.publicKey.toString());
     
     if (solBalance < budgetPerTrade + FEE_RESERVE) {
-      console.log(`[Standalone AI Bot] Insufficient SOL balance: ${solBalance.toFixed(4)} SOL (need ${budgetPerTrade} SOL + ${FEE_RESERVE} SOL for fees)`);
-      return;
+      addLog(`💰 Insufficient SOL balance: ${solBalance.toFixed(4)} SOL (need ${budgetPerTrade} SOL + ${FEE_RESERVE} SOL for fees)`, "error");
+      return logs;
     }
 
-    console.log(`[Standalone AI Bot] Budget status: ${budgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used (${remainingBudget.toFixed(4)} remaining)`);
+    addLog(`💰 Budget status: ${budgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used (${remainingBudget.toFixed(4)} remaining)`, "success");
 
     // Fetch trending tokens
+    addLog(`🔍 Fetching trending tokens from DexScreener...`, "info");
     const trendingTokens = await fetchTrendingPumpFunTokens();
     
     // Filter by volume threshold
@@ -561,11 +578,11 @@ async function executeStandaloneAIBot(ownerWalletAddress: string) {
     const filteredTokens = trendingTokens.filter((t) => t.volumeUSD24h >= minVolumeUSD);
 
     if (filteredTokens.length === 0) {
-      console.log("[Standalone AI Bot] No tokens meet volume criteria");
-      return;
+      addLog(`❌ No tokens meet volume criteria (minimum $${minVolumeUSD.toLocaleString()})`, "warning");
+      return logs;
     }
 
-    console.log(`[Standalone AI Bot] 🔍 Analyzing ${filteredTokens.length} tokens with AI...`);
+    addLog(`🔍 Analyzing ${filteredTokens.length} tokens with AI (Groq Llama 3.3-70B)...`, "info");
 
     // Analyze tokens with Grok AI
     const riskTolerance = (config.riskTolerance || "medium") as "low" | "medium" | "high";
@@ -575,34 +592,41 @@ async function executeStandaloneAIBot(ownerWalletAddress: string) {
       
       // Check if we've hit daily limit
       if (botState.dailyTradesExecuted >= maxDailyTrades) {
+        addLog(`⏹️ Daily trade limit reached (${maxDailyTrades})`, "warning");
         break;
       }
 
-      console.log(`\n[Standalone AI Bot] 📊 Analyzing token ${i + 1}/${filteredTokens.length}: ${token.symbol} (${token.name})`);
-      console.log(`[Standalone AI Bot]    💰 Price: $${token.priceUSD.toFixed(6)} (${token.priceSOL.toFixed(8)} SOL)`);
-      console.log(`[Standalone AI Bot]    📈 Volume 24h: $${token.volumeUSD24h.toLocaleString()}`);
-      console.log(`[Standalone AI Bot]    💎 Market Cap: $${token.marketCapUSD.toLocaleString()}`);
-      console.log(`[Standalone AI Bot]    💧 Liquidity: $${(token.liquidityUSD || 0).toLocaleString()}`);
-      console.log(`[Standalone AI Bot]    📊 Change 24h: ${(token.priceChange24h || 0) > 0 ? '+' : ''}${(token.priceChange24h || 0).toFixed(2)}%`);
+      addLog(`📊 Analyzing token ${i + 1}/${filteredTokens.length}: ${token.symbol} (${token.name})`, "info", {
+        symbol: token.symbol,
+        name: token.name,
+        priceUSD: token.priceUSD,
+        priceSOL: token.priceSOL,
+        volumeUSD24h: token.volumeUSD24h,
+        marketCapUSD: token.marketCapUSD,
+        liquidityUSD: token.liquidityUSD,
+        priceChange24h: token.priceChange24h,
+      });
 
       const analysis = await analyzeTokenWithGrok(token, riskTolerance, budgetPerTrade);
 
-      console.log(`[Standalone AI Bot] 🤖 AI Analysis:`);
-      console.log(`[Standalone AI Bot]    Action: ${analysis.action.toUpperCase()}`);
-      console.log(`[Standalone AI Bot]    Confidence: ${(analysis.confidence * 100).toFixed(1)}%`);
-      console.log(`[Standalone AI Bot]    Potential Upside: ${analysis.potentialUpsidePercent.toFixed(1)}%`);
-      console.log(`[Standalone AI Bot]    💭 Reasoning: ${analysis.reasoning}`);
+      addLog(`🤖 AI Analysis: ${analysis.action.toUpperCase()} | Confidence: ${(analysis.confidence * 100).toFixed(1)}% | Potential: ${analysis.potentialUpsidePercent.toFixed(1)}%`, "info", {
+        symbol: token.symbol,
+        action: analysis.action,
+        confidence: analysis.confidence,
+        potentialUpside: analysis.potentialUpsidePercent,
+        reasoning: analysis.reasoning,
+      });
 
       // Check minimum potential threshold (hardcoded 150% minimum)
       const minPotential = Math.max(parseFloat(config.minPotentialPercent || "150"), 150);
       if (analysis.potentialUpsidePercent < minPotential) {
-        console.log(`[Standalone AI Bot] ❌ SKIP: Potential ${analysis.potentialUpsidePercent.toFixed(1)}% below threshold ${minPotential}%\n`);
+        addLog(`⏭️ SKIP ${token.symbol}: Potential ${analysis.potentialUpsidePercent.toFixed(1)}% below threshold ${minPotential}%`, "warning");
         continue;
       }
 
       // Check confidence threshold
       if (analysis.confidence < 0.6) {
-        console.log(`[Standalone AI Bot] ❌ SKIP: Confidence ${(analysis.confidence * 100).toFixed(1)}% below 60% threshold\n`);
+        addLog(`⏭️ SKIP ${token.symbol}: Confidence ${(analysis.confidence * 100).toFixed(1)}% below 60% threshold`, "warning");
         continue;
       }
 
@@ -610,8 +634,12 @@ async function executeStandaloneAIBot(ownerWalletAddress: string) {
       if (analysis.action === "buy") {
         const amountSOL = analysis.suggestedBuyAmountSOL || budgetPerTrade;
         
-        console.log(`[Standalone AI Bot] BUY signal: ${token.symbol} - ${amountSOL} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
-        console.log(`[Standalone AI Bot] Reasoning: ${analysis.reasoning}`);
+        addLog(`🚀 BUY SIGNAL: ${token.symbol} - ${amountSOL} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%)`, "success", {
+          symbol: token.symbol,
+          amount: amountSOL,
+          confidence: analysis.confidence,
+          reasoning: analysis.reasoning,
+        });
 
         // Buy using Jupiter Ultra API for better routing and pricing
         const result = await buyTokenWithJupiter(
@@ -628,7 +656,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string) {
             ownerWalletAddress,
             budgetUsed: newBudgetUsed.toString(),
           });
-          console.log(`[Standalone AI Bot] Budget updated: ${newBudgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used`);
+          addLog(`💰 Budget updated: ${newBudgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used`, "info");
 
           // Record transaction (no project ID for standalone)
           await storage.createTransaction({
@@ -664,16 +692,26 @@ async function executeStandaloneAIBot(ownerWalletAddress: string) {
           });
 
           botState.dailyTradesExecuted++;
-          console.log(`[Standalone AI Bot] Trade executed successfully (${botState.dailyTradesExecuted}/${maxDailyTrades})`);
+          addLog(`✅ Trade executed successfully! ${token.symbol} bought (${botState.dailyTradesExecuted}/${maxDailyTrades} trades today)`, "success", {
+            symbol: token.symbol,
+            txSignature: result.signature,
+            amount: amountSOL,
+          });
         } else {
-          console.error(`[Standalone AI Bot] Trade failed: ${result.error}`);
+          addLog(`❌ Trade failed: ${result.error}`, "error");
         }
       }
     }
 
-    console.log(`[Standalone AI Bot] Run complete for wallet ${ownerWalletAddress}`);
+    addLog(`✅ Run complete for wallet ${ownerWalletAddress}`, "success");
+    return logs;
   } catch (error) {
+    const errorMessage = `❌ Error: ${error instanceof Error ? error.message : String(error)}`;
+    addLog(errorMessage, "error");
     console.error(`[Standalone AI Bot] Error for wallet ${ownerWalletAddress}:`, error);
+    if (collectLogs) {
+      return logs;
+    }
     throw error;
   }
 }
@@ -681,6 +719,6 @@ async function executeStandaloneAIBot(ownerWalletAddress: string) {
 /**
  * Manual trigger for standalone AI bot (no project required)
  */
-export async function triggerStandaloneAIBot(ownerWalletAddress: string) {
-  await executeStandaloneAIBot(ownerWalletAddress);
+export async function triggerStandaloneAIBot(ownerWalletAddress: string): Promise<ScanLog[]> {
+  return await executeStandaloneAIBot(ownerWalletAddress, true);
 }

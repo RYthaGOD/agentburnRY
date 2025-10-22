@@ -981,12 +981,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Execute the standalone AI trading bot
       const { triggerStandaloneAIBot } = await import("./ai-bot-scheduler");
-      await triggerStandaloneAIBot(ownerWalletAddress);
+      const scanLogs = await triggerStandaloneAIBot(ownerWalletAddress);
 
       res.json({
         success: true,
-        message: "AI bot scan and trade initiated",
+        message: "AI bot scan completed successfully",
         ownerWalletAddress,
+        logs: scanLogs,
       });
     } catch (error: any) {
       console.error("Manual standalone AI bot execution error:", error);
