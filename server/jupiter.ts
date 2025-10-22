@@ -190,7 +190,8 @@ export async function getTokenShieldInfo(mint: string): Promise<any> {
 
 /**
  * Get token price in SOL (not USD)
- * Quotes the token price against SOL by using Jupiter's vsToken parameter
+ * Uses Jupiter's new Price API v3 and calculates SOL-denominated price
+ * by dividing token USD price by SOL USD price
  * Includes retry logic with exponential backoff for resilience
  */
 export async function getTokenPrice(tokenMintAddress: string): Promise<number> {
@@ -200,9 +201,10 @@ export async function getTokenPrice(tokenMintAddress: string): Promise<number> {
   
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      // Using Jupiter's price API with vsToken to get SOL-denominated price
+      // Using Jupiter's new Price API v3 (lite-api.jup.ag)
+      // Fetch both token and SOL prices in USD
       const response = await fetch(
-        `https://price.jup.ag/v4/price?ids=${tokenMintAddress}&vsToken=${SOL_MINT}`,
+        `https://lite-api.jup.ag/price/v3?ids=${tokenMintAddress},${SOL_MINT}`,
         {
           signal: AbortSignal.timeout(10000), // 10 second timeout
         }
@@ -214,12 +216,22 @@ export async function getTokenPrice(tokenMintAddress: string): Promise<number> {
 
       const data = await response.json();
       
-      if (!data.data || !data.data[tokenMintAddress]) {
+      // V3 API returns data directly, not nested in data.data
+      const tokenData = data[tokenMintAddress];
+      const solData = data[SOL_MINT];
+
+      if (!tokenData || typeof tokenData.usdPrice !== 'number') {
         throw new Error("Token price not found");
       }
 
-      // This now returns price in SOL, not USD
-      return data.data[tokenMintAddress].price;
+      if (!solData || typeof solData.usdPrice !== 'number') {
+        throw new Error("SOL price not found");
+      }
+
+      // Calculate SOL-denominated price: tokenPriceUSD / solPriceUSD
+      const tokenPriceInSOL = tokenData.usdPrice / solData.usdPrice;
+      
+      return tokenPriceInSOL;
     } catch (error) {
       const isLastAttempt = attempt === MAX_RETRIES - 1;
       
