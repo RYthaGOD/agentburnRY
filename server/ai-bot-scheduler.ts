@@ -4,7 +4,8 @@
 import cron from "node-cron";
 import { storage } from "./storage";
 import { analyzeTokenWithGrok, isGrokConfigured, type TokenMarketData } from "./grok-analysis";
-import { buyTokenOnPumpFun, sellTokenOnPumpFun } from "./pumpfun";
+import { buyTokenWithJupiter } from "./jupiter";
+import { sellTokenOnPumpFun } from "./pumpfun";
 import { getTreasuryKey } from "./key-manager";
 import { getWalletBalance } from "./solana";
 import { deductTransactionFee } from "./transaction-fee";
@@ -249,12 +250,18 @@ async function executeAITradingBot(project: Project) {
         console.log(`[AI Bot] BUY signal: ${token.symbol} - ${amountSOL} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
         console.log(`[AI Bot] Reasoning: ${analysis.reasoning}`);
 
-        const result = await buyTokenOnPumpFun(
-          treasuryKeypair,
+        // Buy using Jupiter Ultra API for better routing and pricing
+        const treasuryPrivateKey = await getTreasuryKey(project.id);
+        if (!treasuryPrivateKey) {
+          console.log(`[AI Bot] No private key available for project ${project.id}`);
+          continue;
+        }
+        
+        const result = await buyTokenWithJupiter(
+          treasuryPrivateKey,
           token.mint,
           amountSOL,
-          10, // 10% slippage
-          0.00001 // Priority fee
+          1000 // 10% slippage (1000 bps)
         );
 
         if (result.success && result.signature) {

@@ -285,3 +285,65 @@ export async function getSwapQuote(
     route: order,
   };
 }
+
+/**
+ * Buy token using SOL via Jupiter Ultra API (for AI Trading Bot)
+ * @param walletPrivateKey - Base58-encoded private key
+ * @param tokenMint - Token to buy
+ * @param amountSOL - Amount in SOL (not lamports)
+ * @param slippageBps - Slippage in basis points (default: 1000 = 10%)
+ * @returns Transaction result with signature
+ */
+export async function buyTokenWithJupiter(
+  walletPrivateKey: string,
+  tokenMint: string,
+  amountSOL: number,
+  slippageBps: number = 1000
+): Promise<{
+  success: boolean;
+  signature?: string;
+  error?: string;
+  outputAmount?: number;
+}> {
+  try {
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    const keypair = loadKeypairFromPrivateKey(walletPrivateKey);
+    const walletAddress = keypair.publicKey.toString();
+    
+    // Convert SOL to lamports
+    const amountLamports = Math.floor(amountSOL * 1_000_000_000);
+    
+    console.log(`[Jupiter] Buying ${amountSOL} SOL worth of ${tokenMint}`);
+    console.log(`[Jupiter] Wallet: ${walletAddress}`);
+    console.log(`[Jupiter] Amount: ${amountLamports} lamports`);
+    console.log(`[Jupiter] Slippage: ${slippageBps / 100}%`);
+    
+    // Get swap order
+    const swapOrder = await getSwapOrder(
+      SOL_MINT,
+      tokenMint,
+      amountLamports,
+      walletAddress,
+      slippageBps
+    );
+    
+    console.log(`[Jupiter] Expected output: ${swapOrder.outputAmount} tokens`);
+    
+    // Execute swap
+    const result = await executeSwapOrder(swapOrder, walletPrivateKey);
+    
+    console.log(`[Jupiter] Buy successful: ${result.transactionId}`);
+    
+    return {
+      success: true,
+      signature: result.transactionId,
+      outputAmount: parseInt(result.outputAmountResult || "0"),
+    };
+  } catch (error) {
+    console.error(`[Jupiter] Buy failed:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
