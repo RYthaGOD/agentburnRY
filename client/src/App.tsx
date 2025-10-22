@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SolanaWalletProvider } from "@/lib/wallet-provider";
+import { RealtimeProvider } from "@/hooks/use-realtime";
 import Landing from "@/pages/landing";
 import Dashboard from "@/pages/dashboard";
 import NewProject from "@/pages/new-project";
@@ -56,8 +57,10 @@ function App() {
       <SolanaWalletProvider>
         <ThemeProvider defaultTheme="dark">
           <TooltipProvider>
-            <Toaster />
-            <Router />
+            <RealtimeProvider>
+              <Toaster />
+              <Router />
+            </RealtimeProvider>
           </TooltipProvider>
         </ThemeProvider>
       </SolanaWalletProvider>
