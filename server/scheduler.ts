@@ -60,27 +60,60 @@ class BuybackScheduler {
         const isWhitelisted = WHITELISTED_WALLETS.includes(project.ownerWalletAddress);
 
         if (!isWhitelisted) {
-          // Check for active trial first
-          const hasActiveTrial = project.trialEndsAt && new Date(project.trialEndsAt) > now;
-          
-          if (!hasActiveTrial) {
-            // Check if payment is still valid - get the most recent valid payment
-            const payments = await storage.getPaymentsByProject(project.id);
-            const validPayments = payments.filter(p => 
-              p.verified && new Date(p.expiresAt) > now
-            );
+          // Auto-grant trial to projects without one (if within first 100 projects)
+          if (!project.trialEndsAt) {
+            const allProjects = await storage.getAllProjects();
+            const projectCount = allProjects.length;
             
-            // Sort by creation date descending to get the most recent payment
-            const validPayment = validPayments.sort((a, b) => 
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            )[0];
+            if (projectCount <= 100) {
+              // Auto-grant 10-day trial for early users
+              const tenDaysFromNow = new Date();
+              tenDaysFromNow.setDate(tenDaysFromNow.getDate() + 10);
+              
+              await storage.updateProject(project.id, {
+                trialEndsAt: tenDaysFromNow,
+              });
+              
+              console.log(`Project ${project.name} - auto-granted 10-day trial (early user benefit)`);
+              // Continue execution - trial just granted
+            } else {
+              // After 100 projects, require payment
+              const payments = await storage.getPaymentsByProject(project.id);
+              const validPayments = payments.filter(p => 
+                p.verified && new Date(p.expiresAt) > now
+              );
+              
+              const validPayment = validPayments.sort((a, b) => 
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+              )[0];
 
-            if (!validPayment) {
-              console.log(`Project ${project.name} has no valid payment or trial - skipping`);
-              continue;
+              if (!validPayment) {
+                console.log(`Project ${project.name} has no valid payment or trial - skipping`);
+                continue;
+              }
             }
           } else {
-            console.log(`Project ${project.name} - has active trial, executing buyback`);
+            // Check for active trial
+            const hasActiveTrial = new Date(project.trialEndsAt) > now;
+            
+            if (!hasActiveTrial) {
+              // Trial expired - check if payment is still valid
+              const payments = await storage.getPaymentsByProject(project.id);
+              const validPayments = payments.filter(p => 
+                p.verified && new Date(p.expiresAt) > now
+              );
+              
+              const validPayment = validPayments.sort((a, b) => 
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+              )[0];
+
+              if (!validPayment) {
+                console.log(`Project ${project.name} trial expired and no valid payment - skipping`);
+                continue;
+              }
+            } else {
+              console.log(`Project ${project.name} - has active trial, executing buyback`);
+            }
           }
         } else {
           console.log(`Project ${project.name} - owner wallet is whitelisted, bypassing payment check`);

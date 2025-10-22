@@ -243,6 +243,21 @@ export const setProjectKeysSchema = z.object({
   pumpfunPrivateKey: z.string().optional(),
 });
 
+// AI Bot Config schema
+export const insertAIBotConfigSchema = createInsertSchema(aiBotConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  totalBudget: z.string().min(0, "Total budget must be positive"),
+  budgetPerTrade: z.string().min(0, "Budget per trade must be positive"),
+  analysisInterval: z.number().min(5).max(1440), // 5 min to 24 hours
+  minVolumeUSD: z.string().min(0, "Minimum volume must be positive"),
+  minPotentialPercent: z.string().min(0, "Minimum potential must be positive"),
+  maxDailyTrades: z.number().min(1).max(100),
+  riskTolerance: z.enum(["low", "medium", "high"]),
+});
+
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Transaction = typeof transactions.$inferSelect;
@@ -254,3 +269,5 @@ export type InsertUsedSignature = z.infer<typeof insertUsedSignatureSchema>;
 export type ProjectSecret = typeof projectSecrets.$inferSelect;
 export type InsertProjectSecret = z.infer<typeof insertProjectSecretSchema>;
 export type SetProjectKeys = z.infer<typeof setProjectKeysSchema>;
+export type AIBotConfig = typeof aiBotConfigs.$inferSelect;
+export type InsertAIBotConfig = z.infer<typeof insertAIBotConfigSchema>;

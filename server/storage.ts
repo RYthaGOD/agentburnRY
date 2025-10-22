@@ -4,6 +4,7 @@ import {
   payments,
   usedSignatures,
   projectSecrets,
+  aiBotConfigs,
   type Project,
   type InsertProject,
   type Transaction,
@@ -14,6 +15,8 @@ import {
   type InsertUsedSignature,
   type ProjectSecret,
   type InsertProjectSecret,
+  type AIBotConfig,
+  type InsertAIBotConfig,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -49,6 +52,11 @@ export interface IStorage {
   setProjectSecrets(secrets: InsertProjectSecret): Promise<ProjectSecret>;
   updateProjectSecrets(projectId: string, secrets: Partial<InsertProjectSecret>): Promise<ProjectSecret | undefined>;
   deleteProjectSecrets(projectId: string): Promise<boolean>;
+
+  // AI Bot Config operations (standalone, not tied to projects)
+  getAIBotConfig(ownerWalletAddress: string): Promise<AIBotConfig | undefined>;
+  createOrUpdateAIBotConfig(config: Partial<InsertAIBotConfig> & { ownerWalletAddress: string }): Promise<AIBotConfig>;
+  deleteAIBotConfig(ownerWalletAddress: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -253,6 +261,46 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(projectSecrets)
       .where(eq(projectSecrets.projectId, projectId));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // AI Bot Config operations
+  async getAIBotConfig(ownerWalletAddress: string): Promise<AIBotConfig | undefined> {
+    const [config] = await db
+      .select()
+      .from(aiBotConfigs)
+      .where(eq(aiBotConfigs.ownerWalletAddress, ownerWalletAddress));
+    return config || undefined;
+  }
+
+  async createOrUpdateAIBotConfig(
+    config: Partial<InsertAIBotConfig> & { ownerWalletAddress: string }
+  ): Promise<AIBotConfig> {
+    // Check if config exists for this wallet
+    const existing = await this.getAIBotConfig(config.ownerWalletAddress);
+
+    if (existing) {
+      // Update existing config
+      const [updated] = await db
+        .update(aiBotConfigs)
+        .set({ ...config, updatedAt: new Date() })
+        .where(eq(aiBotConfigs.ownerWalletAddress, config.ownerWalletAddress))
+        .returning();
+      return updated;
+    } else {
+      // Create new config
+      const [created] = await db
+        .insert(aiBotConfigs)
+        .values(config as InsertAIBotConfig)
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteAIBotConfig(ownerWalletAddress: string): Promise<boolean> {
+    const result = await db
+      .delete(aiBotConfigs)
+      .where(eq(aiBotConfigs.ownerWalletAddress, ownerWalletAddress));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 }
