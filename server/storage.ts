@@ -36,6 +36,7 @@ export interface IStorage {
   getAllTransactions(): Promise<Transaction[]>;
   getRecentTransactions(limit: number): Promise<Transaction[]>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
+  updateTransaction(txSignature: string, updates: Partial<InsertTransaction>): Promise<Transaction | undefined>;
 
   // Payment operations
   getPayment(id: string): Promise<Payment | undefined>;
@@ -167,6 +168,15 @@ export class DatabaseStorage implements IStorage {
       .values(insertTransaction)
       .returning();
     return transaction;
+  }
+
+  async updateTransaction(txSignature: string, updates: Partial<InsertTransaction>): Promise<Transaction | undefined> {
+    const [transaction] = await db
+      .update(transactions)
+      .set(updates)
+      .where(eq(transactions.txSignature, txSignature))
+      .returning();
+    return transaction || undefined;
   }
 
   // Payment operations
