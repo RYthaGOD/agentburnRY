@@ -87,12 +87,15 @@ export async function executeVolumeBot(project: Project): Promise<TradingBotResu
     result.transactionSignatures.push(buyResult.transactionId);
     result.volume += buyAmountSOL;
 
-    // Record buy transaction
+    // Record buy transaction (use correct token decimals)
+    const tokenDecimals = project.tokenDecimals || 9;
+    const decimalDivisor = Math.pow(10, tokenDecimals);
+    
     await storage.createTransaction({
       projectId: project.id,
       type: "buyback",
       amount: buyAmountSOL.toString(),
-      tokenAmount: (parseInt(buyResult.outputAmountResult) / 1e9).toString(),
+      tokenAmount: (parseInt(buyResult.outputAmountResult) / decimalDivisor).toString(),
       txSignature: buyResult.transactionId,
       status: "completed",
     });
@@ -100,9 +103,7 @@ export async function executeVolumeBot(project: Project): Promise<TradingBotResu
     console.log(`[Volume Bot] Buy completed: ${buyResult.transactionId}`);
     console.log(`[Volume Bot] Received: ${buyResult.outputAmountResult} tokens`);
 
-    // Calculate actual buy price
-    const tokensBought = parseInt(buyResult.outputAmountResult);
-    const actualBuyPrice = buyAmountSOL / (tokensBought / 1e9); // Price per token in SOL
+    // Note: Price accuracy calculation omitted for volume bot (buy/sell cycle, not targeting specific price)
 
     // STEP 2: Sell portion of tokens back to SOL
     const tokensReceived = parseInt(buyResult.outputAmountResult);
@@ -124,12 +125,12 @@ export async function executeVolumeBot(project: Project): Promise<TradingBotResu
     const solReceived = parseInt(sellResult.outputAmountResult) / LAMPORTS_PER_SOL;
     result.volume += solReceived;
 
-    // Record sell transaction
+    // Record sell transaction (use correct token decimals)
     await storage.createTransaction({
       projectId: project.id,
       type: "buyback", // Categorized as buyback for volume trading
       amount: solReceived.toString(),
-      tokenAmount: (tokensToSell / 1e9).toString(),
+      tokenAmount: (tokensToSell / decimalDivisor).toString(),
       txSignature: sellResult.transactionId,
       status: "completed",
     });
@@ -249,12 +250,16 @@ export async function executeBuyBot(project: Project): Promise<TradingBotResult>
           result.transactionSignatures.push(buyResult.transactionId);
           result.volume += buyAmountSOL;
 
+          // Calculate decimal divisor for this token
+          const tokenDecimals = project.tokenDecimals || 9; // Default to 9 if not set
+          const decimalDivisor = Math.pow(10, tokenDecimals);
+
           // Record buy transaction
           await storage.createTransaction({
             projectId: project.id,
             type: "buyback",
             amount: buyAmountSOL.toString(),
-            tokenAmount: (parseInt(buyResult.outputAmountResult) / 1e9).toString(),
+            tokenAmount: (parseInt(buyResult.outputAmountResult) / decimalDivisor).toString(),
             txSignature: buyResult.transactionId,
             status: "completed",
           });
@@ -263,16 +268,29 @@ export async function executeBuyBot(project: Project): Promise<TradingBotResult>
           console.log(`[Buy Bot] Received: ${buyResult.outputAmountResult} tokens`);
 
           // Calculate actual execution price
-          const tokensBought = parseInt(buyResult.outputAmountResult);
-          const actualPrice = buyAmountSOL / (tokensBought / 1e9);
-          const deviationBps = Math.round(((actualPrice - targetPrice) / targetPrice) * 10000);
+          // Note: Jupiter returns token amount in base units (raw lamports-equivalent)
+          // We need to normalize using the token's actual decimal places from mint metadata
+          const tokensReceived = parseInt(buyResult.outputAmountResult) / decimalDivisor;
+          const solSpent = buyAmountSOL;
+          const actualPricePerToken = solSpent / tokensReceived; // SOL per token
+          const expectedPricePerToken = targetPrice;
+
+          // Calculate price deviation in basis points (1 bp = 0.01%)
+          const deviationBps = Math.round(((actualPricePerToken - expectedPricePerToken) / expectedPricePerToken) * 10000);
+
+          // Store accuracy data in transaction
+          await storage.updateTransaction(buyResult.transactionId, {
+            expectedPriceSOL: expectedPricePerToken.toString(),
+            actualPriceSOL: actualPricePerToken.toString(),
+            priceDeviationBps: deviationBps,
+          });
 
           // Emit accuracy check event
           realtimeService.emitAccuracyCheck({
             projectId: project.id,
             transactionId: buyResult.transactionId,
-            expectedPriceSOL: targetPrice,
-            actualPriceSOL: actualPrice,
+            expectedPriceSOL: expectedPricePerToken,
+            actualPriceSOL: actualPricePerToken,
             deviationBps,
             withinThreshold: Math.abs(deviationBps) <= 500, // 5% threshold
           });

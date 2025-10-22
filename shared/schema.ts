@@ -8,6 +8,7 @@ export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   tokenMintAddress: text("token_mint_address").notNull(),
+  tokenDecimals: integer("token_decimals").notNull().default(9), // SPL token decimal places (typically 6, 8, or 9)
   treasuryWalletAddress: text("treasury_wallet_address").notNull(),
   burnAddress: text("burn_address").notNull(),
   schedule: text("schedule").notNull(), // hourly, daily, weekly, custom

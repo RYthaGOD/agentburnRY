@@ -62,6 +62,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const [latestPrices, setLatestPrices] = useState<Map<string, PriceUpdate>>(new Map());
   const wsRef = useRef<WebSocket | null>(null);
   const queryClient = useQueryClient();
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isIntentionalCloseRef = useRef(false);
 
   // Subscriber callbacks
   const priceUpdateCallbacksRef = useRef<Set<(update: PriceUpdate) => void>>(new Set());
@@ -69,8 +72,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const transactionCallbacksRef = useRef<Set<(event: TransactionEvent) => void>>(new Set());
   const accuracyCheckCallbacksRef = useRef<Set<(event: AccuracyCheck) => void>>(new Set());
 
-  // Connect to WebSocket
-  useEffect(() => {
+  // WebSocket connection setup function
+  const connectWebSocket = useCallback(() => {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
     const wsUrl = `${protocol}//${host}/ws`;
@@ -81,6 +84,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     ws.onopen = () => {
       console.log("[WebSocket] Connected to real-time server");
       setIsConnected(true);
+      reconnectAttemptsRef.current = 0; // Reset reconnect attempts on successful connection
     };
 
     ws.onmessage = (event) => {
@@ -133,12 +137,15 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           case "transaction_event": {
             const txEvent = message.data as TransactionEvent;
             
-            // Invalidate transactions list
+            // Invalidate transactions list and project metrics
             queryClient.invalidateQueries({ 
               queryKey: ["/api/transactions/project", txEvent.projectId] 
             });
             queryClient.invalidateQueries({ 
               queryKey: ["/api/projects", txEvent.projectId, "transactions", "recent"] 
+            });
+            queryClient.invalidateQueries({ 
+              queryKey: ["/api/projects", txEvent.projectId, "metrics"] 
             });
 
             // Notify subscribers
@@ -150,6 +157,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
           case "accuracy_check": {
             const accuracyCheck = message.data as AccuracyCheck;
+            
+            // Invalidate transaction queries to refresh accuracy data
+            queryClient.invalidateQueries({ 
+              queryKey: ["/api/projects", accuracyCheck.projectId, "transactions", "recent"] 
+            });
             
             // Notify subscribers
             accuracyCheckCallbacksRef.current.forEach((callback) => {
@@ -172,17 +184,42 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       console.log("[WebSocket] Disconnected from real-time server");
       setIsConnected(false);
       
-      // Attempt to reconnect after 5 seconds
-      setTimeout(() => {
-        console.log("[WebSocket] Attempting to reconnect...");
-        window.location.reload();
-      }, 5000);
-    };
-
-    return () => {
-      ws.close();
+      // Don't reconnect if this was an intentional close (component unmount)
+      if (isIntentionalCloseRef.current) {
+        return;
+      }
+      
+      // Exponential backoff reconnection (max 5 attempts: 1s, 2s, 4s, 8s, 16s)
+      const maxAttempts = 5;
+      if (reconnectAttemptsRef.current < maxAttempts) {
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 16000);
+        console.log(`[WebSocket] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxAttempts})`);
+        
+        reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectAttemptsRef.current++;
+          connectWebSocket(); // Reconnect without page reload
+        }, delay);
+      } else {
+        console.error("[WebSocket] Max reconnection attempts reached. Please refresh the page.");
+      }
     };
   }, [queryClient]);
+
+  // Connect on mount
+  useEffect(() => {
+    isIntentionalCloseRef.current = false;
+    connectWebSocket();
+
+    return () => {
+      isIntentionalCloseRef.current = true;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [connectWebSocket]);
 
   const subscribeToPriceUpdates = useCallback((callback: (update: PriceUpdate) => void) => {
     priceUpdateCallbacksRef.current.add(callback);

@@ -43,6 +43,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/projects", async (req, res) => {
     try {
       const validatedData = insertProjectSchema.parse(req.body);
+      
+      // Fetch token decimals from blockchain if not provided
+      if (!validatedData.tokenDecimals && validatedData.tokenMintAddress) {
+        const { getTokenDecimals } = await import("./solana-mint");
+        try {
+          const decimals = await getTokenDecimals(validatedData.tokenMintAddress);
+          validatedData.tokenDecimals = decimals;
+        } catch (error) {
+          console.error("Failed to fetch token decimals, using default:", error);
+          validatedData.tokenDecimals = 9; // Fallback to default
+        }
+      }
+      
       const project = await storage.createProject(validatedData);
       res.status(201).json(project);
     } catch (error: any) {
