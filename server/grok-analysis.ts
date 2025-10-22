@@ -1,16 +1,43 @@
-// Grok AI-powered trading analysis service for PumpFun tokens
-// Uses xAI's Grok API to analyze market data and generate trading signals
+// AI-powered trading analysis service for PumpFun tokens
+// Supports both Groq (free, Llama 3) and xAI Grok (paid)
 
 import OpenAI from "openai";
 
-// xAI integration - using xAI blueprint pattern
-const grokClient = new OpenAI({
-  baseURL: "https://api.x.ai/v1",
-  apiKey: process.env.XAI_API_KEY,
-});
+/**
+ * Initialize AI client - Groq (free) preferred, xAI as fallback
+ */
+function getAIClient(): { client: OpenAI; model: string; provider: string } {
+  // Prefer Groq (completely free with generous limits)
+  if (process.env.GROQ_API_KEY) {
+    return {
+      client: new OpenAI({
+        baseURL: "https://api.groq.com/openai/v1",
+        apiKey: process.env.GROQ_API_KEY,
+      }),
+      model: "llama-3.1-70b-versatile", // Free, fast, excellent for analysis
+      provider: "Groq (free)",
+    };
+  }
+  
+  // Fallback to xAI Grok (paid)
+  if (process.env.XAI_API_KEY) {
+    return {
+      client: new OpenAI({
+        baseURL: "https://api.x.ai/v1",
+        apiKey: process.env.XAI_API_KEY,
+      }),
+      model: "grok-4-fast-reasoning",
+      provider: "xAI Grok",
+    };
+  }
 
-// Use cost-efficient Grok model (98% cheaper than grok-4)
-const MODEL = "grok-4-fast-reasoning";
+  throw new Error("No AI API key configured. Set GROQ_API_KEY (free) or XAI_API_KEY (paid)");
+}
+
+// Check if any AI provider is configured
+export function isGrokConfigured(): boolean {
+  return !!(process.env.GROQ_API_KEY || process.env.XAI_API_KEY);
+}
 
 export interface TokenMarketData {
   mint: string;
@@ -49,7 +76,10 @@ export async function analyzeTokenWithGrok(
   budgetPerTrade: number
 ): Promise<TradingAnalysis> {
   try {
-    // Build comprehensive prompt for Grok
+    const { client, model, provider } = getAIClient();
+    console.log(`[AI Analysis] Using ${provider} - Model: ${model}`);
+    
+    // Build comprehensive prompt for AI analysis
     const prompt = `You are a professional cryptocurrency trading analyst specializing in Solana PumpFun tokens. Analyze the following token and provide a trading recommendation.
 
 **Token Data:**
@@ -91,8 +121,8 @@ Provide your analysis in JSON format with these exact fields:
 
     console.log(`[Grok AI] Analyzing token ${tokenData.symbol}...`);
 
-    const response = await grokClient.chat.completions.create({
-      model: MODEL,
+    const response = await client.chat.completions.create({
+      model: model,
       messages: [
         {
           role: "system",
@@ -189,13 +219,6 @@ export async function analyzeTokenBatch(
   );
 
   return results;
-}
-
-/**
- * Check if Grok API key is configured
- */
-export function isGrokConfigured(): boolean {
-  return !!process.env.XAI_API_KEY && process.env.XAI_API_KEY.length > 0;
 }
 
 /**
