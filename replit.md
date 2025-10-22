@@ -35,7 +35,7 @@ The platform includes automated trading bots with comprehensive configuration in
   
   **Budget Management:** Total SOL budget allocation with real-time usage tracking. Prevents overspending by checking remaining budget before each trade and updating budget used after execution. Visual progress bars show budget consumption per project.
   
-  **Configurable Parameters:** Total budget (SOL), budget per trade, analysis interval, minimum volume threshold (USD), minimum potential upside (≥150%), daily trade limit, and risk tolerance (low/medium/high). Uses PumpPortal API for trading execution. All completely free (Groq + DexScreener).
+  **Configurable Parameters:** Total budget (SOL), budget per trade, analysis interval, minimum volume threshold (USD), minimum potential upside (≥150%), daily trade limit, and risk tolerance (low/medium/high). Uses Jupiter Ultra API for trading execution (better routing and pricing). All completely free (Groq + DexScreener + Jupiter).
 
 Price fetching for all bots uses Jupiter Price v3 API for SOL-denominated prices.
 
@@ -91,9 +91,9 @@ A 0.5% transaction fee applies to all transaction types (buybacks, volume bot, b
 
 **Third-Party Services:**
 - Neon Database (PostgreSQL)
-- Jupiter Ultra API (Swap API)
+- Jupiter Ultra API (Swap API) - Used for all AI bot trades (buybacks, volume bot, buy bot use Jupiter)
 - Jupiter Price API v3 (lite-api.jup.ag) - SOL-denominated prices via USD conversion
-- PumpFun Lightning API & PumpPortal Trading API
+- PumpFun Lightning API (creator rewards only)
 - Groq API (Llama 3.3-70B - free AI trading analysis, primary)
 - xAI Grok API (grok-4-fast-reasoning - paid fallback if Groq unavailable)
 - DexScreener API (free real-time token market data)
