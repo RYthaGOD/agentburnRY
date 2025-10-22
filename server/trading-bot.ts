@@ -7,6 +7,8 @@ import { storage } from "./storage";
 import type { Project, InsertTransaction } from "@shared/schema";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { realtimeService } from "./realtime";
+import { deductTransactionFee } from "./transaction-fee";
+import { loadKeypairFromPrivateKey } from "./solana-sdk";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -71,9 +73,20 @@ export async function executeVolumeBot(project: Project): Promise<TradingBotResu
       throw new Error("Treasury key not found");
     }
 
+    // Deduct transaction fee if applicable (after 60 transactions)
+    const keypair = loadKeypairFromPrivateKey(treasuryKey);
+    const feeResult = await deductTransactionFee(project.id, buyAmountSOL, keypair);
+    
+    let actualBuyAmount = buyAmountSOL;
+    if (feeResult.feeDeducted > 0) {
+      console.log(`[Volume Bot] Transaction fee deducted: ${feeResult.feeDeducted} SOL (0.5%)`);
+      console.log(`[Volume Bot] Fee transaction: ${feeResult.txSignature}`);
+      actualBuyAmount = feeResult.remainingAmount;
+    }
+
     // STEP 1: Buy tokens with SOL
-    console.log(`[Volume Bot] Step 1: Buying ${buyAmountSOL} SOL worth of tokens`);
-    const buyAmountLamports = Math.floor(buyAmountSOL * LAMPORTS_PER_SOL);
+    console.log(`[Volume Bot] Step 1: Buying ${actualBuyAmount} SOL worth of tokens`);
+    const buyAmountLamports = Math.floor(actualBuyAmount * LAMPORTS_PER_SOL);
     
     const buyOrder = await getSwapOrder(
       SOL_MINT,
@@ -85,7 +98,7 @@ export async function executeVolumeBot(project: Project): Promise<TradingBotResu
 
     const buyResult = await executeSwapOrder(buyOrder, treasuryKey);
     result.transactionSignatures.push(buyResult.transactionId);
-    result.volume += buyAmountSOL;
+    result.volume += actualBuyAmount;
 
     // Record buy transaction (use correct token decimals)
     const tokenDecimals = project.tokenDecimals || 9;
@@ -94,7 +107,7 @@ export async function executeVolumeBot(project: Project): Promise<TradingBotResu
     await storage.createTransaction({
       projectId: project.id,
       type: "buyback",
-      amount: buyAmountSOL.toString(),
+      amount: actualBuyAmount.toString(),
       tokenAmount: (parseInt(buyResult.outputAmountResult) / decimalDivisor).toString(),
       txSignature: buyResult.transactionId,
       status: "completed",
@@ -236,7 +249,18 @@ export async function executeBuyBot(project: Project): Promise<TradingBotResult>
         console.log(`[Buy Bot] Executing limit order: Buy ${buyAmountSOL} SOL at ${targetPrice} SOL (current: ${currentPrice})`);
 
         try {
-          const buyAmountLamports = Math.floor(buyAmountSOL * LAMPORTS_PER_SOL);
+          // Deduct transaction fee if applicable (after 60 transactions)
+          const keypair = loadKeypairFromPrivateKey(treasuryKey);
+          const feeResult = await deductTransactionFee(project.id, buyAmountSOL, keypair);
+          
+          let actualBuyAmount = buyAmountSOL;
+          if (feeResult.feeDeducted > 0) {
+            console.log(`[Buy Bot] Transaction fee deducted: ${feeResult.feeDeducted} SOL (0.5%)`);
+            console.log(`[Buy Bot] Fee transaction: ${feeResult.txSignature}`);
+            actualBuyAmount = feeResult.remainingAmount;
+          }
+
+          const buyAmountLamports = Math.floor(actualBuyAmount * LAMPORTS_PER_SOL);
           
           const buyOrder = await getSwapOrder(
             SOL_MINT,
@@ -258,7 +282,7 @@ export async function executeBuyBot(project: Project): Promise<TradingBotResult>
           await storage.createTransaction({
             projectId: project.id,
             type: "buyback",
-            amount: buyAmountSOL.toString(),
+            amount: actualBuyAmount.toString(),
             tokenAmount: (parseInt(buyResult.outputAmountResult) / decimalDivisor).toString(),
             txSignature: buyResult.transactionId,
             status: "completed",
@@ -271,7 +295,7 @@ export async function executeBuyBot(project: Project): Promise<TradingBotResult>
           // Note: Jupiter returns token amount in base units (raw lamports-equivalent)
           // We need to normalize using the token's actual decimal places from mint metadata
           const tokensReceived = parseInt(buyResult.outputAmountResult) / decimalDivisor;
-          const solSpent = buyAmountSOL;
+          const solSpent = actualBuyAmount;
           const actualPricePerToken = solSpent / tokensReceived; // SOL per token
           const expectedPricePerToken = targetPrice;
 

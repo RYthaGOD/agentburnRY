@@ -14,6 +14,8 @@ import { burnTokens, loadKeypairFromPrivateKey, getSolBalance } from "./solana-s
 import { executeVolumeBot, executeBuyBot, shouldRunVolumeBot } from "./trading-bot";
 import { deductTransactionFee } from "./transaction-fee";
 
+const SOL_MINT = "So11111111111111111111111111111111111111112";
+
 interface SchedulerConfig {
   enabled: boolean;
 }
@@ -365,7 +367,6 @@ class BuybackScheduler {
 
           // Burn the tokens using SPL Token burn instruction
           console.log(`2. Burning ${tokenAmount} tokens (reduces supply permanently)...`);
-          const keypair = loadKeypairFromPrivateKey(treasuryPrivateKey);
           const burnSignature = await burnTokens(
             project.tokenMintAddress,
             keypair,
