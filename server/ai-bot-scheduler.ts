@@ -184,8 +184,11 @@ async function executeAITradingBot(project: Project) {
       return;
     }
 
-    if (totalBudget > 0 && remainingBudget < budgetPerTrade) {
-      console.log(`[AI Bot] Insufficient budget: ${remainingBudget} SOL remaining (need ${budgetPerTrade} SOL per trade)`);
+    // Reserve 0.01 SOL for transaction fees
+    const FEE_RESERVE = 0.01;
+    
+    if (totalBudget > 0 && remainingBudget < budgetPerTrade + FEE_RESERVE) {
+      console.log(`[AI Bot] Insufficient budget: ${remainingBudget.toFixed(4)} SOL remaining (need ${budgetPerTrade} SOL + ${FEE_RESERVE} SOL fee reserve)`);
       await storage.updateProject(project.id, {
         lastBotStatus: "skipped",
         lastBotRunAt: new Date(),
@@ -193,11 +196,11 @@ async function executeAITradingBot(project: Project) {
       return;
     }
 
-    // Check SOL balance
+    // Check SOL balance (with fee reserve)
     const solBalance = await getWalletBalance(treasuryKeypair.publicKey.toString());
     
-    if (solBalance < budgetPerTrade + 0.01) { // +0.01 for fees
-      console.log(`[AI Bot] Insufficient SOL balance: ${solBalance} SOL`);
+    if (solBalance < budgetPerTrade + FEE_RESERVE) {
+      console.log(`[AI Bot] Insufficient SOL balance: ${solBalance.toFixed(4)} SOL (need ${budgetPerTrade} SOL + ${FEE_RESERVE} SOL for fees)`);
       await storage.updateProject(project.id, {
         lastBotStatus: "failed",
         lastBotRunAt: new Date(),

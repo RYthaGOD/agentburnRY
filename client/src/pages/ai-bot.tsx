@@ -444,11 +444,18 @@ export default function AIBot() {
       {/* Info */}
       <Alert>
         <TrendingUp className="h-4 w-4" />
-        <AlertTitle>Trading Strategy</AlertTitle>
+        <AlertTitle>Trading Strategy & Safety</AlertTitle>
         <AlertDescription>
-          The bot uses <strong>Jupiter Ultra API</strong> for all swaps (better routing & pricing than PumpPortal).
+          The bot uses <strong>Jupiter Ultra API</strong> for all swaps (better routing & pricing).
           Trades are only executed when AI confidence ≥ 60% AND potential return ≥ {form.watch("minPotentialPercent") || "150"}%.
-          All transactions appear on the Transactions page.
+          <br /><br />
+          <strong>Safety Features:</strong>
+          <br />
+          • Always keeps <strong>0.01 SOL reserve</strong> for transaction fees
+          <br />
+          • Won't trade if budget - used &lt; (trade amount + 0.01 SOL)
+          <br />
+          • All transactions appear on the Transactions page
         </AlertDescription>
       </Alert>
     </div>
