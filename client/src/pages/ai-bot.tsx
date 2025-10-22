@@ -71,7 +71,7 @@ function ScanAndTradeButton({ project }: { project: Project }) {
 
       toast({
         title: "Scanning Market...",
-        description: "AI is analyzing trending tokens from DexScreener",
+        description: "AI is analyzing trending Solana tokens (not your project token). Looking for trading opportunities...",
       });
 
       // Execute AI bot scan and trade
@@ -85,8 +85,8 @@ function ScanAndTradeButton({ project }: { project: Project }) {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
 
       toast({
-        title: "Scan Complete",
-        description: "AI bot has analyzed the market. Check transactions for results.",
+        title: "Market Scan Complete",
+        description: "AI analyzed trending market tokens. Check Transactions page for any trades executed.",
       });
     } catch (error: any) {
       console.error("Scan and trade error:", error);
@@ -455,15 +455,17 @@ export default function AIBot() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>How It Works</AlertTitle>
           <AlertDescription>
-            1. DexScreener fetches trending tokens (top 50 by volume)
+            <strong>The AI scans the MARKET for opportunities (not your project tokens):</strong>
+            <br />
+            1. DexScreener fetches trending Solana tokens (top 50 by volume)
             <br />
             2. Filters by your minimum volume threshold
             <br />
             3. Groq AI analyzes each token (volume, liquidity, risk, potential)
             <br />
-            4. Executes trades when confidence ≥ 60% and potential meets your threshold
+            4. Executes trades when confidence ≥ 60% and potential ≥ 150%
             <br />
-            5. Records transactions and respects daily trade limits
+            5. Uses your project's budget/wallet to execute trades on market tokens
           </AlertDescription>
         </Alert>
       </div>
