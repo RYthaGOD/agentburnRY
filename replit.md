@@ -16,6 +16,14 @@ Preferred communication style: Simple, everyday language.
 
 The frontend is built with React 18+ and TypeScript, utilizing Vite for fast development and optimized builds. Wouter handles client-side routing. The UI is designed with shadcn/ui (New York variant) on Radix UI primitives, styled with Tailwind CSS for a crypto/SaaS aesthetic, primarily dark mode. TanStack Query manages server state and caching, while React Hook Form with Zod provides form validation. Key design decisions include component aliases, mobile responsiveness, and specific font choices (Inter and JetBrains Mono).
 
+**Navigation Structure:** Left sidebar with dedicated pages:
+- Overview: Dashboard with all projects
+- New Project: Project creation form
+- Volume Bot: Manage volume generation bots across all projects
+- Trading Bot: Manage limit order bots across all projects
+- Transactions: View all transactions
+- Settings: Wallet key management
+
 **Fire/Molten Theme Design:** The platform features a bold fire and molten rock visual theme that conveys the concept of token burning through intense heat and destruction imagery:
 - **Color Palette:** Volcanic black backgrounds (15 20% 6%), molten orange primary (18 95% 55%), ember accent (35 100% 50%), deep red secondary (0 85% 48%)
 - **Visual Elements:** Fire gradient buttons, ember glow effects on interactive elements, molten lava hero background, orange-tinted hover/active states
@@ -105,6 +113,18 @@ The system features full automation with secure encrypted key management. This i
 4. Confirm scheduler is enabled in production mode
 
 **Production Status**: ✅ READY FOR DEPLOYMENT - All core features implemented and tested. See PRODUCTION_READINESS_CHECKLIST.md for final verification steps.
+
+### Transaction Fee System
+
+A 0.5% transaction fee applies after the 60th transaction for each project:
+- **Free Transactions:** First 60 transactions per project are free
+- **Fee Rate:** 0.5% of SOL amount on every transaction after 60th
+- **Fee Destination:** Sent to payment address (TREASURY_WALLET_ADDRESS)
+- **Applied To:** All transaction types (buybacks, volume bot, buy bot)
+- **Accurate Tracking:** All transaction records and volume metrics reflect fee-adjusted amounts
+- **Graceful Handling:** Continues execution even if fee payment fails
+
+**Implementation:** `server/transaction-fee.ts` with `deductTransactionFee()` function integrated into scheduler buybacks, volume bot, and buy bot execution paths.
 
 ## External Dependencies
 
