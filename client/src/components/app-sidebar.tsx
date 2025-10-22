@@ -1,4 +1,4 @@
-import { Home, Plus, History, Settings, Flame } from "lucide-react";
+import { Home, Plus, History, Settings, Flame, TrendingUp, DollarSign } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,6 +21,16 @@ const menuItems = [
     title: "New Project",
     url: "/dashboard/new",
     icon: Plus,
+  },
+  {
+    title: "Volume Bot",
+    url: "/dashboard/volume-bot",
+    icon: TrendingUp,
+  },
+  {
+    title: "Trading Bot",
+    url: "/dashboard/trading-bot",
+    icon: DollarSign,
   },
   {
     title: "Transactions",

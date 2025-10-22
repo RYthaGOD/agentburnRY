@@ -12,6 +12,8 @@ import NewProject from "@/pages/new-project";
 import ProjectDetails from "@/pages/project-details";
 import Transactions from "@/pages/transactions";
 import Settings from "@/pages/settings";
+import VolumeBot from "@/pages/volume-bot";
+import TradingBot from "@/pages/trading-bot";
 import Whitepaper from "@/pages/whitepaper";
 import DashboardLayout from "@/pages/dashboard-layout";
 import NotFound from "@/pages/not-found";
@@ -44,6 +46,16 @@ function Router() {
       <Route path="/dashboard/settings">
         <DashboardLayout>
           <Settings />
+        </DashboardLayout>
+      </Route>
+      <Route path="/dashboard/volume-bot">
+        <DashboardLayout>
+          <VolumeBot />
+        </DashboardLayout>
+      </Route>
+      <Route path="/dashboard/trading-bot">
+        <DashboardLayout>
+          <TradingBot />
         </DashboardLayout>
       </Route>
       <Route component={NotFound} />
