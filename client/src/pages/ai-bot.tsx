@@ -7,7 +7,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Brain, Loader2, Settings2, Zap, AlertCircle } from "lucide-react";
+import { Brain, Loader2, Settings2, Zap, AlertCircle, Play, Power } from "lucide-react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -472,7 +472,65 @@ export default function AIBot() {
                     </div>
                   </div>
                 )}
-                <AIBotConfigDialog project={project} />
+                
+                <div className="flex gap-2">
+                  {project.aiBotEnabled ? (
+                    <Button
+                      variant="destructive"
+                      className="flex-1"
+                      onClick={async () => {
+                        try {
+                          await apiRequest("PATCH", `/api/projects/${project.id}`, {
+                            aiBotEnabled: false,
+                          });
+                          queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+                          toast({
+                            title: "AI Bot Stopped",
+                            description: "AI trading bot has been disabled",
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Error",
+                            description: "Failed to stop AI bot",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      data-testid={`button-stop-ai-bot-${project.id}`}
+                    >
+                      <Power className="h-4 w-4 mr-2" />
+                      Stop AI Bot
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="default"
+                      className="flex-1"
+                      onClick={async () => {
+                        try {
+                          await apiRequest("PATCH", `/api/projects/${project.id}`, {
+                            aiBotEnabled: true,
+                          });
+                          queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+                          toast({
+                            title: "AI Bot Started",
+                            description: "AI trading bot is now active",
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Error",
+                            description: "Failed to start AI bot",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      data-testid={`button-start-ai-bot-${project.id}`}
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Start AI Bot
+                    </Button>
+                  )}
+                  <AIBotConfigDialog project={project} />
+                </div>
               </CardContent>
             </Card>
           ))}
