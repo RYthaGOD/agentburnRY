@@ -95,6 +95,36 @@ export const usedSignatures = pgTable("used_signatures", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Standalone AI Trading Bot Configuration (not tied to projects)
+export const aiBotConfigs = pgTable("ai_bot_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerWalletAddress: text("owner_wallet_address").notNull().unique(),
+  
+  // Bot settings
+  enabled: boolean("enabled").notNull().default(false),
+  totalBudget: decimal("total_budget", { precision: 18, scale: 9 }).notNull().default("0"),
+  budgetUsed: decimal("budget_used", { precision: 18, scale: 9 }).notNull().default("0"),
+  budgetPerTrade: decimal("budget_per_trade", { precision: 18, scale: 9 }).notNull().default("0.1"),
+  analysisInterval: integer("analysis_interval").notNull().default(60), // Minutes between scans
+  minVolumeUSD: decimal("min_volume_usd", { precision: 18, scale: 2 }).notNull().default("5000"),
+  minPotentialPercent: decimal("min_potential_percent", { precision: 18, scale: 2 }).notNull().default("150"),
+  maxDailyTrades: integer("max_daily_trades").notNull().default(5),
+  riskTolerance: text("risk_tolerance").notNull().default("medium"), // "low", "medium", "high"
+  
+  // Encrypted treasury key for AI bot trading
+  treasuryKeyCiphertext: text("treasury_key_ciphertext"),
+  treasuryKeyIv: text("treasury_key_iv"),
+  treasuryKeyAuthTag: text("treasury_key_auth_tag"),
+  treasuryKeyFingerprint: text("treasury_key_fingerprint"),
+  
+  // Status tracking
+  lastBotRunAt: timestamp("last_bot_run_at"),
+  lastBotStatus: text("last_bot_status"), // "success", "failed", "skipped"
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Encrypted private key storage for automated buybacks
 export const projectSecrets = pgTable("project_secrets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -150,6 +180,8 @@ export const projectSecretsRelations = relations(projectSecrets, ({ one }) => ({
     references: [projects.id],
   }),
 }));
+
+// No relations for aiBotConfigs - it's standalone
 
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
