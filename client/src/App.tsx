@@ -14,6 +14,7 @@ import Transactions from "@/pages/transactions";
 import Settings from "@/pages/settings";
 import VolumeBot from "@/pages/volume-bot";
 import TradingBot from "@/pages/trading-bot";
+import AIBot from "@/pages/ai-bot";
 import Whitepaper from "@/pages/whitepaper";
 import DashboardLayout from "@/pages/dashboard-layout";
 import NotFound from "@/pages/not-found";
@@ -56,6 +57,11 @@ function Router() {
       <Route path="/dashboard/trading-bot">
         <DashboardLayout>
           <TradingBot />
+        </DashboardLayout>
+      </Route>
+      <Route path="/dashboard/ai-bot">
+        <DashboardLayout>
+          <AIBot />
         </DashboardLayout>
       </Route>
       <Route component={NotFound} />
