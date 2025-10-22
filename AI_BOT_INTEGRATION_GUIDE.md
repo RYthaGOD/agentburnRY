@@ -260,8 +260,8 @@ Connect to `/ws` to receive real-time updates.
 ### Groq API (Current Setup)
 - **Cost:** $0.00 forever
 - **Limits:** 30 requests/min, 14,400/day
-- **Model:** Llama 3.1-70B (excellent for trading analysis)
-- **Speed:** ~500 tokens/second
+- **Model:** Llama 3.3-70B Versatile (Meta's latest, excellent for trading analysis)
+- **Speed:** ~50 analyses/second (extremely fast)
 
 ### DexScreener API
 - **Cost:** $0.00

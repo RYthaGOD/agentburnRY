@@ -14,7 +14,7 @@ function getAIClient(): { client: OpenAI; model: string; provider: string } {
         baseURL: "https://api.groq.com/openai/v1",
         apiKey: process.env.GROQ_API_KEY,
       }),
-      model: "llama-3.1-70b-versatile", // Free, fast, excellent for analysis
+      model: "llama-3.3-70b-versatile", // Latest Llama 3.3, free, fast, excellent for analysis
       provider: "Groq (free)",
     };
   }
