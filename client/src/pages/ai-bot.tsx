@@ -1,14 +1,11 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Brain, Loader2, Settings2, Zap, AlertCircle, Play, Power, Scan } from "lucide-react";
-import { Link } from "wouter";
+import { Brain, Loader2, Zap, AlertCircle, Play, Power, Scan, TrendingUp } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -20,40 +17,66 @@ import type { Project } from "@shared/schema";
 import bs58 from "bs58";
 
 const aiBotConfigSchema = z.object({
-  aiBotEnabled: z.boolean(),
-  aiBotTotalBudget: z.string().min(1, "Total budget is required").refine(
+  totalBudget: z.string().min(1).refine(
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     "Must be a positive number"
   ),
-  aiBotBudgetPerTrade: z.string().min(1, "Budget is required").refine(
+  budgetPerTrade: z.string().min(1).refine(
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     "Must be a positive number"
   ),
-  aiBotAnalysisInterval: z.number().min(5, "Minimum 5 minutes").max(1440, "Max 1440 minutes (24 hours)"),
-  aiBotMinVolumeUSD: z.string().min(1, "Volume threshold is required").refine(
+  minVolumeUSD: z.string().min(1).refine(
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
     "Must be a positive number"
   ),
-  aiBotMinPotentialPercent: z.string().min(1, "Potential threshold is required").refine(
+  minPotentialPercent: z.string().min(1).refine(
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 150,
     "Must be at least 150% (1.5X minimum returns)"
   ),
-  aiBotMaxDailyTrades: z.number().min(1, "Must be at least 1").max(100, "Max 100 trades per day"),
-  aiBotRiskTolerance: z.enum(["low", "medium", "high"]),
+  maxDailyTrades: z.string().min(1).refine(
+    (val) => !isNaN(parseInt(val)) && parseInt(val) >= 1,
+    "Must be at least 1"
+  ),
+  riskTolerance: z.enum(["low", "medium", "high"]),
 });
 
 type AIBotConfigFormData = z.infer<typeof aiBotConfigSchema>;
 
-function ScanAndTradeButton({ project }: { project: Project }) {
-  const [isScanning, setIsScanning] = useState(false);
+export default function AIBot() {
+  const { publicKey, connected, signMessage } = useWallet();
   const { toast } = useToast();
-  const { publicKey, signMessage } = useWallet();
+  const [isScanning, setIsScanning] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const { data: projects, isLoading } = useQuery<Project[]>({
+    queryKey: ["/api/projects/owner", publicKey?.toString()],
+    enabled: connected && !!publicKey,
+  });
+
+  // Use first project as AI bot configuration storage
+  const aiProject = projects?.[0];
+  const isEnabled = aiProject?.aiBotEnabled || false;
+  const budgetUsed = parseFloat(aiProject?.aiBotBudgetUsed || "0");
+  const totalBudget = parseFloat(aiProject?.aiBotTotalBudget || "0");
+  const remainingBudget = totalBudget - budgetUsed;
+
+  const form = useForm<AIBotConfigFormData>({
+    resolver: zodResolver(aiBotConfigSchema),
+    defaultValues: {
+      totalBudget: aiProject?.aiBotTotalBudget || "1.0",
+      budgetPerTrade: aiProject?.aiBotBudgetPerTrade || "0.1",
+      minVolumeUSD: aiProject?.aiBotMinVolumeUSD || "5000",
+      minPotentialPercent: aiProject?.aiBotMinPotentialPercent || "150",
+      maxDailyTrades: aiProject?.aiBotMaxDailyTrades?.toString() || "5",
+      riskTolerance: (aiProject?.aiBotRiskTolerance as "low" | "medium" | "high") || "medium",
+    },
+  });
 
   const handleScanAndTrade = async () => {
-    if (!publicKey || !signMessage) {
+    if (!publicKey || !signMessage || !aiProject) {
       toast({
-        title: "Wallet Not Connected",
-        description: "Please connect your wallet first",
+        title: "Error",
+        description: "Please connect wallet and configure settings first",
         variant: "destructive",
       });
       return;
@@ -61,21 +84,17 @@ function ScanAndTradeButton({ project }: { project: Project }) {
 
     setIsScanning(true);
     try {
-      // Create message to sign
-      const message = `Execute AI bot for project ${project.id} at ${Date.now()}`;
+      const message = `Execute AI bot for project ${aiProject.id} at ${Date.now()}`;
       const messageBytes = new TextEncoder().encode(message);
-
-      // Request signature from wallet
       const signature = await signMessage(messageBytes);
       const signatureBase58 = bs58.encode(signature);
 
       toast({
-        title: "Scanning Market...",
-        description: "AI is analyzing trending Solana tokens (not your project token). Looking for trading opportunities...",
+        title: "🔍 Scanning Market...",
+        description: "AI is analyzing trending Solana tokens via DexScreener",
       });
 
-      // Execute AI bot scan and trade
-      const response = await apiRequest("POST", `/api/execute-ai-bot/${project.id}`, {
+      await apiRequest("POST", `/api/execute-ai-bot/${aiProject.id}`, {
         ownerWalletAddress: publicKey.toString(),
         signature: signatureBase58,
         message,
@@ -85,14 +104,13 @@ function ScanAndTradeButton({ project }: { project: Project }) {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
 
       toast({
-        title: "Market Scan Complete",
-        description: "AI analyzed trending market tokens. Check Transactions page for any trades executed.",
+        title: "✅ Market Scan Complete",
+        description: "Check Transactions page for any trades executed",
       });
     } catch (error: any) {
-      console.error("Scan and trade error:", error);
       toast({
         title: "Scan Failed",
-        description: error.message || "Failed to execute AI bot scan",
+        description: error.message || "Failed to execute AI bot",
         variant: "destructive",
       });
     } finally {
@@ -100,306 +118,58 @@ function ScanAndTradeButton({ project }: { project: Project }) {
     }
   };
 
-  return (
-    <Button
-      variant="outline"
-      className="w-full"
-      onClick={handleScanAndTrade}
-      disabled={isScanning || !publicKey}
-      data-testid={`button-scan-trade-${project.id}`}
-    >
-      {isScanning ? (
-        <>
-          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          Scanning Market...
-        </>
-      ) : (
-        <>
-          <Scan className="h-4 w-4 mr-2" />
-          Scan & Trade Now
-        </>
-      )}
-    </Button>
-  );
-}
-
-function AIBotConfigDialog({ project }: { project: Project }) {
-  const [open, setOpen] = useState(false);
-  const { toast } = useToast();
-  const { publicKey } = useWallet();
-
-  const form = useForm<AIBotConfigFormData>({
-    resolver: zodResolver(aiBotConfigSchema),
-    defaultValues: {
-      aiBotEnabled: project.aiBotEnabled || false,
-      aiBotTotalBudget: project.aiBotTotalBudget || "1.0",
-      aiBotBudgetPerTrade: project.aiBotBudgetPerTrade || "0.1",
-      aiBotAnalysisInterval: project.aiBotAnalysisInterval || 30,
-      aiBotMinVolumeUSD: project.aiBotMinVolumeUSD || "5000",
-      aiBotMinPotentialPercent: project.aiBotMinPotentialPercent || "150",
-      aiBotMaxDailyTrades: project.aiBotMaxDailyTrades || 5,
-      aiBotRiskTolerance: (project.aiBotRiskTolerance as "low" | "medium" | "high") || "medium",
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async (data: AIBotConfigFormData) => {
-      return await apiRequest("PATCH", `/api/projects/${project.id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/projects/owner", publicKey?.toString()] });
-      toast({
-        title: "Configuration saved",
-        description: "AI bot settings have been updated successfully.",
+  const handleToggleBot = async () => {
+    if (!aiProject) return;
+    
+    try {
+      await apiRequest("PATCH", `/api/projects/${aiProject.id}`, {
+        aiBotEnabled: !isEnabled,
       });
-      setOpen(false);
-    },
-    onError: (error: Error) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       toast({
-        title: "Configuration failed",
-        description: error.message,
+        title: isEnabled ? "Auto Trading Stopped" : "Auto Trading Started",
+        description: isEnabled 
+          ? "Scheduled scans disabled. You can still scan manually." 
+          : "AI will scan market on schedule",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to toggle AI bot",
         variant: "destructive",
       });
-    },
-  });
-
-  const onSubmit = (data: AIBotConfigFormData) => {
-    updateMutation.mutate(data);
+    }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="w-full" data-testid={`button-configure-ai-${project.id}`}>
-          <Settings2 className="h-4 w-4 mr-2" />
-          {project.aiBotEnabled ? "Configure" : "Enable & Configure"}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>AI Trading Bot Configuration</DialogTitle>
-          <DialogDescription>
-            Configure AI-powered trading analysis and automation for {project.name}
-          </DialogDescription>
-        </DialogHeader>
-
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="aiBotEnabled"
-              render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Enable AI Bot</FormLabel>
-                    <FormDescription>
-                      Start AI-powered token analysis and automated trading
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="switch-ai-bot-enabled"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="aiBotTotalBudget"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Total Budget (SOL)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="text"
-                        placeholder="1.0"
-                        data-testid="input-ai-total-budget"
-                      />
-                    </FormControl>
-                    <FormDescription>Total SOL allocated for AI trading</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="aiBotBudgetPerTrade"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Budget Per Trade (SOL)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="text"
-                        placeholder="0.1"
-                        data-testid="input-ai-budget"
-                      />
-                    </FormControl>
-                    <FormDescription>SOL amount per AI trade</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="aiBotAnalysisInterval"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Analysis Interval (minutes)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="number"
-                        min={5}
-                        max={1440}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                        data-testid="input-ai-interval"
-                      />
-                    </FormControl>
-                    <FormDescription>How often to analyze tokens</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="aiBotMinVolumeUSD"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Min Volume (USD)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="text"
-                        placeholder="5000"
-                        data-testid="input-ai-min-volume"
-                      />
-                    </FormControl>
-                    <FormDescription>Minimum 24h trading volume</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="aiBotMinPotentialPercent"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Min Potential (% - Min 150%)</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="text"
-                        placeholder="150"
-                        data-testid="input-ai-min-potential"
-                      />
-                    </FormControl>
-                    <FormDescription>Minimum 1.5X (150%) upside required</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="aiBotMaxDailyTrades"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Max Daily Trades</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="number"
-                        min={1}
-                        max={100}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                        data-testid="input-ai-max-trades"
-                      />
-                    </FormControl>
-                    <FormDescription>Maximum trades per day</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="aiBotRiskTolerance"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Risk Tolerance</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-ai-risk">
-                          <SelectValue placeholder="Select risk level" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="low">Low - Conservative</SelectItem>
-                        <SelectItem value="medium">Medium - Balanced</SelectItem>
-                        <SelectItem value="high">High - Aggressive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>AI trading risk level</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <Alert>
-              <Brain className="h-4 w-4" />
-              <AlertTitle>Risk Management & Budget Protection</AlertTitle>
-              <AlertDescription>
-                • Enforces minimum 1.5X (150%) return requirement on all trades
-                <br />
-                • Tracks total budget usage to prevent overspending
-                <br />
-                • Only executes when AI confidence ≥ 60%
-                <br />
-                • Uses free Groq AI (Llama 3.3-70B) + DexScreener data
-              </AlertDescription>
-            </Alert>
-
-            <div className="flex gap-2">
-              <Button
-                type="submit"
-                disabled={updateMutation.isPending}
-                className="flex-1"
-                data-testid="button-save-ai-config"
-              >
-                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Configuration
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                data-testid="button-cancel-ai-config"
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-export default function AIBot() {
-  const { publicKey, connected } = useWallet();
-  const { toast } = useToast();
+  const onSubmit = async (data: AIBotConfigFormData) => {
+    if (!aiProject) return;
+    
+    setIsSaving(true);
+    try {
+      await apiRequest("PATCH", `/api/projects/${aiProject.id}`, {
+        aiBotTotalBudget: data.totalBudget,
+        aiBotBudgetPerTrade: data.budgetPerTrade,
+        aiBotMinVolumeUSD: data.minVolumeUSD,
+        aiBotMinPotentialPercent: data.minPotentialPercent,
+        aiBotMaxDailyTrades: parseInt(data.maxDailyTrades),
+        aiBotRiskTolerance: data.riskTolerance,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      toast({
+        title: "✅ Settings Saved",
+        description: "AI bot configuration updated successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save settings",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   if (!connected) {
     return (
@@ -408,82 +178,279 @@ export default function AIBot() {
           <Brain className="h-16 w-16 text-muted-foreground" />
           <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
           <p className="text-muted-foreground max-w-md">
-            Please connect your Solana wallet to use the AI trading bot
+            Connect your Solana wallet to start AI-powered trading
           </p>
         </div>
       </div>
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!aiProject) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No Project Found</AlertTitle>
+          <AlertDescription>
+            You need at least one project to use the AI trading bot. The bot will use your project's wallet for trading.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto py-8 px-4 space-y-8">
+    <div className="container mx-auto py-8 px-4 space-y-6 max-w-4xl">
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <Brain className="h-8 w-8 text-primary" />
           <div>
             <h1 className="text-3xl font-bold" data-testid="heading-ai-bot">AI Market Scanner</h1>
             <p className="text-muted-foreground">
-              Standalone AI trading bot powered by Groq Llama 3.3-70B (100% Free)
+              Powered by Groq Llama 3.3-70B + Jupiter Ultra API (100% Free)
             </p>
           </div>
         </div>
 
         <Alert>
           <Zap className="h-4 w-4" />
-          <AlertTitle>Completely Free AI Trading</AlertTitle>
-          <AlertDescription>
-            This is a <strong>standalone trading bot</strong> - completely separate from your buyback/burn projects.
-            It scans trending Solana tokens and executes trades based on AI analysis.
-          </AlertDescription>
-        </Alert>
-
-        <Alert variant="default">
-          <AlertCircle className="h-4 w-4" />
           <AlertTitle>How It Works</AlertTitle>
           <AlertDescription>
-            <strong>The AI scans the MARKET for trading opportunities:</strong>
-            <br />
-            1. DexScreener fetches trending Solana tokens (top 50 by volume)
-            <br />
-            2. Filters by your minimum volume threshold
-            <br />
-            3. Groq AI analyzes each token (volume, liquidity, risk, potential)
-            <br />
-            4. Executes trades when confidence ≥ 60% and potential ≥ 150%
-            <br />
-            5. All trades are recorded in your Transactions page
+            <strong>Scans trending Solana tokens from DexScreener</strong> → Groq AI analyzes volume, liquidity, momentum
+            → <strong>Jupiter Ultra API executes swaps</strong> when confidence ≥ 60% and potential ≥ 150% (1.5X minimum)
           </AlertDescription>
         </Alert>
       </div>
 
+      {/* Budget Overview */}
+      {totalBudget > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Budget Status</span>
+              <span className={`text-sm font-normal ${isEnabled ? 'text-green-500' : 'text-muted-foreground'}`}>
+                {isEnabled ? '🟢 Auto Trading Active' : '⚫ Auto Trading Paused'}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Used: {budgetUsed.toFixed(4)} SOL</span>
+                <span className="text-muted-foreground">Total: {totalBudget.toFixed(4)} SOL</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${Math.min(100, (budgetUsed / totalBudget) * 100)}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-xs">
+                <span className="font-medium">Remaining: {remainingBudget.toFixed(4)} SOL</span>
+                <span className="text-muted-foreground">{((budgetUsed / totalBudget) * 100).toFixed(1)}% used</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Controls */}
       <Card>
         <CardHeader>
-          <CardTitle>AI Trading Bot Configuration</CardTitle>
-          <CardDescription>
-            Configure your standalone AI trading bot. This is separate from your buyback/burn projects.
-          </CardDescription>
+          <CardTitle>Trading Controls</CardTitle>
+          <CardDescription>Start auto trading or scan the market manually</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <Alert variant="default">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Feature Coming Soon</AlertTitle>
-            <AlertDescription>
-              The standalone AI trading bot is currently being developed. For now, you can configure AI trading
-              through individual projects in the Volume Bot or Buy Bot pages.
-              <br /><br />
-              This page will soon allow you to:
-              <br />
-              • Set up a dedicated trading wallet
-              <br />
-              • Configure budget and risk tolerance
-              <br />
-              • Scan and trade market tokens independently
-              <br />
-              • View AI trading performance metrics
-            </AlertDescription>
-          </Alert>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Button
+              onClick={handleToggleBot}
+              variant={isEnabled ? "destructive" : "default"}
+              className="flex-1"
+              data-testid="button-toggle-auto-trading"
+            >
+              {isEnabled ? (
+                <>
+                  <Power className="h-4 w-4 mr-2" />
+                  Stop Auto Trading
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Auto Trading
+                </>
+              )}
+            </Button>
+          </div>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleScanAndTrade}
+            disabled={isScanning || !publicKey}
+            data-testid="button-scan-now"
+          >
+            {isScanning ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Scanning Market...
+              </>
+            ) : (
+              <>
+                <Scan className="h-4 w-4 mr-2" />
+                Scan & Trade Now
+              </>
+            )}
+          </Button>
+          <p className="text-xs text-muted-foreground text-center">
+            Manual scans work independently of auto-trading status
+          </p>
         </CardContent>
       </Card>
+
+      {/* Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle>AI Bot Configuration</CardTitle>
+          <CardDescription>Configure budget, risk tolerance, and trading criteria</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="totalBudget"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Total Budget (SOL)</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.01" placeholder="1.0" data-testid="input-total-budget" />
+                      </FormControl>
+                      <FormDescription>Maximum SOL to spend on AI trades</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="budgetPerTrade"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Budget Per Trade (SOL)</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="0.01" placeholder="0.1" data-testid="input-budget-per-trade" />
+                      </FormControl>
+                      <FormDescription>SOL amount for each trade</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="minVolumeUSD"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Min Volume (USD)</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="1000" placeholder="5000" data-testid="input-min-volume" />
+                      </FormControl>
+                      <FormDescription>Only scan tokens with this 24h volume</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="minPotentialPercent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Min Potential Return (%)</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" step="10" placeholder="150" data-testid="input-min-potential" />
+                      </FormControl>
+                      <FormDescription>Minimum 150% (1.5X) enforced</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="maxDailyTrades"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max Daily Trades</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="number" placeholder="5" data-testid="input-max-daily-trades" />
+                      </FormControl>
+                      <FormDescription>Limit trades per day</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="riskTolerance"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Risk Tolerance</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-risk-tolerance">
+                            <SelectValue placeholder="Select risk level" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Affects AI's trading decisions</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={isSaving} data-testid="button-save-config">
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Configuration"
+                )}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      {/* Info */}
+      <Alert>
+        <TrendingUp className="h-4 w-4" />
+        <AlertTitle>Trading Strategy</AlertTitle>
+        <AlertDescription>
+          The bot uses <strong>Jupiter Ultra API</strong> for all swaps (better routing & pricing than PumpPortal).
+          Trades are only executed when AI confidence ≥ 60% AND potential return ≥ {form.watch("minPotentialPercent") || "150"}%.
+          All transactions appear on the Transactions page.
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }
