@@ -27,6 +27,22 @@ The backend utilizes an Express.js server with TypeScript, employing an ESM modu
 
 A dedicated scheduler service automates buyback execution using `node-cron`. It performs hourly checks, validates payments (unless whitelisted), verifies treasury balances, integrates with Jupiter Ultra API for optimal token swaps, and claims PumpFun creator rewards. Token burns use the SPL Token burn instruction to permanently destroy tokens and reduce total supply (visible on Solscan as actual "Token Burn" transactions, not transfers). The system supports minute-based to weekly scheduling and custom cron patterns, operating in both production and simulation modes.
 
+**Automation Requirements (Critical for Auto-Execution):**
+1. **Project must be ACTIVE**: Toggle the "Active" switch ON in project dashboard
+2. **Treasury private key REQUIRED**: Store via Settings → Private Key Management for automated swaps and burns
+3. **PumpFun creator key OPTIONAL**: Store for automatic reward claims (otherwise claims remain pending)
+4. **Sufficient SOL balance**: Treasury must have enough SOL to cover buyback amount + 0.01 SOL fee reserve
+5. **Valid payment OR trial OR whitelisted wallet**: Automation only runs for paid/trial/whitelisted projects
+
+**Scheduler Timing:**
+- Development: Checks every 5 minutes for faster testing
+- Production: Checks every hour for efficiency
+- AI Bot: Every 5 minutes (dev) / 30 minutes (prod)
+
+**Manual vs Automated Execution:**
+- Manual: Uses connected wallet signatures (browser wallet interaction)
+- Automated: Requires stored private keys in database (secure encrypted storage)
+
 ### Trading Bot System
 
 The platform includes three types of automated trading bots with comprehensive configuration interfaces:

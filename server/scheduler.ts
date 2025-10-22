@@ -57,7 +57,10 @@ class BuybackScheduler {
       console.log(`Checking ${activeProjects.length} active projects for scheduled buybacks`);
 
       for (const project of activeProjects) {
-        if (!project.isActive) continue;
+        if (!project.isActive) {
+          console.log(`⏭️  Skipping project "${project.name}" - marked as inactive`);
+          continue;
+        }
 
         // Check if wallet is whitelisted for free access
         const { WHITELISTED_WALLETS } = await import("@shared/config");
@@ -319,6 +322,11 @@ class BuybackScheduler {
       // Get treasury private key from encrypted database storage
       const { getTreasuryKey } = await import("./key-manager");
       const treasuryPrivateKey = await getTreasuryKey(project.id);
+      
+      if (!treasuryPrivateKey) {
+        console.log(`\n⚠️  No treasury private key configured for "${project.name}"`);
+        console.log(`   Go to Settings → Private Key Management to store your treasury key for automated execution`);
+      }
       
       if (treasuryPrivateKey) {
         try {
