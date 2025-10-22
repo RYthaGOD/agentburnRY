@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
-import { Flame, ArrowLeft, Save, Zap, Trash2, Crown, Play, AlertTriangle, DollarSign, Wallet, RefreshCw, Clock } from "lucide-react";
+import { Flame, ArrowLeft, Save, Zap, Trash2, Crown, Play, AlertTriangle, DollarSign, Wallet, RefreshCw, Clock, TrendingUp, Activity } from "lucide-react";
 import { useWalletSignature } from "@/hooks/use-wallet-signature";
 import {
   AlertDialog,
@@ -90,6 +90,15 @@ export default function ProjectDetails() {
       ownerWalletAddress: "",
       isPumpfunToken: false,
       pumpfunCreatorWallet: "",
+      volumeBotEnabled: false,
+      volumeBotBuyAmountSOL: "",
+      volumeBotSellPercentage: "",
+      volumeBotMinPriceSOL: "",
+      volumeBotMaxPriceSOL: "",
+      volumeBotIntervalMinutes: undefined,
+      buyBotEnabled: false,
+      buyBotLimitOrders: "",
+      buyBotMaxSlippage: "",
     },
   });
 
@@ -108,6 +117,15 @@ export default function ProjectDetails() {
         ownerWalletAddress: project.ownerWalletAddress,
         isPumpfunToken: project.isPumpfunToken,
         pumpfunCreatorWallet: project.pumpfunCreatorWallet || "",
+        volumeBotEnabled: project.volumeBotEnabled || false,
+        volumeBotBuyAmountSOL: project.volumeBotBuyAmountSOL || "",
+        volumeBotSellPercentage: project.volumeBotSellPercentage || "",
+        volumeBotMinPriceSOL: project.volumeBotMinPriceSOL || "",
+        volumeBotMaxPriceSOL: project.volumeBotMaxPriceSOL || "",
+        volumeBotIntervalMinutes: project.volumeBotIntervalMinutes || undefined,
+        buyBotEnabled: project.buyBotEnabled || false,
+        buyBotLimitOrders: project.buyBotLimitOrders || "",
+        buyBotMaxSlippage: project.buyBotMaxSlippage || "",
       });
     }
   }, [project, form]);
@@ -363,6 +381,12 @@ export default function ProjectDetails() {
       buybackAmountSol: data.buybackAmountSol === "" ? undefined : data.buybackAmountSol,
       customCronExpression: data.customCronExpression === "" ? undefined : data.customCronExpression,
       pumpfunCreatorWallet: data.pumpfunCreatorWallet === "" ? undefined : data.pumpfunCreatorWallet,
+      volumeBotBuyAmountSOL: data.volumeBotBuyAmountSOL === "" ? undefined : data.volumeBotBuyAmountSOL,
+      volumeBotSellPercentage: data.volumeBotSellPercentage === "" ? undefined : data.volumeBotSellPercentage,
+      volumeBotMinPriceSOL: data.volumeBotMinPriceSOL === "" ? undefined : data.volumeBotMinPriceSOL,
+      volumeBotMaxPriceSOL: data.volumeBotMaxPriceSOL === "" ? undefined : data.volumeBotMaxPriceSOL,
+      buyBotLimitOrders: data.buyBotLimitOrders === "" ? undefined : data.buyBotLimitOrders,
+      buyBotMaxSlippage: data.buyBotMaxSlippage === "" ? undefined : data.buyBotMaxSlippage,
     };
 
     // If trying to activate and not whitelisted, check for payment or trial first
@@ -406,6 +430,8 @@ export default function ProjectDetails() {
 
   const schedule = form.watch("schedule");
   const isPumpfunToken = form.watch("isPumpfunToken");
+  const volumeBotEnabled = form.watch("volumeBotEnabled");
+  const buyBotEnabled = form.watch("buyBotEnabled");
 
   if (isLoading) {
     return (
@@ -776,6 +802,239 @@ export default function ProjectDetails() {
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          {/* Trading Bots Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <Activity className="inline h-5 w-5 mr-2 text-accent" />
+                Trading Bots
+              </CardTitle>
+              <CardDescription>Configure automated trading bots for volume generation and limit orders</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Volume Bot Section */}
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="volumeBotEnabled"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">
+                          <TrendingUp className="inline h-4 w-4 mr-1.5 text-accent" />
+                          Volume Bot
+                        </FormLabel>
+                        <FormDescription>
+                          Automatically buy and sell tokens to generate trading volume
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-volume-bot-enabled"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {volumeBotEnabled && (
+                  <div className="space-y-4 pl-4 border-l-2 border-accent/30">
+                    <FormField
+                      control={form.control}
+                      name="volumeBotBuyAmountSOL"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Buy Amount (SOL)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.001"
+                              placeholder="0.1"
+                              {...field}
+                              data-testid="input-volume-bot-buy-amount"
+                            />
+                          </FormControl>
+                          <FormDescription>Amount of SOL to spend on each buy cycle</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="volumeBotSellPercentage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Sell Percentage (%)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="1"
+                              min="0"
+                              max="100"
+                              placeholder="90"
+                              {...field}
+                              data-testid="input-volume-bot-sell-percentage"
+                            />
+                          </FormControl>
+                          <FormDescription>Percentage of bought tokens to sell back (0-100%)</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="volumeBotMinPriceSOL"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Min Price (SOL)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.00001"
+                                placeholder="0.0001"
+                                {...field}
+                                data-testid="input-volume-bot-min-price"
+                              />
+                            </FormControl>
+                            <FormDescription>Only trade if price is above this</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="volumeBotMaxPriceSOL"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Max Price (SOL)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                step="0.00001"
+                                placeholder="0.01"
+                                {...field}
+                                data-testid="input-volume-bot-max-price"
+                              />
+                            </FormControl>
+                            <FormDescription>Only trade if price is below this</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="volumeBotIntervalMinutes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Trading Interval (minutes)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="1"
+                              max="1440"
+                              placeholder="60"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                              value={field.value || ""}
+                              data-testid="input-volume-bot-interval"
+                            />
+                          </FormControl>
+                          <FormDescription>How often to execute trading cycles (1-1440 minutes)</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Buy Bot Section */}
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="buyBotEnabled"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">
+                          <DollarSign className="inline h-4 w-4 mr-1.5 text-green-600 dark:text-green-500" />
+                          Buy Bot (Limit Orders)
+                        </FormLabel>
+                        <FormDescription>
+                          Automatically buy tokens when price reaches target levels
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-buy-bot-enabled"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {buyBotEnabled && (
+                  <div className="space-y-4 pl-4 border-l-2 border-green-500/30">
+                    <FormField
+                      control={form.control}
+                      name="buyBotLimitOrders"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Limit Orders (JSON)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder='[{"priceSOL": "0.001", "amountSOL": "0.1"}]'
+                              className="font-mono text-sm"
+                              {...field}
+                              data-testid="input-buy-bot-limit-orders"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            JSON array of limit orders. Each order: priceSOL (target price) and amountSOL (buy amount)
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="buyBotMaxSlippage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Max Slippage (%)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              placeholder="0.5"
+                              {...field}
+                              data-testid="input-buy-bot-max-slippage"
+                            />
+                          </FormControl>
+                          <FormDescription>Maximum allowed slippage for limit orders (0-100%)</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
