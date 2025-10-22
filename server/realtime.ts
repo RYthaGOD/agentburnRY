@@ -116,7 +116,18 @@ class RealtimeService {
               priceTimestamp: new Date(),
             });
           } catch (error) {
-            console.error(`[WebSocket] Error fetching price for ${project.tokenMintAddress}:`, error);
+            // Gracefully handle price fetch failures - reduced logging
+            // If we have a cached price, continue using it
+            if (this.priceCache.has(project.tokenMintAddress)) {
+              const cached = this.priceCache.get(project.tokenMintAddress)!;
+              const ageMinutes = Math.floor((Date.now() - cached.timestamp) / 60000);
+              
+              if (ageMinutes > 5) {
+                console.warn(`[WebSocket] Price fetch failed for ${project.tokenMintAddress}, using cached price (${ageMinutes}min old)`);
+              }
+            } else {
+              console.warn(`[WebSocket] Unable to fetch price for ${project.tokenMintAddress}`);
+            }
           }
         }
       } catch (error) {

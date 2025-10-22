@@ -7,6 +7,12 @@ import { fromZodError } from "zod-validation-error";
 import { verifyPayment, getWalletBalance, isValidSolanaAddress } from "./solana";
 import { PRICING } from "@shared/config";
 import { storeProjectKeys, getKeyMetadata, deleteProjectKeys, getTreasuryKey } from "./key-manager";
+import { 
+  strictRateLimit, 
+  authRateLimit,
+  validateSolanaAddresses,
+  auditLog,
+} from "./security";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Project routes
@@ -40,7 +46,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/projects", async (req, res) => {
+  app.post("/api/projects", validateSolanaAddresses, async (req, res) => {
     try {
       const validatedData = insertProjectSchema.parse(req.body);
       
@@ -357,7 +363,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manual buyback execution (requires private keys configured in environment)
-  app.post("/api/execute-buyback/:projectId", async (req, res) => {
+  // Manual buyback execution - requires authentication signature
+  app.post("/api/execute-buyback/:projectId", authRateLimit, validateSolanaAddresses, async (req, res) => {
+    auditLog("Manual buyback execution attempted", {
+      projectId: req.params.projectId,
+      ip: req.ip,
+    });
     try {
       const { ownerWalletAddress, signature, message } = req.body;
       
@@ -1060,7 +1071,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Set/update private keys (requires wallet signature authentication)
-  app.post("/api/projects/:id/keys", async (req, res) => {
+  // Set project keys - HIGHLY SENSITIVE - Requires wallet signature authentication
+  app.post("/api/projects/:id/keys", strictRateLimit, validateSolanaAddresses, async (req, res) => {
+    auditLog("Private keys update attempted", {
+      projectId: req.params.id,
+      ip: req.ip,
+    });
     try {
       const { ownerWalletAddress, signature, message, keys } = req.body;
       
@@ -1177,7 +1193,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete private keys (requires wallet signature authentication)
-  app.delete("/api/projects/:id/keys", async (req, res) => {
+  // Delete project keys - HIGHLY SENSITIVE - Requires wallet signature authentication  
+  app.delete("/api/projects/:id/keys", strictRateLimit, validateSolanaAddresses, async (req, res) => {
+    auditLog("Private keys deletion attempted", {
+      projectId: req.params.id,
+      ip: req.ip,
+    });
     try {
       const { ownerWalletAddress, signature, message } = req.body;
       

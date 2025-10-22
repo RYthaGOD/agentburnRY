@@ -3,10 +3,28 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { scheduler } from "./scheduler";
 import { realtimeService } from "./realtime";
+import {
+  securityHeaders,
+  globalRateLimit,
+  sanitizeInput,
+  corsPolicy,
+  checkSecurityEnvVars,
+  requestSizeLimit,
+} from "./security";
+
+// Check security environment variables on startup
+checkSecurityEnvVars();
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// Security middleware - FIRST
+app.use(securityHeaders());
+app.use(corsPolicy());
+app.use(sanitizeInput);
+
+// Body parsing with size limits
+app.use(express.json({ limit: requestSizeLimit }));
+app.use(express.urlencoded({ extended: false, limit: requestSizeLimit }));
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -37,6 +55,9 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// Global rate limiting for all API routes
+app.use("/api", globalRateLimit);
 
 (async () => {
   const server = await registerRoutes(app);

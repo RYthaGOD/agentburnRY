@@ -191,32 +191,51 @@ export async function getTokenShieldInfo(mint: string): Promise<any> {
 /**
  * Get token price in SOL (not USD)
  * Quotes the token price against SOL by using Jupiter's vsToken parameter
+ * Includes retry logic with exponential backoff for resilience
  */
 export async function getTokenPrice(tokenMintAddress: string): Promise<number> {
-  try {
-    const SOL_MINT = "So11111111111111111111111111111111111111112";
-    
-    // Using Jupiter's price API with vsToken to get SOL-denominated price
-    const response = await fetch(
-      `https://price.jup.ag/v4/price?ids=${tokenMintAddress}&vsToken=${SOL_MINT}`
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Jupiter price API error: ${response.statusText}`);
-    }
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  const MAX_RETRIES = 3;
+  const INITIAL_DELAY = 1000; // 1 second
+  
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    try {
+      // Using Jupiter's price API with vsToken to get SOL-denominated price
+      const response = await fetch(
+        `https://price.jup.ag/v4/price?ids=${tokenMintAddress}&vsToken=${SOL_MINT}`,
+        {
+          signal: AbortSignal.timeout(10000), // 10 second timeout
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Jupiter price API error: ${response.statusText}`);
+      }
 
-    const data = await response.json();
-    
-    if (!data.data || !data.data[tokenMintAddress]) {
-      throw new Error("Token price not found");
-    }
+      const data = await response.json();
+      
+      if (!data.data || !data.data[tokenMintAddress]) {
+        throw new Error("Token price not found");
+      }
 
-    // This now returns price in SOL, not USD
-    return data.data[tokenMintAddress].price;
-  } catch (error) {
-    console.error("Error getting token price:", error);
-    throw error;
+      // This now returns price in SOL, not USD
+      return data.data[tokenMintAddress].price;
+    } catch (error) {
+      const isLastAttempt = attempt === MAX_RETRIES - 1;
+      
+      if (isLastAttempt) {
+        console.error(`Error getting token price after ${MAX_RETRIES} attempts:`, error);
+        throw error;
+      }
+      
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = INITIAL_DELAY * Math.pow(2, attempt);
+      console.warn(`Price fetch attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
   }
+  
+  throw new Error("Failed to fetch token price after all retries");
 }
 
 /**
