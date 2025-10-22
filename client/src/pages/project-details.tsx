@@ -31,6 +31,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
 import { Flame, ArrowLeft, Save, Zap, Trash2, Crown, Play, AlertTriangle, DollarSign, Wallet, RefreshCw, Clock, TrendingUp, Activity } from "lucide-react";
 import { useWalletSignature } from "@/hooks/use-wallet-signature";
+import RealtimeMonitoring from "@/components/realtime-monitoring";
+import TransactionAccuracy from "@/components/transaction-accuracy";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -516,6 +518,12 @@ export default function ProjectDetails() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+
+      {/* Real-time Monitoring Section */}
+      <RealtimeMonitoring 
+        projectId={project.id} 
+        tokenMintAddress={project.tokenMintAddress} 
+      />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -1386,6 +1394,9 @@ export default function ProjectDetails() {
           </div>
         </form>
       </Form>
+
+      {/* Transaction Accuracy Section */}
+      <TransactionAccuracy projectId={project.id} />
 
       {/* Payment Modal */}
       <PaymentModal
