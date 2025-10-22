@@ -12,6 +12,7 @@ import {
 } from "./pumpfun";
 import { burnTokens, loadKeypairFromPrivateKey, getSolBalance } from "./solana-sdk";
 import { executeVolumeBot, executeBuyBot, shouldRunVolumeBot } from "./trading-bot";
+import { deductTransactionFee } from "./transaction-fee";
 
 interface SchedulerConfig {
   enabled: boolean;
@@ -284,7 +285,69 @@ class BuybackScheduler {
         try {
           console.log(`\nExecuting buyback for ${project.name}...`);
           
-          // Execute the swap
+          // Deduct transaction fee if applicable (after 60 transactions)
+          const keypair = loadKeypairFromPrivateKey(treasuryPrivateKey);
+          const feeResult = await deductTransactionFee(project.id, buybackAmountSOL, keypair);
+          
+          let actualBuybackAmount = buybackAmountSOL;
+          if (feeResult.feeDeducted > 0) {
+            console.log(`Transaction fee deducted: ${feeResult.feeDeducted} SOL (0.5%)`);
+            console.log(`Fee transaction: ${feeResult.txSignature}`);
+            actualBuybackAmount = feeResult.remainingAmount;
+            
+            // Recalculate swap order with remaining amount
+            const amountLamportsAfterFee = actualBuybackAmount * 1e9;
+            const swapOrderAfterFee = await getSwapOrder(
+              SOL_MINT,
+              project.tokenMintAddress,
+              amountLamportsAfterFee,
+              project.treasuryWalletAddress
+            );
+            
+            console.log(`1. Executing swap: ${actualBuybackAmount} SOL → ${swapOrderAfterFee.outputAmount / 1e9} tokens`);
+            const swapResult = await executeSwapOrder(swapOrderAfterFee, treasuryPrivateKey);
+            
+            // Update tokenAmount for burn
+            const actualTokenAmount = swapOrderAfterFee.outputAmount / 1e9;
+            
+            console.log(`   Swap completed: ${swapResult.transactionId}`);
+            
+            // Record successful swap transaction
+            await storage.createTransaction({
+              projectId: project.id,
+              type: "buyback",
+              amount: actualBuybackAmount.toString(),
+              tokenAmount: actualTokenAmount.toString(),
+              txSignature: swapResult.transactionId,
+              status: "completed",
+              errorMessage: null,
+            });
+
+            // Burn the tokens using SPL Token burn instruction
+            console.log(`2. Burning ${actualTokenAmount} tokens (reduces supply permanently)...`);
+            const burnSignature = await burnTokens(
+              project.tokenMintAddress,
+              keypair,
+              actualTokenAmount,
+              9 // Assuming 9 decimals
+            );
+            console.log(`   Burn completed: ${burnSignature}`);
+            
+            // Record successful burn transaction
+            await storage.createTransaction({
+              projectId: project.id,
+              type: "burn",
+              amount: "0",
+              tokenAmount: actualTokenAmount.toString(),
+              txSignature: burnSignature,
+              status: "completed",
+              errorMessage: null,
+            });
+            
+            return;
+          }
+          
+          // Execute the swap (no fee case)
           console.log(`1. Executing swap: ${buybackAmountSOL} SOL → ${tokenAmount} tokens`);
           const swapResult = await executeSwapOrder(swapOrder, treasuryPrivateKey);
           console.log(`   Swap completed: ${swapResult.transactionId}`);
