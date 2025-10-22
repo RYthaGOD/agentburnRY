@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { scheduler } from "./scheduler";
+import { realtimeService } from "./realtime";
 
 const app = express();
 app.use(express.json());
@@ -40,6 +41,9 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
+  // Initialize WebSocket real-time service
+  realtimeService.initialize(server);
+
   // Initialize scheduler
   await scheduler.initialize();
 
@@ -77,6 +81,7 @@ app.use((req, res, next) => {
   process.on("SIGTERM", () => {
     log("SIGTERM received, shutting down gracefully");
     scheduler.stop();
+    realtimeService.shutdown();
     server.close(() => {
       log("Server closed");
       process.exit(0);

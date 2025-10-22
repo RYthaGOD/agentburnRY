@@ -34,17 +34,29 @@ export const projects = pgTable("projects", {
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  
+  // Real-time monitoring metrics
+  lastBotRunAt: timestamp("last_bot_run_at"),
+  lastBotStatus: text("last_bot_status"), // "success", "failed", "skipped"
+  latestPriceSOL: decimal("latest_price_sol", { precision: 18, scale: 9 }),
+  priceTimestamp: timestamp("price_timestamp"),
 });
 
 export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").notNull().references(() => projects.id),
-  type: text("type").notNull(), // claim, buyback, burn
+  type: text("type").notNull(), // claim, buyback, burn, volume_buy, volume_sell, limit_buy
   amount: decimal("amount", { precision: 18, scale: 9 }).notNull(),
   tokenAmount: decimal("token_amount", { precision: 18, scale: 9 }),
   txSignature: text("tx_signature").notNull(),
   status: text("status").notNull(), // pending, completed, failed
   errorMessage: text("error_message"),
+  
+  // Accuracy monitoring for trading bots
+  expectedPriceSOL: decimal("expected_price_sol", { precision: 18, scale: 9 }),
+  actualPriceSOL: decimal("actual_price_sol", { precision: 18, scale: 9 }),
+  priceDeviationBps: integer("price_deviation_bps"), // Basis points (1bp = 0.01%)
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -6,6 +6,7 @@ import { getTreasuryKey } from "./key-manager";
 import { storage } from "./storage";
 import type { Project, InsertTransaction } from "@shared/schema";
 import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { realtimeService } from "./realtime";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -99,6 +100,10 @@ export async function executeVolumeBot(project: Project): Promise<TradingBotResu
     console.log(`[Volume Bot] Buy completed: ${buyResult.transactionId}`);
     console.log(`[Volume Bot] Received: ${buyResult.outputAmountResult} tokens`);
 
+    // Calculate actual buy price
+    const tokensBought = parseInt(buyResult.outputAmountResult);
+    const actualBuyPrice = buyAmountSOL / (tokensBought / 1e9); // Price per token in SOL
+
     // STEP 2: Sell portion of tokens back to SOL
     const tokensReceived = parseInt(buyResult.outputAmountResult);
     const tokensToSell = Math.floor(tokensReceived * (sellPercentage / 100));
@@ -134,11 +139,42 @@ export async function executeVolumeBot(project: Project): Promise<TradingBotResu
     console.log(`[Volume Bot] Total volume generated: ${result.volume} SOL`);
 
     result.success = true;
+
+    // Emit WebSocket event for volume bot completion
+    realtimeService.emitBotEvent({
+      projectId: project.id,
+      botType: "volume",
+      status: "success",
+      message: `Generated ${result.volume.toFixed(4)} SOL volume`,
+      volume: result.volume,
+    });
+
+    // Update project with last bot run info
+    await storage.updateProject(project.id, {
+      lastBotRunAt: new Date(),
+      lastBotStatus: "success",
+    });
+
     return result;
 
   } catch (error: any) {
     console.error("[Volume Bot] Error:", error);
     result.error = error.message;
+
+    // Emit failure event
+    realtimeService.emitBotEvent({
+      projectId: project.id,
+      botType: "volume",
+      status: "failed",
+      message: error.message,
+    });
+
+    // Update project with last bot run info
+    await storage.updateProject(project.id, {
+      lastBotRunAt: new Date(),
+      lastBotStatus: "failed",
+    }).catch(err => console.error("Failed to update project status:", err));
+
     return result;
   }
 }
@@ -225,6 +261,21 @@ export async function executeBuyBot(project: Project): Promise<TradingBotResult>
 
           console.log(`[Buy Bot] Limit order executed: ${buyResult.transactionId}`);
           console.log(`[Buy Bot] Received: ${buyResult.outputAmountResult} tokens`);
+
+          // Calculate actual execution price
+          const tokensBought = parseInt(buyResult.outputAmountResult);
+          const actualPrice = buyAmountSOL / (tokensBought / 1e9);
+          const deviationBps = Math.round(((actualPrice - targetPrice) / targetPrice) * 10000);
+
+          // Emit accuracy check event
+          realtimeService.emitAccuracyCheck({
+            projectId: project.id,
+            transactionId: buyResult.transactionId,
+            expectedPriceSOL: targetPrice,
+            actualPriceSOL: actualPrice,
+            deviationBps,
+            withinThreshold: Math.abs(deviationBps) <= 500, // 5% threshold
+          });
         } catch (error: any) {
           console.error(`[Buy Bot] Error executing limit order:`, error);
           // Continue with other orders even if one fails
@@ -235,11 +286,44 @@ export async function executeBuyBot(project: Project): Promise<TradingBotResult>
     }
 
     result.success = true;
+
+    // Emit WebSocket event for buy bot completion
+    if (result.transactionSignatures.length > 0) {
+      realtimeService.emitBotEvent({
+        projectId: project.id,
+        botType: "buy",
+        status: "success",
+        message: `Executed ${result.transactionSignatures.length} limit orders`,
+        executedOrders: result.transactionSignatures.length,
+      });
+
+      // Update project with last bot run info
+      await storage.updateProject(project.id, {
+        lastBotRunAt: new Date(),
+        lastBotStatus: "success",
+      });
+    }
+
     return result;
 
   } catch (error: any) {
     console.error("[Buy Bot] Error:", error);
     result.error = error.message;
+
+    // Emit failure event
+    realtimeService.emitBotEvent({
+      projectId: project.id,
+      botType: "buy",
+      status: "failed",
+      message: error.message,
+    });
+
+    // Update project with last bot run info
+    await storage.updateProject(project.id, {
+      lastBotRunAt: new Date(),
+      lastBotStatus: "failed",
+    }).catch(err => console.error("Failed to update project status:", err));
+
     return result;
   }
 }
