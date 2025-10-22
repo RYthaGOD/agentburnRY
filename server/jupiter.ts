@@ -189,12 +189,17 @@ export async function getTokenShieldInfo(mint: string): Promise<any> {
 }
 
 /**
- * Get token price in SOL
+ * Get token price in SOL (not USD)
+ * Quotes the token price against SOL by using Jupiter's vsToken parameter
  */
 export async function getTokenPrice(tokenMintAddress: string): Promise<number> {
   try {
-    // Using Jupiter's price API
-    const response = await fetch(`https://price.jup.ag/v4/price?ids=${tokenMintAddress}`);
+    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    
+    // Using Jupiter's price API with vsToken to get SOL-denominated price
+    const response = await fetch(
+      `https://price.jup.ag/v4/price?ids=${tokenMintAddress}&vsToken=${SOL_MINT}`
+    );
     
     if (!response.ok) {
       throw new Error(`Jupiter price API error: ${response.statusText}`);
@@ -206,6 +211,7 @@ export async function getTokenPrice(tokenMintAddress: string): Promise<number> {
       throw new Error("Token price not found");
     }
 
+    // This now returns price in SOL, not USD
     return data.data[tokenMintAddress].price;
   } catch (error) {
     console.error("Error getting token price:", error);
