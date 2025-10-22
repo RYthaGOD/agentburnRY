@@ -272,7 +272,7 @@ export async function executeBuyBot(project: Project): Promise<TradingBotResult>
 
           const buyResult = await executeSwapOrder(buyOrder, treasuryKey);
           result.transactionSignatures.push(buyResult.transactionId);
-          result.volume += buyAmountSOL;
+          result.volume += actualBuyAmount;
 
           // Calculate decimal divisor for this token
           const tokenDecimals = project.tokenDecimals || 9; // Default to 9 if not set
