@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Switch } from "@/components/ui/switch";
 import type { AIBotConfig } from "@shared/schema";
 import bs58 from "bs58";
 import {
@@ -72,8 +73,23 @@ const aiBotConfigSchema = z.object({
     (val) => !isNaN(parseInt(val)) && parseInt(val) >= 10,
     "Must be at least 10"
   ),
+  enableAiSellDecisions: z.boolean(),
+  minAiSellConfidence: z.string().min(1).refine(
+    (val) => !isNaN(parseInt(val)) && parseInt(val) >= 0 && parseInt(val) <= 100,
+    "Must be between 0-100"
+  ),
+  holdIfHighConfidence: z.string().min(1).refine(
+    (val) => !isNaN(parseInt(val)) && parseInt(val) >= 0 && parseInt(val) <= 100,
+    "Must be between 0-100"
+  ),
   riskTolerance: z.enum(["low", "medium", "high"]),
-});
+}).refine(
+  (data) => parseInt(data.holdIfHighConfidence) > parseInt(data.minAiSellConfidence),
+  {
+    message: "Hold threshold must be greater than sell threshold to avoid conflicts",
+    path: ["holdIfHighConfidence"],
+  }
+);
 
 type AIBotConfigFormData = z.infer<typeof aiBotConfigSchema>;
 
@@ -135,6 +151,9 @@ export default function AIBot() {
       minQualityScore: aiConfig?.minQualityScore?.toString() || "30",
       minLiquidityUSD: aiConfig?.minLiquidityUSD || "5000",
       minTransactions24h: aiConfig?.minTransactions24h?.toString() || "20",
+      enableAiSellDecisions: aiConfig?.enableAiSellDecisions !== false, // Default true
+      minAiSellConfidence: aiConfig?.minAiSellConfidence?.toString() || "40",
+      holdIfHighConfidence: aiConfig?.holdIfHighConfidence?.toString() || "70",
       riskTolerance: (aiConfig?.riskTolerance as "low" | "medium" | "high") || "medium",
     },
   });
@@ -280,6 +299,9 @@ export default function AIBot() {
         minQualityScore: parseInt(data.minQualityScore),
         minLiquidityUSD: data.minLiquidityUSD,
         minTransactions24h: parseInt(data.minTransactions24h),
+        enableAiSellDecisions: data.enableAiSellDecisions,
+        minAiSellConfidence: parseInt(data.minAiSellConfidence),
+        holdIfHighConfidence: parseInt(data.holdIfHighConfidence),
         riskTolerance: data.riskTolerance,
         enabled: aiConfig?.enabled || false, // Preserve enabled state
       });
@@ -1129,6 +1151,94 @@ export default function AIBot() {
                         )}
                       />
                     </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* AI Sell Decisions - Collapsible Section */}
+              <Collapsible className="border rounded-md">
+                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover-elevate active-elevate-2" data-testid="button-toggle-ai-sell-decisions">
+                  <div className="flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-primary" />
+                    <span className="font-medium">AI-Powered Sell Decisions</span>
+                  </div>
+                  <ChevronDown className="h-4 w-4 transition-transform" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="px-4 pb-4">
+                  <div className="pt-4 space-y-4 border-t">
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Let AI decide when to sell positions based on market analysis. AI re-analyzes held positions and can hold winners longer when confidence is high.
+                    </p>
+                    
+                    <FormField
+                      control={form.control}
+                      name="enableAiSellDecisions"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between p-3 border rounded-md">
+                          <div className="space-y-0.5">
+                            <FormLabel>Enable AI Sell Decisions</FormLabel>
+                            <FormDescription>
+                              Let AI analyze positions and decide optimal sell timing
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-enable-ai-sell"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="minAiSellConfidence"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Min AI Sell Confidence (0-100)</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="number" placeholder="40" data-testid="input-min-ai-sell-confidence" />
+                            </FormControl>
+                            <FormDescription>Sell if AI confidence drops below this %</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="holdIfHighConfidence"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Hold If High Confidence (0-100)</FormLabel>
+                            <FormControl>
+                              <Input {...field} type="number" placeholder="70" data-testid="input-hold-if-high-confidence" />
+                            </FormControl>
+                            <FormDescription>Hold beyond profit target if AI confidence ≥ this %</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <Alert>
+                      <Brain className="h-4 w-4" />
+                      <AlertTitle>How AI Sell Decisions Work</AlertTitle>
+                      <AlertDescription>
+                        <strong>AI re-analyzes</strong> every held position to assess current market conditions. It will:
+                        <br />
+                        • <strong>SELL</strong> if confidence drops below {form.watch("minAiSellConfidence") || "40"}% (weakening momentum)
+                        <br />
+                        • <strong>HOLD</strong> if confidence ≥ {form.watch("holdIfHighConfidence") || "70"}% even when profit target is reached
+                        <br />
+                        • <strong>SELL</strong> at profit target if confidence is between these thresholds
+                        <br /><br />
+                        This allows the bot to ride winners longer while cutting losers early.
+                      </AlertDescription>
+                    </Alert>
                   </div>
                 </CollapsibleContent>
               </Collapsible>

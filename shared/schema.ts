@@ -112,6 +112,11 @@ export const aiBotConfigs = pgTable("ai_bot_configs", {
   riskTolerance: text("risk_tolerance").notNull().default("medium"), // "low", "medium", "high"
   profitTargetPercent: decimal("profit_target_percent", { precision: 18, scale: 2 }).notNull().default("50"), // Sell when profit >= this %
   
+  // AI-driven sell decisions
+  enableAiSellDecisions: boolean("enable_ai_sell_decisions").notNull().default(true), // Let AI decide when to sell
+  minAiSellConfidence: integer("min_ai_sell_confidence").notNull().default(40), // Sell if AI confidence drops below this (0-100)
+  holdIfHighConfidence: integer("hold_if_high_confidence").notNull().default(70), // Hold even if profit target reached when AI confidence >= this (0-100)
+  
   // Organic volume filtering (wash trading detection)
   minOrganicScore: integer("min_organic_score").notNull().default(40), // 0-100, filters wash trading
   minQualityScore: integer("min_quality_score").notNull().default(30), // 0-100, overall token quality
@@ -267,7 +272,20 @@ export const insertAIBotConfigSchema = createInsertSchema(aiBotConfigs).omit({
   minPotentialPercent: z.string().min(0, "Minimum potential must be positive"),
   maxDailyTrades: z.number().min(1).max(100),
   riskTolerance: z.enum(["low", "medium", "high"]),
-});
+  minAiSellConfidence: z.number().min(0).max(100).optional(),
+  holdIfHighConfidence: z.number().min(0).max(100).optional(),
+}).refine(
+  (data) => {
+    // Ensure hold threshold > sell threshold to avoid conflicts
+    if (data.minAiSellConfidence !== undefined && data.holdIfHighConfidence !== undefined) {
+      return data.holdIfHighConfidence > data.minAiSellConfidence;
+    }
+    return true;
+  },
+  {
+    message: "Hold threshold (holdIfHighConfidence) must be greater than sell threshold (minAiSellConfidence)",
+  }
+);
 
 export type Project = typeof projects.$inferSelect;
 export type InsertProject = z.infer<typeof insertProjectSchema>;
