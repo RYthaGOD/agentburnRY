@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Brain, Loader2, Zap, AlertCircle, Play, Power, Scan, TrendingUp, Activity, CheckCircle, XCircle, Clock, Key, Eye, EyeOff, Shield, Lock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -83,6 +85,19 @@ export default function AIBot() {
   const { data: aiConfig, isLoading } = useQuery<AIBotConfig>({
     queryKey: ["/api/ai-bot/config", publicKey?.toString()],
     enabled: connected && !!publicKey,
+  });
+
+  // Fetch active positions for this wallet
+  const { data: activePositions = [], isLoading: isLoadingPositions } = useQuery<Array<{
+    mint: string;
+    entryPriceSOL: number;
+    amountSOL: number;
+    currentPriceSOL: number;
+    profitPercent: number;
+  }>>({
+    queryKey: ["/api/ai-bot/positions", publicKey?.toString()],
+    enabled: connected && !!publicKey,
+    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
   });
 
   const isEnabled = aiConfig?.enabled || false;
@@ -163,6 +178,7 @@ export default function AIBot() {
       addScanLog(`ℹ️ Check Transactions page for trade details`, "info");
 
       queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/config", publicKey.toString()] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/positions", publicKey.toString()] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
 
       toast({
@@ -734,6 +750,100 @@ export default function AIBot() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Active Positions */}
+      {activePositions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Active Positions ({activePositions.length})
+            </CardTitle>
+            <CardDescription>
+              Positions being monitored for profit-taking (target: {aiConfig?.profitTargetPercent || "50"}%)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {activePositions.map((position) => (
+                <div
+                  key={position.mint}
+                  className="p-4 rounded-lg border bg-card hover-elevate"
+                  data-testid={`position-${position.mint}`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {position.mint.slice(0, 8)}...{position.mint.slice(-4)}
+                        </Badge>
+                        <Badge
+                          variant={position.profitPercent >= 0 ? "default" : "destructive"}
+                          className="ml-auto"
+                        >
+                          {position.profitPercent >= 0 ? "+" : ""}
+                          {position.profitPercent.toFixed(2)}%
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground">Entry Price</p>
+                          <p className="font-medium">
+                            {position.entryPriceSOL.toFixed(8)} SOL
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Current Price</p>
+                          <p className="font-medium">
+                            {position.currentPriceSOL > 0
+                              ? `${position.currentPriceSOL.toFixed(8)} SOL`
+                              : "Loading..."}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Investment</p>
+                          <p className="font-medium">{position.amountSOL.toFixed(4)} SOL</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Est. Value</p>
+                          <p className="font-medium">
+                            {position.currentPriceSOL > 0
+                              ? `${(position.amountSOL * (1 + position.profitPercent / 100)).toFixed(4)} SOL`
+                              : "Loading..."}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                          <span>Progress to Target ({aiConfig?.profitTargetPercent || "50"}%)</span>
+                          <span>
+                            {Math.min(
+                              100,
+                              (position.profitPercent / parseFloat(aiConfig?.profitTargetPercent || "50")) * 100
+                            ).toFixed(0)}%
+                          </span>
+                        </div>
+                        <Progress
+                          value={Math.min(
+                            100,
+                            (position.profitPercent / parseFloat(aiConfig?.profitTargetPercent || "50")) * 100
+                          )}
+                          className="h-2"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+              <p className="text-xs text-muted-foreground">
+                💡 Positions will automatically sell when profit target is reached. Budget is recycled for new trades.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Scan Activity Log */}
       {(scanLog.length > 0 || isScanning) && (

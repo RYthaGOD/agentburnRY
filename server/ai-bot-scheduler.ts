@@ -885,3 +885,52 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
 export async function triggerStandaloneAIBot(ownerWalletAddress: string): Promise<ScanLog[]> {
   return await executeStandaloneAIBot(ownerWalletAddress, true);
 }
+
+/**
+ * Get active positions for a wallet address
+ */
+export async function getActivePositions(ownerWalletAddress: string): Promise<Array<{
+  mint: string;
+  entryPriceSOL: number;
+  amountSOL: number;
+  currentPriceSOL: number;
+  profitPercent: number;
+}>> {
+  const botState = aiBotStates.get(ownerWalletAddress);
+  if (!botState || botState.activePositions.size === 0) {
+    return [];
+  }
+
+  const positions = [];
+  const positionsArray = Array.from(botState.activePositions.entries());
+  
+  for (const [mint, position] of positionsArray) {
+    try {
+      // Get current price for profit calculation
+      const currentPriceSOL = await getTokenPrice(mint);
+      const profitPercent = currentPriceSOL 
+        ? ((currentPriceSOL - position.entryPriceSOL) / position.entryPriceSOL) * 100
+        : 0;
+
+      positions.push({
+        mint,
+        entryPriceSOL: position.entryPriceSOL,
+        amountSOL: position.amountSOL,
+        currentPriceSOL: currentPriceSOL || 0,
+        profitPercent,
+      });
+    } catch (error) {
+      console.error(`Error fetching price for ${mint}:`, error);
+      // Still include position but with 0 current price
+      positions.push({
+        mint,
+        entryPriceSOL: position.entryPriceSOL,
+        amountSOL: position.amountSOL,
+        currentPriceSOL: 0,
+        profitPercent: 0,
+      });
+    }
+  }
+
+  return positions;
+}

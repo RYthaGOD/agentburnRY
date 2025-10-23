@@ -930,6 +930,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get active positions for a wallet
+  app.get("/api/ai-bot/positions/:ownerWalletAddress", async (req, res) => {
+    try {
+      const { getActivePositions } = await import("./ai-bot-scheduler");
+      const positions = await getActivePositions(req.params.ownerWalletAddress);
+      res.json(positions);
+    } catch (error: any) {
+      console.error("Get active positions error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Manual execution of standalone AI bot (no project required)
   app.post("/api/ai-bot/execute", authRateLimit, async (req, res) => {
     try {
