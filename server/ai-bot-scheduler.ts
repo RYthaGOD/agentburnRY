@@ -933,8 +933,8 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         reasoning: analysis.reasoning,
       });
 
-      // Check minimum potential threshold (hardcoded 150% minimum)
-      const minPotential = Math.max(parseFloat(config.minPotentialPercent || "150"), 150);
+      // Check minimum potential threshold (hardcoded 50% minimum)
+      const minPotential = Math.max(parseFloat(config.minPotentialPercent || "50"), 50);
       if (analysis.potentialUpsidePercent < minPotential) {
         addLog(`⏭️ SKIP ${token.symbol}: Potential ${analysis.potentialUpsidePercent.toFixed(1)}% below threshold ${minPotential}%`, "warning");
         continue;

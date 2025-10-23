@@ -85,13 +85,13 @@ The AI bot uses a revolutionary "hive mind" approach where **multiple AI models 
 **Trading Logic:** Scans trending tokens from DexScreener, analyzes with hive mind consensus, and executes buy orders ONLY when:
   - Hive mind consensus reaches BUY (≥60% model agreement)
   - Combined AI confidence ≥ 65%
-  - Minimum 1.5X (150%) upside potential (hardcoded minimum)
+  - Minimum 50% upside potential (hardcoded minimum)
   - Total budget not exhausted
   - Daily trade limit not reached
   
 **Budget Management:** Total SOL budget allocation with real-time usage tracking. Prevents overspending by checking remaining budget before each trade and updating budget used after execution. Visual progress bars show budget consumption.
   
-**Configurable Parameters:** Total budget (SOL), budget per trade, analysis interval, minimum volume threshold (USD), minimum potential upside (≥150%), daily trade limit, and risk tolerance (low/medium/high). Uses Jupiter Ultra API for trading execution (better routing and pricing). Completely free with generous limits (Cerebras + Together AI + Groq + DexScreener + Jupiter).
+**Configurable Parameters:** Total budget (SOL), budget per trade, analysis interval, minimum volume threshold (USD), minimum potential upside (≥50%), daily trade limit, and risk tolerance (low/medium/high). Uses Jupiter Ultra API for trading execution (better routing and pricing). Completely free with generous limits (Cerebras + Together AI + Groq + DexScreener + Jupiter).
 
 Price fetching for all bots uses Jupiter Price v3 API for SOL-denominated prices.
 
