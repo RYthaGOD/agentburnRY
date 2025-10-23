@@ -70,6 +70,11 @@ export default function AIBot() {
     type: "info" | "success" | "warning" | "error";
   }>>([]);
   
+  // Private key converter state
+  const [arrayKeyInput, setArrayKeyInput] = useState("");
+  const [convertedBase58, setConvertedBase58] = useState("");
+  const [conversionError, setConversionError] = useState("");
+  
   // Fetch AI bot config for this wallet (completely independent of projects)
   const { data: aiConfig, isLoading } = useQuery<AIBotConfig>({
     queryKey: ["/api/ai-bot/config", publicKey?.toString()],
@@ -324,6 +329,64 @@ export default function AIBot() {
     }
   };
 
+  const handleConvertArrayKey = () => {
+    setConversionError("");
+    setConvertedBase58("");
+
+    try {
+      // Parse the array input
+      let parsedArray: number[];
+      
+      // Try to parse as JSON array
+      try {
+        parsedArray = JSON.parse(arrayKeyInput.trim());
+      } catch {
+        // If not valid JSON, throw error
+        throw new Error("Invalid format. Please paste a valid number array like [123, 45, 67, ...]");
+      }
+
+      // Validate it's an array
+      if (!Array.isArray(parsedArray)) {
+        throw new Error("Input must be an array of numbers");
+      }
+
+      // Validate array length (Solana private keys are 64 bytes)
+      if (parsedArray.length !== 64) {
+        throw new Error(`Invalid key length: ${parsedArray.length} bytes (expected 64 bytes)`);
+      }
+
+      // Validate all elements are numbers
+      if (!parsedArray.every(n => typeof n === 'number' && n >= 0 && n <= 255)) {
+        throw new Error("Array must contain only numbers between 0 and 255");
+      }
+
+      // Convert to Uint8Array and then to base58
+      const uint8Array = new Uint8Array(parsedArray);
+      const base58Key = bs58.encode(uint8Array);
+      
+      setConvertedBase58(base58Key);
+      toast({
+        title: "✅ Conversion Successful",
+        description: "Your private key has been converted to base58 format",
+      });
+    } catch (error: any) {
+      setConversionError(error.message || "Conversion failed");
+      toast({
+        title: "Conversion Failed",
+        description: error.message || "Failed to convert private key",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCopyBase58 = () => {
+    navigator.clipboard.writeText(convertedBase58);
+    toast({
+      title: "Copied!",
+      description: "Base58 private key copied to clipboard",
+    });
+  };
+
   if (!connected) {
     return (
       <div className="container mx-auto py-8 px-4">
@@ -522,6 +585,89 @@ export default function AIBot() {
               </AlertDialog>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Private Key Converter */}
+      <Card>
+        <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500/10">
+            <Key className="h-5 w-5 text-amber-500" />
+          </div>
+          <div className="flex-1">
+            <CardTitle>Private Key Converter</CardTitle>
+            <CardDescription>
+              Convert your private key from array format to base58 format
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-sm">
+              Have your key in <code className="text-xs bg-muted px-1 py-0.5 rounded">[123, 45, 67, ...]</code> format? 
+              Paste it below to convert to base58 format for the AI bot.
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-2">
+            <label htmlFor="array-key-input" className="text-sm font-medium">
+              Array Format Key
+            </label>
+            <textarea
+              id="array-key-input"
+              value={arrayKeyInput}
+              onChange={(e) => setArrayKeyInput(e.target.value)}
+              placeholder="[123, 45, 67, ...]"
+              className="w-full min-h-[100px] p-3 text-sm font-mono rounded-md border bg-background resize-y"
+              data-testid="textarea-array-key-input"
+            />
+            <p className="text-xs text-muted-foreground">
+              Paste your private key in array format (64 numbers from 0-255)
+            </p>
+          </div>
+
+          {conversionError && (
+            <Alert variant="destructive">
+              <XCircle className="h-4 w-4" />
+              <AlertDescription>{conversionError}</AlertDescription>
+            </Alert>
+          )}
+
+          {convertedBase58 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-green-500">
+                ✅ Base58 Format (Ready to use)
+              </label>
+              <div className="relative">
+                <div className="p-3 text-sm font-mono rounded-md border bg-muted break-all">
+                  {convertedBase58}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-2"
+                  onClick={handleCopyBase58}
+                  data-testid="button-copy-base58"
+                >
+                  Copy
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Copy this and paste it in the "Treasury Wallet Private Key" field above
+              </p>
+            </div>
+          )}
+
+          <Button
+            onClick={handleConvertArrayKey}
+            disabled={!arrayKeyInput.trim()}
+            className="w-full"
+            data-testid="button-convert-key"
+          >
+            <Zap className="h-4 w-4 mr-2" />
+            Convert to Base58
+          </Button>
         </CardContent>
       </Card>
 
