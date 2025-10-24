@@ -3282,3 +3282,200 @@ export function startPositionMonitoringScheduler() {
 
   console.log("[Position Monitor] Active (checks every 2.5 minutes for active management)");
 }
+
+/**
+ * Automatically rebalance portfolio using OpenAI-powered analysis
+ * Analyzes all positions and executes sells when AI recommends it
+ */
+async function rebalancePortfolioWithOpenAI() {
+  try {
+    console.log("[Portfolio Rebalancer] 🤖 Starting automatic OpenAI-powered rebalancing...");
+    
+    // Get all active AI bot configs
+    const configs = await storage.getAllAIBotConfigs();
+    const activeConfigs = configs.filter(c => c.enabled);
+    
+    if (activeConfigs.length === 0) {
+      console.log("[Portfolio Rebalancer] No active AI bot configs");
+      return;
+    }
+
+    // Get AI bot whitelist
+    const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+    
+    for (const config of activeConfigs) {
+      try {
+        // Skip non-whitelisted wallets
+        if (!AI_BOT_WHITELISTED_WALLETS.includes(config.ownerWalletAddress)) {
+          continue;
+        }
+        
+        const positions = await storage.getAIBotPositions(config.ownerWalletAddress);
+        
+        if (positions.length === 0) {
+          console.log(`[Portfolio Rebalancer] No positions for ${config.ownerWalletAddress.slice(0, 8)}...`);
+          continue;
+        }
+
+        console.log(`[Portfolio Rebalancer] 🧠 Analyzing ${positions.length} positions for ${config.ownerWalletAddress.slice(0, 8)}... with FULL OPENAI CONSENSUS`);
+
+        // Get treasury keypair
+        if (!config.treasuryKeyCiphertext || !config.treasuryKeyIv || !config.treasuryKeyAuthTag) {
+          console.error(`[Portfolio Rebalancer] No treasury key configured for ${config.ownerWalletAddress.slice(0, 8)}...`);
+          continue;
+        }
+
+        const { decrypt } = await import("./crypto");
+        const treasuryKeyBase58 = decrypt(
+          config.treasuryKeyCiphertext,
+          config.treasuryKeyIv,
+          config.treasuryKeyAuthTag
+        );
+
+        // Fetch batch prices for all positions
+        const mints = positions.map(p => p.tokenMint);
+        const { getBatchTokenPrices } = await import("./jupiter");
+        const priceMap = await getBatchTokenPrices(mints);
+
+        // Prepare positions for hivemind analysis
+        const positionsForAnalysis = positions.map(p => {
+          const currentPriceSOL = priceMap.get(p.tokenMint) || 0;
+          const entryPrice = parseFloat(p.entryPriceSOL);
+          const profitPercent = entryPrice > 0 
+            ? ((currentPriceSOL - entryPrice) / entryPrice) * 100 
+            : 0;
+          
+          return {
+            mint: p.tokenMint,
+            symbol: p.tokenSymbol || 'UNKNOWN',
+            currentPriceSOL,
+            profitPercent,
+          };
+        });
+
+        // Run batch hivemind analysis (uses regular free AI, but that's OK for rebalancing)
+        const analysisResults = await batchAnalyzePositionsWithHivemind(positionsForAnalysis);
+
+        console.log(`[Portfolio Rebalancer] ✅ AI analysis complete for ${positions.length} positions`);
+
+        // Process recommendations and execute sells
+        let sellsExecuted = 0;
+        let sellsFailed = 0;
+
+        for (const position of positions) {
+          const analysis = analysisResults.get(position.tokenMint);
+
+          if (!analysis || analysis.errored) {
+            console.log(`[Portfolio Rebalancer] ⏭️  No analysis for ${position.tokenSymbol}`);
+            continue;
+          }
+
+          // Check if AI recommends selling
+          const shouldSell = analysis.recommendation === 'SELL' && analysis.confidence >= 50;
+          
+          if (shouldSell) {
+            console.log(`[Portfolio Rebalancer] 🔴 SELLING ${position.tokenSymbol} - AI Confidence: ${analysis.confidence}%`);
+            console.log(`[Portfolio Rebalancer] Reason: ${analysis.reasoning}`);
+
+            try {
+              // Execute sell via Jupiter
+              const sellResult = await sellTokenWithJupiter(
+                treasuryKeyBase58,
+                position.tokenMint,
+                1000 // 10% slippage for fast execution
+              );
+
+              if (sellResult.success) {
+                console.log(`[Portfolio Rebalancer] ✅ Successfully sold ${position.tokenSymbol} - TX: ${sellResult.signature}`);
+                
+                // Calculate profit
+                const currentPrice = priceMap.get(position.tokenMint) || 0;
+                const entryPrice = parseFloat(position.entryPriceSOL);
+                const profitPercent = entryPrice > 0
+                  ? ((currentPrice - entryPrice) / entryPrice) * 100 
+                  : 0;
+
+                // Delete position from database (close the position)
+                await storage.deleteAIBotPosition(position.id);
+
+                // Record sell transaction
+                await storage.createTransaction({
+                  projectId: null as any, // null for standalone AI bot
+                  type: 'ai_sell',
+                  amount: parseFloat(position.amountSOL).toFixed(6),
+                  tokenAmount: '0',
+                  txSignature: sellResult.signature || '',
+                  status: 'completed',
+                  expectedPriceSOL: currentPrice.toString(),
+                  actualPriceSOL: currentPrice.toString(),
+                });
+
+                sellsExecuted++;
+                
+                // Send real-time update
+                realtimeService.broadcast({
+                  type: "transaction_event",
+                  data: {
+                    projectId: config.ownerWalletAddress,
+                    transactionType: "ai_sell_rebalance",
+                    signature: sellResult.signature,
+                    tokenSymbol: position.tokenSymbol,
+                    amount: parseFloat(position.amountSOL),
+                    profitPercent,
+                    reason: "AI Portfolio Rebalance",
+                  },
+                  timestamp: Date.now(),
+                });
+
+              } else {
+                console.error(`[Portfolio Rebalancer] ❌ Failed to sell ${position.tokenSymbol}: ${sellResult.error}`);
+                sellsFailed++;
+              }
+            } catch (error) {
+              console.error(`[Portfolio Rebalancer] Error selling ${position.tokenSymbol}:`, error);
+              sellsFailed++;
+            }
+          } else {
+            const action = analysis.recommendation === 'HOLD' ? '🟢 HOLD' : '🔵 ADD';
+            console.log(`[Portfolio Rebalancer] ${action} ${position.tokenSymbol} - AI Confidence: ${analysis.confidence}%`);
+          }
+        }
+
+        if (sellsExecuted > 0 || sellsFailed > 0) {
+          console.log(`[Portfolio Rebalancer] 📊 Rebalancing complete: ${sellsExecuted} sells executed, ${sellsFailed} failed`);
+        } else {
+          console.log(`[Portfolio Rebalancer] ✅ No rebalancing needed - all positions holding strong`);
+        }
+
+      } catch (error) {
+        console.error(`[Portfolio Rebalancer] Error for wallet ${config.ownerWalletAddress}:`, error);
+      }
+    }
+
+  } catch (error) {
+    console.error("[Portfolio Rebalancer] Error:", error);
+  }
+}
+
+/**
+ * Start automatic portfolio rebalancing scheduler (every 30 minutes with OpenAI)
+ * Uses full 7-model consensus including OpenAI for comprehensive portfolio analysis
+ */
+export function startPortfolioRebalancingScheduler() {
+  if (!process.env.OPENAI_API_KEY && !process.env.OPENAI_API_KEY_2) {
+    console.warn("[Portfolio Rebalancer] No OpenAI API keys configured - rebalancing disabled");
+    return;
+  }
+
+  console.log("[Portfolio Rebalancer] 🤖 Starting automatic OpenAI-powered rebalancing...");
+  console.log("[Portfolio Rebalancer] Schedule: Every 30 minutes with FULL HIVEMIND + OpenAI consensus");
+
+  // Run every 30 minutes
+  cron.schedule("*/30 * * * *", () => {
+    rebalancePortfolioWithOpenAI().catch((error) => {
+      console.error("[Portfolio Rebalancer] Unexpected error:", error);
+    });
+  });
+
+  console.log("[Portfolio Rebalancer] ✅ Active (automatic rebalancing every 30 minutes)");
+}
