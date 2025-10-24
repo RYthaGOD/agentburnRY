@@ -2069,6 +2069,36 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
     addLog(`   Largest Position: ${portfolio.largestPosition.toFixed(1)}% of portfolio`, "info");
     addLog(`   Diversification Score: ${portfolio.diversificationScore.toFixed(0)}/100`, "info");
     
+    // STRICT DRAWDOWN PROTECTION: Pause trading if portfolio drops >20% from peak
+    const portfolioPeak = parseFloat(config.portfolioPeakSOL || portfolio.totalValueSOL.toString());
+    const currentPortfolioValue = portfolio.totalValueSOL;
+    
+    // Update peak if current value is higher
+    if (currentPortfolioValue > portfolioPeak) {
+      await storage.createOrUpdateAIBotConfig({
+        ownerWalletAddress,
+        portfolioPeakSOL: currentPortfolioValue.toString(),
+      });
+      addLog(`📈 New portfolio peak: ${currentPortfolioValue.toFixed(4)} SOL`, "success");
+    }
+    
+    // Calculate drawdown from peak
+    const drawdownPercent = ((currentPortfolioValue - portfolioPeak) / portfolioPeak) * 100;
+    const MAX_DRAWDOWN_PERCENT = -20; // Pause trading if portfolio drops >20%
+    
+    // Drawdown protection flag
+    let skipNewTrades = false;
+    
+    if (drawdownPercent <= MAX_DRAWDOWN_PERCENT) {
+      skipNewTrades = true;
+      addLog(`🛑 DRAWDOWN PROTECTION ACTIVATED: Portfolio down ${Math.abs(drawdownPercent).toFixed(1)}% from peak (${portfolioPeak.toFixed(4)} SOL → ${currentPortfolioValue.toFixed(4)} SOL)`, "warning");
+      addLog(`   Trading PAUSED to prevent further capital erosion. Positions will be monitored but no new trades executed.`, "warning");
+      addLog(`   Resume trading when portfolio recovers above ${(portfolioPeak * 0.85).toFixed(4)} SOL (15% from peak)`, "info");
+    } else if (drawdownPercent < -10) {
+      // Warning zone (10-20% drawdown)
+      addLog(`⚠️ Portfolio drawdown: ${Math.abs(drawdownPercent).toFixed(1)}% from peak - Approaching pause threshold (${MAX_DRAWDOWN_PERCENT}%)`, "warning");
+    }
+    
     if (portfolio.holdings.length > 0) {
       addLog(`   Top Holdings:`, "info");
       portfolio.holdings.slice(0, 5).forEach((holding, idx) => {
@@ -2148,6 +2178,12 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         continue;
       }
 
+      // DRAWDOWN PROTECTION: Skip new trades if portfolio dropped >20% from peak
+      if (skipNewTrades) {
+        addLog(`🛑 SKIP ${token.symbol}: Drawdown protection active - no new trades until recovery`, "warning");
+        continue;
+      }
+      
       // Execute trade based on AI recommendation
       if (analysis.action === "buy") {
         // Calculate dynamic trade amount based on hivemind budget and AI confidence
@@ -2359,9 +2395,10 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
       }
     }
 
-    // Check active positions for AI-driven profit-taking
-    const minAiSellConfidence = config.minAiSellConfidence || 40;
+    // Check active positions for AI-driven profit-taking with STRICT DRAWDOWN PROTECTION
+    const minAiSellConfidence = config.minAiSellConfidence || 50; // INCREASED: Faster exits (was 40)
     const holdIfHighConfidence = config.holdIfHighConfidence || 70;
+    const stopLossPercent = -30; // Auto-sell if position drops >30% to limit drawdowns
     
     if (botState.activePositions.size > 0) {
       addLog(`📊 Checking ${botState.activePositions.size} active positions - Mode: 100% AI & Hivemind Strategy`, "info");
@@ -2382,7 +2419,58 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           
           addLog(`💹 Position ${mint.slice(0, 8)}... | Entry: ${position.entryPriceSOL.toFixed(8)} SOL | Current: ${currentPriceSOL.toFixed(8)} SOL | Profit: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}%`, "info");
 
-          // AI & Hivemind Strategy makes ALL sell decisions
+          // STRICT STOP-LOSS: Auto-sell if loss exceeds 30% (capital preservation priority)
+          if (profitPercent <= stopLossPercent) {
+            addLog(`🛑 STOP-LOSS TRIGGERED: ${profitPercent.toFixed(2)}% loss exceeds ${stopLossPercent}% limit - AUTO-SELLING to preserve capital`, "warning");
+            
+            // Execute immediate sell without AI analysis (emergency exit)
+            const connection = getConnection();
+            const treasuryKeypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
+            const tokenAccount = await connection.getTokenAccountsByOwner(
+              treasuryKeypair.publicKey,
+              { mint: new PublicKey(mint) }
+            );
+
+            if (tokenAccount.value.length > 0) {
+              const sellResult = await sellTokenWithJupiter(treasuryKeyBase58, mint, 1000);
+              
+              if (sellResult.success && sellResult.signature) {
+                const solReceived = position.amountSOL * (1 + profitPercent / 100);
+                
+                await storage.createTransaction({
+                  projectId: null as any,
+                  type: "ai_sell",
+                  amount: solReceived.toString(),
+                  tokenAmount: position.amountSOL.toString(),
+                  txSignature: sellResult.signature,
+                  status: "completed",
+                  expectedPriceSOL: currentPriceSOL.toString(),
+                  actualPriceSOL: currentPriceSOL.toString(),
+                });
+
+                await storage.deleteAIBotPositionByMint(ownerWalletAddress, mint);
+                botState.activePositions.delete(mint);
+                availableBalance += solReceived;
+                
+                addLog(`🛑 STOP-LOSS EXECUTED: Sold at ${profitPercent.toFixed(2)}% loss to prevent further drawdown`, "warning");
+                
+                realtimeService.broadcast({
+                  type: "transaction_event",
+                  data: {
+                    projectId: ownerWalletAddress,
+                    transactionType: "ai_sell_stoploss",
+                    signature: sellResult.signature,
+                    profitPercent,
+                    reason: `Stop-loss: ${profitPercent.toFixed(2)}% loss`,
+                  },
+                  timestamp: Date.now(),
+                });
+              }
+            }
+            continue; // Skip AI analysis for stop-loss positions
+          }
+
+          // AI & Hivemind Strategy makes ALL sell decisions (if not stop-loss)
           let shouldSell = false;
           let sellReason = "";
 

@@ -114,7 +114,7 @@ export const aiBotConfigs = pgTable("ai_bot_configs", {
   
   // AI-driven sell decisions (ALWAYS ENABLED - these control AI behavior)
   enableAiSellDecisions: boolean("enable_ai_sell_decisions").notNull().default(true), // DEPRECATED - always true, AI always makes decisions
-  minAiSellConfidence: integer("min_ai_sell_confidence").notNull().default(40), // Sell if AI confidence drops below this (0-100)
+  minAiSellConfidence: integer("min_ai_sell_confidence").notNull().default(50), // INCREASED: Faster exits for drawdown protection (was 40)
   holdIfHighConfidence: integer("hold_if_high_confidence").notNull().default(70), // Hold when AI confidence >= this (0-100)
   
   // Organic volume filtering (wash trading detection)
@@ -128,6 +128,9 @@ export const aiBotConfigs = pgTable("ai_bot_configs", {
   treasuryKeyIv: text("treasury_key_iv"),
   treasuryKeyAuthTag: text("treasury_key_auth_tag"),
   treasuryKeyFingerprint: text("treasury_key_fingerprint"),
+  
+  // STRICT DRAWDOWN PROTECTION: Track portfolio peak for drawdown monitoring
+  portfolioPeakSOL: decimal("portfolio_peak_sol", { precision: 18, scale: 9 }).notNull().default("0"),
   
   // Status tracking
   lastBotRunAt: timestamp("last_bot_run_at"),
