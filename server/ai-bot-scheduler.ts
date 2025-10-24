@@ -739,6 +739,38 @@ async function executeAITradingBot(project: Project) {
         console.log(`[AI Bot] BUY signal: ${token.symbol} - ${amountSOL} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
         console.log(`[AI Bot] Reasoning: ${analysis.reasoning}`);
 
+        // Check if we already hold this token
+        const existingPositions = await storage.getAIBotPositions(project.ownerWalletAddress);
+        const existingPosition = existingPositions.find(p => p.tokenMint === token.mint);
+        
+        if (existingPosition) {
+          const entryPrice = parseFloat(existingPosition.entryPriceSOL);
+          const currentPrice = token.priceSOL;
+          const priceChangePercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+          const previousConfidence = existingPosition.aiConfidenceAtBuy || 0;
+          const newConfidence = analysis.confidence * 100; // Convert to 0-100 scale
+          
+          // Only buy more if BOTH conditions are met:
+          // 1. Price has dropped at least 10% (drawback/dip)
+          // 2. New AI confidence is higher than previous
+          const hasDrawback = priceChangePercent <= -10; // Price down 10%+
+          const hasHigherConfidence = newConfidence > previousConfidence;
+          
+          if (!hasDrawback || !hasHigherConfidence) {
+            console.log(`[AI Bot] ⏭️ SKIP ${token.symbol} - Already holding position:`);
+            console.log(`[AI Bot]    Previous entry: ${entryPrice.toFixed(8)} SOL (confidence: ${previousConfidence}%)`);
+            console.log(`[AI Bot]    Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`);
+            console.log(`[AI Bot]    New confidence: ${newConfidence.toFixed(1)}%`);
+            console.log(`[AI Bot]    Drawback requirement: ${hasDrawback ? '✅' : '❌'} (need -10% dip, have ${priceChangePercent.toFixed(2)}%)`);
+            console.log(`[AI Bot]    Higher confidence: ${hasHigherConfidence ? '✅' : '❌'} (need >${previousConfidence}%, have ${newConfidence.toFixed(1)}%)`);
+            continue;
+          }
+          
+          console.log(`[AI Bot] ✅ Adding to position ${token.symbol}:`);
+          console.log(`[AI Bot]    Price dropped ${Math.abs(priceChangePercent).toFixed(2)}% from entry (${entryPrice.toFixed(8)} → ${currentPrice.toFixed(8)} SOL)`);
+          console.log(`[AI Bot]    Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`);
+        }
+
         // Buy using Jupiter Ultra API for better routing and pricing
         const treasuryPrivateKey = await getTreasuryKey(project.id);
         if (!treasuryPrivateKey) {
@@ -1147,7 +1179,7 @@ async function executeQuickTrade(
       // Only buy more if BOTH conditions are met:
       // 1. Price has dropped at least 10% (drawback/dip)
       // 2. New AI confidence is higher than previous
-      const hasDrawback = priceChangePercent < -10; // Price down 10%+
+      const hasDrawback = priceChangePercent <= -10; // Price down 10%+
       const hasHigherConfidence = newConfidence > previousConfidence;
       
       if (!hasDrawback || !hasHigherConfidence) {
@@ -1184,7 +1216,7 @@ async function executeQuickTrade(
 
       // Record transaction
       await storage.createTransaction({
-        projectId: "",
+        projectId: null as any, // null for standalone AI bot transactions
         type: "ai_buy",
         amount: tradeAmount.toString(),
         tokenAmount: "0",
@@ -1576,7 +1608,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           // Only buy more if BOTH conditions are met:
           // 1. Price has dropped at least 10% (drawback/dip)
           // 2. New AI confidence is higher than previous
-          const hasDrawback = priceChangePercent < -10; // Price down 10%+
+          const hasDrawback = priceChangePercent <= -10; // Price down 10%+
           const hasHigherConfidence = newConfidence > previousConfidence;
           
           if (!hasDrawback || !hasHigherConfidence) {
@@ -1614,7 +1646,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
 
           // Record transaction (no project ID for standalone)
           await storage.createTransaction({
-            projectId: "", // Empty for standalone AI bot transactions
+            projectId: null as any, // null for standalone AI bot transactions
             type: "ai_buy",
             amount: tradeAmount.toString(),
             tokenAmount: "0", // Would need to calculate from tx
@@ -1786,7 +1818,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
               
               // Record sell transaction
               await storage.createTransaction({
-                projectId: "", // Empty for standalone AI bot
+                projectId: null as any, // null for standalone AI bot
                 type: "ai_sell",
                 amount: solReceived.toFixed(6), // SOL received from sale
                 tokenAmount: "0", // We don't track exact token amount
