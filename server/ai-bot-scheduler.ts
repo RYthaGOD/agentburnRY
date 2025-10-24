@@ -1023,6 +1023,10 @@ async function executeAITradingBot(project: Project) {
         );
 
         if (result.success && result.signature) {
+          // Calculate actual tokens received
+          const tokensReceived = result.outputAmount || 0;
+          console.log(`[AI Bot] ✅ Received ${tokensReceived} tokens from swap`);
+          
           // Update budget tracking
           const newBudgetUsed = budgetUsed + amountSOL;
           await storage.updateProject(project.id, {
@@ -1030,12 +1034,12 @@ async function executeAITradingBot(project: Project) {
           });
           console.log(`[AI Bot] Budget updated: ${newBudgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used`);
 
-          // Record transaction
+          // Record transaction with actual tokens received
           await storage.createTransaction({
             projectId: project.id,
             type: "ai_buy",
             amount: amountSOL.toString(),
-            tokenAmount: "0", // Would need to calculate from tx
+            tokenAmount: tokensReceived.toString(),
             txSignature: result.signature,
             status: "completed",
             expectedPriceSOL: token.priceSOL.toString(),
@@ -1105,7 +1109,7 @@ async function executeAITradingBot(project: Project) {
               tokenName: token.name,
               entryPriceSOL: token.priceSOL.toString(),
               amountSOL: amountSOL.toString(),
-              tokenAmount: "0", // Would need to calculate from tx
+              tokenAmount: tokensReceived.toString(),
               buyTxSignature: result.signature,
               lastCheckPriceSOL: token.priceSOL.toString(),
               lastCheckProfitPercent: "0",
@@ -1649,6 +1653,10 @@ async function executeQuickTrade(
     );
 
     if (result.success && result.signature) {
+      // Calculate actual tokens received
+      const tokensReceived = result.outputAmount || 0;
+      console.log(`[Quick Scan] ✅ Received ${tokensReceived} tokens from swap`);
+      
       // Update budget tracking
       const budgetUsed = parseFloat(config.budgetUsed || "0");
       const newBudgetUsed = budgetUsed + tradeAmount;
@@ -1657,12 +1665,12 @@ async function executeQuickTrade(
         budgetUsed: newBudgetUsed.toString(),
       });
 
-      // Record transaction
+      // Record transaction with actual tokens received
       await storage.createTransaction({
         projectId: null as any, // null for standalone AI bot transactions
         type: "ai_buy",
         amount: tradeAmount.toString(),
-        tokenAmount: "0",
+        tokenAmount: tokensReceived.toString(),
         txSignature: result.signature,
         status: "completed",
         expectedPriceSOL: token.priceSOL.toString(),
@@ -1716,7 +1724,7 @@ async function executeQuickTrade(
           tokenName: token.name,
           entryPriceSOL: token.priceSOL.toString(),
           amountSOL: tradeAmount.toString(),
-          tokenAmount: "0", // TBD from tx
+          tokenAmount: tokensReceived.toString(),
           buyTxSignature: result.signature,
           lastCheckPriceSOL: token.priceSOL.toString(),
           lastCheckProfitPercent: "0",
@@ -2395,6 +2403,10 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         );
 
         if (result.success && result.signature) {
+          // Calculate actual tokens received
+          const tokensReceived = result.outputAmount || 0;
+          addLog(`✅ Received ${tokensReceived} tokens from swap`, "success");
+          
           // Update budget tracking and available balance
           const newBudgetUsed = budgetUsed + tradeAmount;
           availableBalance -= tradeAmount;
@@ -2404,12 +2416,12 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           });
           addLog(`💰 Budget updated: ${newBudgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used (${availableBalance.toFixed(4)} SOL remaining)`, "info");
 
-          // Record transaction (no project ID for standalone)
+          // Record transaction with actual tokens received
           await storage.createTransaction({
             projectId: null as any, // null for standalone AI bot transactions
             type: "ai_buy",
             amount: tradeAmount.toString(),
-            tokenAmount: "0", // Would need to calculate from tx
+            tokenAmount: tokensReceived.toString(),
             txSignature: result.signature,
             status: "completed",
             expectedPriceSOL: token.priceSOL.toString(),
@@ -2475,7 +2487,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
               tokenName: token.name,
               entryPriceSOL: token.priceSOL.toString(),
               amountSOL: tradeAmount.toString(),
-              tokenAmount: "0", // Would need to calculate from tx
+              tokenAmount: tokensReceived.toString(),
               buyTxSignature: result.signature,
               lastCheckPriceSOL: token.priceSOL.toString(),
               lastCheckProfitPercent: "0",

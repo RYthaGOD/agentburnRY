@@ -2194,6 +2194,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Utility: Fix positions with zero tokenAmount by querying blockchain
+  app.post("/api/ai-bot/fix-zero-positions/:walletAddress", async (req, res) => {
+    try {
+      const { walletAddress } = req.params;
+      
+      console.log(`[Fix Zero Positions] Starting for wallet ${walletAddress}...`);
+      
+      // Get all positions with zero tokenAmount
+      const { getTokenBalance } = await import("./solana-sdk");
+      const positions = await storage.getAIBotPositions(walletAddress);
+      const zeroPositions = positions.filter(p => {
+        const amount = parseFloat(p.tokenAmount);
+        return amount === 0 || isNaN(amount);
+      });
+
+      if (zeroPositions.length === 0) {
+        return res.json({
+          message: "No positions with zero tokenAmount found",
+          fixed: 0,
+          total: positions.length,
+        });
+      }
+
+      console.log(`[Fix Zero Positions] Found ${zeroPositions.length} positions with zero tokenAmount`);
+
+      // Get the wallet's private key to derive public key
+      const config = await storage.getAIBotConfig(walletAddress);
+      if (!config) {
+        return res.status(404).json({ message: "AI bot config not found" });
+      }
+
+      const treasuryKey = await getTreasuryKey(config.id);
+      if (!treasuryKey) {
+        return res.status(404).json({ message: "Treasury key not found" });
+      }
+
+      const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
+      const keypair = loadKeypairFromPrivateKey(treasuryKey);
+      const publicKey = keypair.publicKey.toString();
+
+      let fixed = 0;
+      let failed = 0;
+
+      // Query actual balances and update positions
+      for (const position of zeroPositions) {
+        try {
+          const actualBalance = await getTokenBalance(position.tokenMint, publicKey);
+          
+          if (actualBalance > 0) {
+            await storage.updateAIBotPosition(position.id, {
+              tokenAmount: actualBalance.toString(),
+            });
+            console.log(`[Fix Zero Positions] ✅ Fixed ${position.tokenSymbol}: ${actualBalance} tokens`);
+            fixed++;
+          } else {
+            console.log(`[Fix Zero Positions] ⚠️ ${position.tokenSymbol}: Balance is still 0 (likely sold or never received)`);
+            failed++;
+          }
+        } catch (error) {
+          console.error(`[Fix Zero Positions] ❌ Error fixing ${position.tokenSymbol}:`, error);
+          failed++;
+        }
+      }
+
+      res.json({
+        message: `Fixed ${fixed} positions, ${failed} failed or empty`,
+        fixed,
+        failed,
+        total: zeroPositions.length,
+        positions: zeroPositions.map(p => ({
+          symbol: p.tokenSymbol,
+          mint: p.tokenMint,
+        })),
+      });
+    } catch (error: any) {
+      console.error("[Fix Zero Positions] Error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
