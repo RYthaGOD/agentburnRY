@@ -39,17 +39,20 @@ Preferred communication style: Simple, everyday language.
     - <55% confidence: 0.5x base amount (low)
   - Caps trade amounts at available wallet balance
 - **Implemented smart scanning system to reduce API usage**
-  - Added 10-minute cache for token data (prevents repeated API calls)
+  - Extended token data cache from 10 to 15 minutes (reduces DexScreener/PumpFun API calls)
+  - Added AI analysis cache (30 minutes) - prevents re-analyzing same tokens repeatedly
   - Two-tier scanning approach:
     - Quick scans: Every 10 minutes using technical filters + fast Cerebras AI (free)
       - Analyzes top 2 opportunities with single-model AI
       - Executes trades immediately when AI confidence >= 75%
       - 3x faster response on high-quality opportunities
+      - Uses AI analysis cache to skip already-analyzed tokens
     - Deep scans: Every 30 minutes with full 6-model AI consensus
       - All opportunities analyzed by all 6 models
       - Executes trades when consensus confidence >= 55%
-  - Cache shared across all scans within 10-minute window
-  - Significantly reduces API calls while increasing scan frequency
+      - Fetches positions once per scan (not per-token) for efficiency
+  - Position monitoring reduced from every 5 to every 10 minutes (50% fewer API calls)
+  - Significantly reduces API calls while maintaining responsiveness
 - **Implemented Cerebras-powered position monitoring system** (runs every 5 minutes, free API)
   - Monitors all active AI bot positions in real-time
   - Updates current prices and profit percentages in database

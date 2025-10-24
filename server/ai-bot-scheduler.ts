@@ -57,7 +57,7 @@ const aiBotStates = new Map<string, AIBotState>();
 
 /**
  * Cache for DexScreener token data to reduce API calls
- * Cached for 10 minutes to allow frequent scans without hammering API
+ * Cached for 15 minutes to allow frequent scans without hammering API
  */
 interface TokenCache {
   tokens: TokenMarketData[];
@@ -66,7 +66,20 @@ interface TokenCache {
 }
 
 const tokenDataCache: Map<string, TokenCache> = new Map();
-const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
+const CACHE_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+
+/**
+ * Cache for AI analysis results to avoid re-analyzing same tokens
+ * Cached for 30 minutes - market conditions don't change that fast
+ */
+interface AnalysisCache {
+  analysis: any;
+  timestamp: number;
+  expiresAt: number;
+}
+
+const analysisCache: Map<string, AnalysisCache> = new Map();
+const ANALYSIS_CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
 /**
  * Get cached token data or fetch fresh data if cache expired
@@ -1033,8 +1046,37 @@ async function runQuickTechnicalScan() {
 }
 
 /**
+ * Get cached AI analysis or return null if not found/expired
+ */
+function getCachedAnalysis(tokenMint: string): any | null {
+  const cached = analysisCache.get(tokenMint);
+  const now = Date.now();
+  
+  if (cached && cached.expiresAt > now) {
+    const remainingMinutes = Math.floor((cached.expiresAt - now) / 60000);
+    console.log(`[AI Cache] Using cached analysis for ${tokenMint.slice(0, 8)}... (${remainingMinutes}m remaining)`);
+    return cached.analysis;
+  }
+  
+  return null;
+}
+
+/**
+ * Cache AI analysis result for 30 minutes
+ */
+function cacheAnalysis(tokenMint: string, analysis: any): void {
+  const now = Date.now();
+  analysisCache.set(tokenMint, {
+    analysis,
+    timestamp: now,
+    expiresAt: now + ANALYSIS_CACHE_DURATION_MS,
+  });
+}
+
+/**
  * Fast single-model analysis using Cerebras (free)
  * Used for quick 75%+ confidence trades
+ * Results cached for 30 minutes to reduce API calls
  */
 async function analyzeTokenWithCerebrasOnly(
   tokenData: TokenMarketData,
@@ -1047,6 +1089,12 @@ async function analyzeTokenWithCerebrasOnly(
   potentialUpsidePercent: number;
   riskLevel: "low" | "medium" | "high";
 }> {
+  // Check cache first
+  const cached = getCachedAnalysis(tokenData.mint);
+  if (cached) {
+    return cached;
+  }
+  
   try {
     const cerebrasClient = new OpenAI({
       baseURL: "https://api.cerebras.ai/v1",
@@ -1093,16 +1141,22 @@ Respond ONLY with valid JSON:
       riskLevel: "high",
     };
 
+    // Cache the analysis result
+    cacheAnalysis(tokenData.mint, analysis);
+
     return analysis;
   } catch (error) {
     console.error("[Cerebras] Quick analysis failed:", error);
-    return {
-      action: "hold",
+    const errorAnalysis = {
+      action: "hold" as const,
       confidence: 0,
       reasoning: "Cerebras analysis error",
       potentialUpsidePercent: 0,
-      riskLevel: "high",
+      riskLevel: "high" as const,
     };
+    
+    // Don't cache error results
+    return errorAnalysis;
   }
 }
 
@@ -1499,7 +1553,11 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
 
     addLog(`💰 Budget status: ${budgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used`, "success");
 
-    // Fetch trending tokens with organic volume filtering (uses 10-min cache)
+    // Fetch all existing positions once (optimization: avoid repeated database queries)
+    const allExistingPositions = await storage.getAIBotPositions(ownerWalletAddress);
+    addLog(`📊 Currently holding ${allExistingPositions.length} active positions`, "info");
+
+    // Fetch trending tokens with organic volume filtering (uses 15-min cache)
     addLog(`🔍 Fetching trending tokens from DexScreener with organic volume filters...`, "info");
     const trendingTokens = await getCachedOrFetchTokens({
       minOrganicScore: config.minOrganicScore || 40,
@@ -1594,9 +1652,8 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           reasoning: analysis.reasoning,
         });
 
-        // Check if we already hold this token
-        const existingPositions = await storage.getAIBotPositions(ownerWalletAddress);
-        const existingPosition = existingPositions.find(p => p.tokenMint === token.mint);
+        // Check if we already hold this token (using pre-fetched positions)
+        const existingPosition = allExistingPositions.find(p => p.tokenMint === token.mint);
         
         if (existingPosition) {
           const entryPrice = parseFloat(existingPosition.entryPriceSOL);
@@ -2175,7 +2232,8 @@ async function monitorPositionsWithCerebras() {
 }
 
 /**
- * Start position monitoring scheduler (every 5 minutes using free Cerebras)
+ * Start position monitoring scheduler (every 10 minutes using free Cerebras)
+ * Reduced from 5 to 10 minutes to cut API calls in half
  */
 export function startPositionMonitoringScheduler() {
   if (!process.env.CEREBRAS_API_KEY) {
@@ -2186,12 +2244,12 @@ export function startPositionMonitoringScheduler() {
   console.log("[Position Monitor] Starting...");
   console.log("[Position Monitor] Using free Cerebras API for position monitoring");
 
-  // Run every 5 minutes
-  cron.schedule("*/5 * * * *", () => {
+  // Run every 10 minutes (reduced from 5 to save API calls)
+  cron.schedule("*/10 * * * *", () => {
     monitorPositionsWithCerebras().catch((error) => {
       console.error("[Position Monitor] Unexpected error:", error);
     });
   });
 
-  console.log("[Position Monitor] Active (checks every 5 minutes)");
+  console.log("[Position Monitor] Active (checks every 10 minutes)");
 }
