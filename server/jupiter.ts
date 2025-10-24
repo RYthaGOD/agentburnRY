@@ -189,10 +189,71 @@ export async function getTokenShieldInfo(mint: string): Promise<any> {
 }
 
 /**
+ * Get prices for multiple tokens in a single API call (batch operation)
+ * Returns a Map of mint address -> price in SOL
+ * Dramatically reduces API calls and avoids rate limiting
+ */
+export async function getBatchTokenPrices(tokenMintAddresses: string[]): Promise<Map<string, number>> {
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  const priceMap = new Map<string, number>();
+  
+  if (tokenMintAddresses.length === 0) {
+    return priceMap;
+  }
+
+  try {
+    // Jupiter Price API v3 supports up to 100 tokens per request
+    // Build comma-separated list of all token mints + SOL
+    const allMints = [...tokenMintAddresses, SOL_MINT].join(',');
+    
+    const response = await fetch(
+      `https://lite-api.jup.ag/price/v3?ids=${allMints}`,
+      {
+        signal: AbortSignal.timeout(15000), // 15 second timeout for batch
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Jupiter price API error: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const solData = data[SOL_MINT];
+
+    if (!solData || typeof solData.usdPrice !== 'number') {
+      throw new Error("SOL price not found in batch response");
+    }
+
+    const solPriceUSD = solData.usdPrice;
+
+    // Process each token price
+    for (const mint of tokenMintAddresses) {
+      const tokenData = data[mint];
+      
+      if (tokenData && typeof tokenData.usdPrice === 'number') {
+        // Calculate SOL-denominated price
+        const tokenPriceInSOL = tokenData.usdPrice / solPriceUSD;
+        priceMap.set(mint, tokenPriceInSOL);
+      }
+      // If token not found, we simply don't add it to the map (graceful handling)
+    }
+
+    return priceMap;
+  } catch (error) {
+    console.error(`Error fetching batch token prices:`, error);
+    // Return empty map on error rather than throwing
+    // This allows the calling code to continue with what it has
+    return priceMap;
+  }
+}
+
+/**
  * Get token price in SOL (not USD)
  * Uses Jupiter's new Price API v3 and calculates SOL-denominated price
  * by dividing token USD price by SOL USD price
  * Includes retry logic with exponential backoff for resilience
+ * 
+ * NOTE: For multiple tokens, use getBatchTokenPrices() instead to avoid rate limiting
  */
 export async function getTokenPrice(tokenMintAddress: string): Promise<number> {
   const SOL_MINT = "So11111111111111111111111111111111111111112";

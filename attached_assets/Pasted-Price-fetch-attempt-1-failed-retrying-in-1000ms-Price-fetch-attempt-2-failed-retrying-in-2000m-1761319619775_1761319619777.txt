@@ -1,0 +1,27 @@
+Price fetch attempt 1 failed, retrying in 1000ms...
+Price fetch attempt 2 failed, retrying in 2000ms...
+[WebSocket] Client connected
+Error getting token price after 3 attempts: Error: Jupiter price API error: Too Many Requests
+    at getTokenPrice (/home/runner/workspace/server/jupiter.ts:214:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async getActivePositions (/home/runner/workspace/server/ai-bot-scheduler.ts:3113:33)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:937:25)
+Error fetching price for 4NGbC4RRrUjS78ooSN53Up7gSg4dGrj6F6dxpMWHbonk: Error: Jupiter price API error: Too Many Requests
+    at getTokenPrice (/home/runner/workspace/server/jupiter.ts:214:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async getActivePositions (/home/runner/workspace/server/ai-bot-scheduler.ts:3113:33)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:937:25)
+Price fetch attempt 1 failed, retrying in 1000ms...
+Price fetch attempt 2 failed, retrying in 2000ms...
+Error getting token price after 3 attempts: Error: Jupiter price API error: Too Many Requests
+    at getTokenPrice (/home/runner/workspace/server/jupiter.ts:214:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async getActivePositions (/home/runner/workspace/server/ai-bot-scheduler.ts:3113:33)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:937:25)
+Error fetching price for Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk: Error: Jupiter price API error: Too Many Requests
+    at getTokenPrice (/home/runner/workspace/server/jupiter.ts:214:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async getActivePositions (/home/runner/workspace/server/ai-bot-scheduler.ts:3113:33)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:937:25)
+Price fetch attempt 1 failed, retrying in 1000ms...
+Price fetch attempt 2 failed, retrying in 2000ms...
