@@ -13,21 +13,27 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-- **Hivemind Now Controls 100% of Trading Parameters (Fully Autonomous)**
+- **Conservative Compounding Strategy (Maximize Gains Through Consistent Wins)**
+  - Hivemind now implements a conservative compounding approach by default
+  - **Focus on high-probability trades** with strict quality filters (50%+ organic score, 40%+ quality)
+  - **Smaller position sizes** (0.02-0.04 SOL) for capital preservation and compounding
+  - **Higher confidence thresholds** across all market conditions (65-80% vs previous 45-75%)
+  - **Quality over quantity**: Max 2-5 trades/day (vs previous 2-10)
+  - **Very high confidence trigger**: Only becomes aggressive when AI confidence ≥85%
+  - **Conservative defaults**:
+    - Neutral markets: 68% confidence, 0.03 SOL trades, 3 trades/day max
+    - Bullish markets: 65% confidence, 0.04 SOL trades, 5 trades/day max (moderate, not aggressive)
+    - Bearish markets: 80% confidence, 0.02 SOL trades, 2 trades/day max
+    - Volatile markets: 72% confidence, 0.03 SOL trades, 3 trades/day max
+  - **Aggressive mode**: Only activated when confidence ≥85%, then increases position size 1.5x and trades to 8/day max
+  - Strategy: Build wealth through consistent small wins that compound, not high-risk moonshots
+
+- **Hivemind Controls 100% of Trading Parameters (Fully Autonomous)**
   - Removed ALL manual parameter dependencies - hivemind runs the system autonomously
-  - Hivemind dynamically generates ALL trading parameters every 6 hours based on market sentiment:
-    - **Budget per trade** (0.03-0.08 SOL based on market conditions and confidence)
-    - **Token filters** (volume, liquidity, organic score, quality, transactions)
-    - **Confidence thresholds** (45-75% based on market sentiment)
-    - **Profit targets** (0.5x-1.8x multipliers based on bullish/bearish/neutral/volatile markets)
-    - **Max daily trades** (2-10 based on risk level and market conditions)
-    - **Risk levels** (conservative, moderate, aggressive)
-  - Manual config only maintains essential settings: enabled flag, total budget, treasury key
+  - Hivemind dynamically generates ALL trading parameters every 6 hours based on market sentiment
+  - Manual config only maintains essential settings: enabled flag, total budget, treasury key, AI sell decisions
   - Deep scan and quick scan both operate 100% on hivemind-generated parameters
   - System self-regulates and adapts to market conditions without human intervention
-  - In bullish markets: Aggressive (0.08 SOL trades, 45% confidence, 1.8x profit targets, 10 trades/day)
-  - In bearish markets: Conservative (0.03 SOL trades, 75% confidence, 0.5x profit targets, 2 trades/day)
-  - In volatile markets: Balanced (0.04 SOL trades, 60% confidence, 0.7x profit targets, 6 trades/day)
 - **Added PumpFun API scanning for very low market cap tokens**
   - Scans PumpFun API directly for brand new token launches
   - Filters for ultra-low market cap tokens (<$100k) for aggressive meme trading
@@ -107,7 +113,16 @@ A dedicated scheduler service automates buyback execution using `node-cron`. It 
 -   **Buy Bot (Limit Orders):** Executes buy orders when target SOL prices are met, with configurable limit orders and slippage protection.
 
 #### AI Trading Bot (Standalone)
-This bot operates independently, with configurations stored in a dedicated `aiBotConfigs` table. It uses a "hive mind" system where 6 AI models (Cerebras, Google Gemini, DeepSeek V3, ChatAnywhere, Groq, OpenAI) vote on trades. The strategy focuses on aggressive meme coin trading, requiring a 50% consensus threshold, 55% minimum confidence, and 30% minimum upside potential for low market cap tokens. 
+This bot operates independently, with configurations stored in a dedicated `aiBotConfigs` table. It uses a "hive mind" system where 6 AI models (Cerebras, Google Gemini, DeepSeek V3, ChatAnywhere, Groq, OpenAI) vote on trades. 
+
+**Conservative Compounding Strategy:**
+- Focus on high-probability trades with strict quality filters
+- Small position sizes (0.02-0.04 SOL) for capital preservation
+- Higher confidence thresholds (65-80%) across all market conditions
+- Quality over quantity: 2-5 trades per day maximum
+- Only becomes aggressive when AI confidence ≥85%
+- Stricter token filters: 50%+ organic score, 40%+ quality score, $15k+ volume, $8k+ liquidity
+- Strategy goal: Consistent small wins that compound over time, not moonshot gambling 
 
 **Token Discovery:**
 - Scans trending tokens from DexScreener API (organic volume scoring, quality filters)
