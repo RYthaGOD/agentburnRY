@@ -1133,6 +1133,38 @@ async function executeQuickTrade(
 
     console.log(`[Quick Scan] Dynamic trade amount: ${tradeAmount.toFixed(4)} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
 
+    // Check if we already hold this token
+    const existingPositions = await storage.getAIBotPositions(config.ownerWalletAddress);
+    const existingPosition = existingPositions.find(p => p.tokenMint === token.mint);
+    
+    if (existingPosition) {
+      const entryPrice = parseFloat(existingPosition.entryPriceSOL);
+      const currentPrice = token.priceSOL;
+      const priceChangePercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+      const previousConfidence = existingPosition.aiConfidenceAtBuy || 0;
+      const newConfidence = analysis.confidence * 100; // Convert to 0-100 scale
+      
+      // Only buy more if BOTH conditions are met:
+      // 1. Price has dropped at least 10% (drawback/dip)
+      // 2. New AI confidence is higher than previous
+      const hasDrawback = priceChangePercent < -10; // Price down 10%+
+      const hasHigherConfidence = newConfidence > previousConfidence;
+      
+      if (!hasDrawback || !hasHigherConfidence) {
+        console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol} - Already holding position:`);
+        console.log(`[Quick Scan]    Previous entry: ${entryPrice.toFixed(8)} SOL (confidence: ${previousConfidence}%)`);
+        console.log(`[Quick Scan]    Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`);
+        console.log(`[Quick Scan]    New confidence: ${newConfidence.toFixed(1)}%`);
+        console.log(`[Quick Scan]    Drawback requirement: ${hasDrawback ? '✅' : '❌'} (need -10% dip, have ${priceChangePercent.toFixed(2)}%)`);
+        console.log(`[Quick Scan]    Higher confidence: ${hasHigherConfidence ? '✅' : '❌'} (need >${previousConfidence}%, have ${newConfidence.toFixed(1)}%)`);
+        return;
+      }
+      
+      console.log(`[Quick Scan] ✅ Adding to position ${token.symbol}:`);
+      console.log(`[Quick Scan]    Price dropped ${Math.abs(priceChangePercent).toFixed(2)}% from entry (${entryPrice.toFixed(8)} → ${currentPrice.toFixed(8)} SOL)`);
+      console.log(`[Quick Scan]    Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`);
+    }
+
     // Execute buy
     const result = await buyTokenWithJupiter(
       treasuryKeyBase58,
@@ -1529,6 +1561,38 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           confidence: analysis.confidence,
           reasoning: analysis.reasoning,
         });
+
+        // Check if we already hold this token
+        const existingPositions = await storage.getAIBotPositions(ownerWalletAddress);
+        const existingPosition = existingPositions.find(p => p.tokenMint === token.mint);
+        
+        if (existingPosition) {
+          const entryPrice = parseFloat(existingPosition.entryPriceSOL);
+          const currentPrice = token.priceSOL;
+          const priceChangePercent = ((currentPrice - entryPrice) / entryPrice) * 100;
+          const previousConfidence = existingPosition.aiConfidenceAtBuy || 0;
+          const newConfidence = analysis.confidence * 100; // Convert to 0-100 scale
+          
+          // Only buy more if BOTH conditions are met:
+          // 1. Price has dropped at least 10% (drawback/dip)
+          // 2. New AI confidence is higher than previous
+          const hasDrawback = priceChangePercent < -10; // Price down 10%+
+          const hasHigherConfidence = newConfidence > previousConfidence;
+          
+          if (!hasDrawback || !hasHigherConfidence) {
+            addLog(`⏭️ SKIP ${token.symbol} - Already holding position:`, "warning");
+            addLog(`   Previous entry: ${entryPrice.toFixed(8)} SOL (confidence: ${previousConfidence}%)`, "info");
+            addLog(`   Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`, "info");
+            addLog(`   New confidence: ${newConfidence.toFixed(1)}%`, "info");
+            addLog(`   Drawback requirement: ${hasDrawback ? '✅' : '❌'} (need -10% dip, have ${priceChangePercent.toFixed(2)}%)`, "info");
+            addLog(`   Higher confidence: ${hasHigherConfidence ? '✅' : '❌'} (need >${previousConfidence}%, have ${newConfidence.toFixed(1)}%)`, "info");
+            continue;
+          }
+          
+          addLog(`✅ Adding to position ${token.symbol}:`, "success");
+          addLog(`   Price dropped ${Math.abs(priceChangePercent).toFixed(2)}% from entry (${entryPrice.toFixed(8)} → ${currentPrice.toFixed(8)} SOL)`, "info");
+          addLog(`   Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`, "info");
+        }
 
         // Buy using Jupiter Ultra API for better routing and pricing
         const result = await buyTokenWithJupiter(
