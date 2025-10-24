@@ -70,6 +70,7 @@ const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes
 
 /**
  * Get cached token data or fetch fresh data if cache expired
+ * Combines DexScreener trending tokens with low market cap PumpFun API tokens
  */
 async function getCachedOrFetchTokens(config?: {
   minOrganicScore?: number;
@@ -87,15 +88,30 @@ async function getCachedOrFetchTokens(config?: {
   }
 
   console.log("[AI Bot Cache] Cache miss or expired, fetching fresh data...");
-  const tokens = await fetchTrendingPumpFunTokens(config);
+  
+  // Fetch from both sources in parallel for efficiency
+  const [dexTokens, pumpfunLowCapTokens] = await Promise.all([
+    fetchTrendingPumpFunTokens(config),
+    fetchLowMarketCapPumpFunTokens(10), // Get top 10 very low market cap new tokens
+  ]);
+  
+  // Combine both sources, removing duplicates by mint address
+  const seenMints = new Set<string>();
+  const allTokens = [...dexTokens, ...pumpfunLowCapTokens].filter(token => {
+    if (seenMints.has(token.mint)) return false;
+    seenMints.add(token.mint);
+    return true;
+  });
+
+  console.log(`[AI Bot] Combined ${dexTokens.length} DexScreener + ${pumpfunLowCapTokens.length} PumpFun low-cap = ${allTokens.length} total tokens`);
   
   tokenDataCache.set(cacheKey, {
-    tokens,
+    tokens: allTokens,
     timestamp: now,
     expiresAt: now + CACHE_DURATION_MS,
   });
 
-  return tokens;
+  return allTokens;
 }
 
 /**
