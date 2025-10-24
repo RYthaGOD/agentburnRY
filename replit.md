@@ -54,14 +54,24 @@ This bot operates independently, with configurations stored in a dedicated `aiBo
 
 The bot executes unlimited trades via Jupiter Ultra API when conditions are met and within budget, dynamically sizing trades based on AI confidence and wallet balance. It includes intelligent position re-buy logic with a maximum of two re-buys per position, triggered by price drops and increased AI confidence.
 
+**Swing Trading Strategy (High-Confidence Positions):**
+- **Auto-Detection:** Positions opened with AI confidence ≥85% automatically flagged as "swing trades" via `isSwingTrade` database field.
+- **Wider Stop-Loss:** Swing trades use -50% stop-loss (vs -30% regular) to weather volatility and capture larger moves.
+- **Higher Profit Targets:** Hold for 100%+ gains before taking profits (vs quick exits for regular trades).
+- **Stricter Exit Criteria:** Only sell when AI STRONGLY recommends SELL with 60%+ confidence (vs 50% for regular positions).
+- **AI-Driven Only:** No confidence threshold exits - swing trades ignore the 50% minimum AI confidence rule.
+- **Visual Indicators:** Frontend displays swing trade badge and distinct stop-loss percentage for transparency.
+
 **Sell Decision Framework (AI-Driven + Safety Overrides):**
 - **Quick Monitoring:** AI continuously monitors all positions (every 2.5 minutes via Cerebras for fast checks).
 - **Deep Scan Analysis:** Full 6-model AI consensus analyzes all holdings during deep scans (every 30 minutes) for comprehensive position management with SELL/HOLD/ADD recommendations.
-- **Automatic Stop-Loss Override:** Immediately sells at -30% loss regardless of AI recommendation (prevents catastrophic losses).
-- Sells when AI confidence drops below 50% threshold (raised from 40% for faster capital preservation).
-- Sells when AI explicitly recommends SELL based on market analysis.
+- **Automatic Stop-Loss Override:** 
+  - Regular positions: Immediately sells at -30% loss regardless of AI recommendation
+  - Swing trades: Immediately sells at -50% loss (wider tolerance for high-confidence plays)
+- **Regular Positions:** Sells when AI confidence drops below 50% threshold OR AI explicitly recommends SELL.
+- **Swing Trades:** Only sells when AI recommends SELL with 60%+ confidence OR profit ≥100%.
 - Holds when AI recommends HOLD and position is above stop-loss threshold.
-- No fixed profit targets - AI analyzes momentum, liquidity, buy pressure, and trend data to optimize exits.
+- No fixed profit targets for regular trades - AI analyzes momentum, liquidity, buy pressure, and trend data to optimize exits.
 
 **Portfolio-Wide Risk Management:**
 - **Peak Tracking:** System tracks all-time portfolio peak value in database.

@@ -96,6 +96,7 @@ export default function AIBot() {
     currentPriceSOL: number;
     profitPercent: number;
     aiConfidenceAtBuy: number;
+    isSwingTrade?: number;
   }>>({
     queryKey: ["/api/ai-bot/positions", publicKey?.toString()],
     enabled: connected && !!publicKey,
@@ -815,13 +816,22 @@ export default function AIBot() {
                   data-testid={`position-${idx}`}
                 >
                   <div className="flex-1">
-                    <div className="font-medium">{position.tokenSymbol}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium">{position.tokenSymbol}</div>
+                      {position.isSwingTrade === 1 && (
+                        <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-500 border-purple-500/30">
+                          <TrendingUp className="h-3 w-3 mr-1" />
+                          Swing Trade
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       Entry: {position.entryPriceSOL?.toFixed(9) || '0.000000000'} SOL | 
                       Current: {position.currentPriceSOL?.toFixed(9) || '0.000000000'} SOL
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      AI Confidence: {position.aiConfidenceAtBuy?.toFixed(0) || '0'}%
+                      AI Confidence: {position.aiConfidenceAtBuy?.toFixed(0) || '0'}% | 
+                      Stop-Loss: {position.isSwingTrade === 1 ? '-50%' : '-30%'}
                     </div>
                   </div>
                   <div className="text-right">

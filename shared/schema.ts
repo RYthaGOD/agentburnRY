@@ -158,6 +158,7 @@ export const aiBotPositions = pgTable("ai_bot_positions", {
   aiConfidenceAtBuy: integer("ai_confidence_at_buy"),
   aiPotentialAtBuy: decimal("ai_potential_at_buy", { precision: 10, scale: 2 }),
   rebuyCount: integer("rebuy_count").notNull().default(0), // Track number of times we've added to this position (max 2)
+  isSwingTrade: integer("is_swing_trade").notNull().default(0), // 1 = swing trade (high confidence 85%+), 0 = regular trade
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -1087,6 +1087,9 @@ async function executeAITradingBot(project: Project) {
             });
           } else {
             // New position: Create it
+            const aiConfidence = Math.round(analysis.confidence * 100);
+            const isSwingTrade = aiConfidence >= 85 ? 1 : 0; // High confidence = swing trade
+            
             await storage.createAIBotPosition({
               ownerWalletAddress: project.ownerWalletAddress,
               tokenMint: token.mint,
@@ -1098,9 +1101,14 @@ async function executeAITradingBot(project: Project) {
               buyTxSignature: result.signature,
               lastCheckPriceSOL: token.priceSOL.toString(),
               lastCheckProfitPercent: "0",
-              aiConfidenceAtBuy: Math.round(analysis.confidence * 100),
+              aiConfidenceAtBuy: aiConfidence,
               aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
+              isSwingTrade,
             });
+            
+            if (isSwingTrade) {
+              console.log(`[AI Bot] 🎯 SWING TRADE: High AI confidence (${aiConfidence}%) - using swing strategy for ${token.symbol}`);
+            }
           }
 
           console.log(`[AI Bot] Trade executed successfully`);
@@ -1689,6 +1697,9 @@ async function executeQuickTrade(
         console.log(`[Quick Scan] Updated position with ${existingPosition.rebuyCount + 1} re-buys (avg entry: ${newAvgEntryPrice.toFixed(8)} SOL)`);
       } else {
         // New position: Create it
+        const aiConfidence = Math.round(analysis.confidence * 100);
+        const isSwingTrade = aiConfidence >= 85 ? 1 : 0; // High confidence = swing trade
+        
         await storage.createAIBotPosition({
           ownerWalletAddress: config.ownerWalletAddress,
           tokenMint: token.mint,
@@ -1700,10 +1711,14 @@ async function executeQuickTrade(
           buyTxSignature: result.signature,
           lastCheckPriceSOL: token.priceSOL.toString(),
           lastCheckProfitPercent: "0",
-          aiConfidenceAtBuy: Math.round(analysis.confidence * 100),
+          aiConfidenceAtBuy: aiConfidence,
           aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
+          isSwingTrade,
         });
         
+        if (isSwingTrade) {
+          console.log(`[Quick Scan] 🎯 SWING TRADE: High AI confidence (${aiConfidence}%) - using swing strategy for ${token.symbol}`);
+        }
         console.log(`[Quick Scan] ✅ New position opened: ${token.symbol}`);
       }
 
@@ -2405,6 +2420,9 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
             });
           } else {
             // New position: Create it
+            const aiConfidence = Math.round(analysis.confidence * 100);
+            const isSwingTrade = aiConfidence >= 85 ? 1 : 0; // High confidence = swing trade
+            
             await storage.createAIBotPosition({
               ownerWalletAddress,
               tokenMint: token.mint,
@@ -2416,9 +2434,14 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
               buyTxSignature: result.signature,
               lastCheckPriceSOL: token.priceSOL.toString(),
               lastCheckProfitPercent: "0",
-              aiConfidenceAtBuy: Math.round(analysis.confidence * 100),
+              aiConfidenceAtBuy: aiConfidence,
               aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
+              isSwingTrade,
             });
+            
+            if (isSwingTrade) {
+              addLog(`🎯 SWING TRADE: High AI confidence (${aiConfidence}%) - holding for bigger gains`, "success");
+            }
             
             addLog(`✅ New position opened! ${token.symbol}`, "success", {
               symbol: token.symbol,
@@ -2454,11 +2477,22 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           // Calculate profit percentage
           const profitPercent = ((currentPriceSOL - position.entryPriceSOL) / position.entryPriceSOL) * 100;
           
-          addLog(`💹 Position ${mint.slice(0, 8)}... | Entry: ${position.entryPriceSOL.toFixed(9)} SOL | Current: ${currentPriceSOL.toFixed(9)} SOL | Profit: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}%`, "info");
+          // Check if this is a swing trade (high confidence position) - fetch from database
+          const dbPosition = await storage.getAIBotPositions(ownerWalletAddress);
+          const positionData = dbPosition.find(p => p.tokenMint === mint);
+          const isSwingTrade = positionData?.isSwingTrade === 1;
+          const swingStopLoss = -50; // Wider stop-loss for swing trades
+          const effectiveStopLoss = isSwingTrade ? swingStopLoss : stopLossPercent;
+          
+          if (isSwingTrade) {
+            addLog(`🎯 SWING TRADE ${mint.slice(0, 8)}... | Entry: ${position.entryPriceSOL.toFixed(9)} SOL | Current: ${currentPriceSOL.toFixed(9)} SOL | Profit: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}% | Stop: ${swingStopLoss}%`, "info");
+          } else {
+            addLog(`💹 Position ${mint.slice(0, 8)}... | Entry: ${position.entryPriceSOL.toFixed(9)} SOL | Current: ${currentPriceSOL.toFixed(9)} SOL | Profit: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}%`, "info");
+          }
 
-          // STRICT STOP-LOSS: Auto-sell if loss exceeds 30% (capital preservation priority)
-          if (profitPercent <= stopLossPercent) {
-            addLog(`🛑 STOP-LOSS TRIGGERED: ${profitPercent.toFixed(2)}% loss exceeds ${stopLossPercent}% limit - AUTO-SELLING to preserve capital`, "warning");
+          // STOP-LOSS: Auto-sell if loss exceeds threshold (swing trades get wider stop-loss)
+          if (profitPercent <= effectiveStopLoss) {
+            addLog(`🛑 STOP-LOSS TRIGGERED: ${profitPercent.toFixed(2)}% loss exceeds ${effectiveStopLoss}% limit - AUTO-SELLING to preserve capital`, "warning");
             
             // Execute immediate sell without AI analysis (emergency exit)
             const connection = getConnection();
@@ -2521,25 +2555,52 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           } else {
             addLog(`🧠 AI Decision: ${aiDecision.recommendation} (confidence: ${aiDecision.confidence}%) - ${aiDecision.reasoning}`, "info");
 
-            // Respect explicit HOLD recommendation
-            if (aiDecision.recommendation === "HOLD") {
-              addLog(`🎯 HOLDING - AI recommends HOLD (confidence: ${aiDecision.confidence}%)`, "success");
-              shouldSell = false;
+            // SWING TRADE STRATEGY: Let profits run, only exit on strong signals
+            if (isSwingTrade) {
+              addLog(`🎯 SWING TRADE STRATEGY: High confidence position - letting profits run`, "info");
+              
+              // Respect explicit HOLD recommendation
+              if (aiDecision.recommendation === "HOLD") {
+                addLog(`📈 HOLDING SWING TRADE - AI confirms continued momentum`, "success");
+                shouldSell = false;
+              }
+              // Only sell swing trades when AI STRONGLY recommends it (60%+ confidence)
+              else if (aiDecision.recommendation === "SELL" && aiDecision.confidence >= 60) {
+                shouldSell = true;
+                sellReason = `SWING TRADE EXIT: AI strongly recommends SELL with ${aiDecision.confidence}% confidence`;
+              }
+              // Take profits on huge wins (100%+)
+              else if (profitPercent >= 100) {
+                shouldSell = true;
+                sellReason = `SWING TRADE PROFIT TARGET: ${profitPercent.toFixed(2)}% profit (100%+ target hit)`;
+              }
+              else {
+                addLog(`📊 HOLDING SWING TRADE - AI confidence ${aiDecision.confidence}% not strong enough to exit (need 60%+)`, "info");
+                shouldSell = false;
+              }
             }
-            // Sell if AI confidence drops below minimum threshold (momentum weakening)
-            else if (aiDecision.confidence < minAiSellConfidence) {
-              shouldSell = true;
-              sellReason = `AI confidence dropped to ${aiDecision.confidence}% (below ${minAiSellConfidence}% threshold)`;
-            }
-            // Sell if AI explicitly recommends selling
-            else if (aiDecision.recommendation === "SELL") {
-              shouldSell = true;
-              sellReason = `AI recommends SELL: ${aiDecision.reasoning}`;
-            }
-            // Hold if AI has confidence to hold
+            // REGULAR TRADE STRATEGY: Standard exit rules
             else {
-              addLog(`🎯 HOLDING - AI confidence: ${aiDecision.confidence}%`, "success");
-              shouldSell = false;
+              // Respect explicit HOLD recommendation
+              if (aiDecision.recommendation === "HOLD") {
+                addLog(`🎯 HOLDING - AI recommends HOLD (confidence: ${aiDecision.confidence}%)`, "success");
+                shouldSell = false;
+              }
+              // Sell if AI confidence drops below minimum threshold (momentum weakening)
+              else if (aiDecision.confidence < minAiSellConfidence) {
+                shouldSell = true;
+                sellReason = `AI confidence dropped to ${aiDecision.confidence}% (below ${minAiSellConfidence}% threshold)`;
+              }
+              // Sell if AI explicitly recommends selling
+              else if (aiDecision.recommendation === "SELL") {
+                shouldSell = true;
+                sellReason = `AI recommends SELL: ${aiDecision.reasoning}`;
+              }
+              // Hold if AI has confidence to hold
+              else {
+                addLog(`🎯 HOLDING - AI confidence: ${aiDecision.confidence}%`, "success");
+                shouldSell = false;
+              }
             }
           }
 
@@ -2818,6 +2879,7 @@ export async function getActivePositions(ownerWalletAddress: string): Promise<Ar
   currentPriceSOL: number;
   profitPercent: number;
   aiConfidenceAtBuy: number;
+  isSwingTrade?: number;
 }>> {
   try {
     // Read positions from database (persisted across restarts)
@@ -2846,6 +2908,7 @@ export async function getActivePositions(ownerWalletAddress: string): Promise<Ar
           currentPriceSOL: currentPriceSOL || 0,
           profitPercent,
           aiConfidenceAtBuy: position.aiConfidenceAtBuy || 0,
+          isSwingTrade: position.isSwingTrade,
         });
       } catch (error) {
         console.error(`Error fetching price for ${position.tokenMint}:`, error);
@@ -2858,6 +2921,7 @@ export async function getActivePositions(ownerWalletAddress: string): Promise<Ar
           currentPriceSOL: 0,
           profitPercent: 0,
           aiConfidenceAtBuy: position.aiConfidenceAtBuy || 0,
+          isSwingTrade: position.isSwingTrade,
         });
       }
     }
