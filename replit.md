@@ -22,6 +22,7 @@ The platform also includes three types of trading bots:
   - OpenAI always included for high-confidence trades (85%+ expected swing trades)
   - Position monitoring (every 2.5 min) uses only Cerebras for efficiency (90% cost reduction)
   - Automatic tie-breaker mode when free models disagree on buy/sell decisions
+  - **Emergency Fallback:** If all free AI models fail, automatically retries with OpenAI as safety net
 - **Portfolio Analytics:** Dashboard displays token breakdown, diversification metrics, concentration analysis
 - **Accurate Calculations:** Portfolio value = SOL balance + sum(all token values), avoiding double-counting
 - **Updated frontend:** Removed budget controls, added autonomous management panel + holdings analysis card
@@ -144,4 +145,5 @@ A 0.5% transaction fee applies after the first 60 free transactions per project,
     -   OpenAI Primary (GPT-4o-mini) - OPENAI_API_KEY (paid, strategic use)
     -   OpenAI Backup (GPT-4o-mini) - OPENAI_API_KEY_2 (paid, automatic failover)
     -   **Intelligent OpenAI Usage:** OpenAI models included strategically during peak trading hours (9am-5pm UTC), for high-confidence opportunities (85%+ expected confidence), and as tie-breakers when free models disagree. Position monitoring uses only Cerebras for efficiency.
+    -   **Emergency Fallback:** If all free models fail, automatically retries with OpenAI as safety net to ensure bot never fails completely.
 -   DexScreener API (token market data & trending tokens)
