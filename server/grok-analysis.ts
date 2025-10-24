@@ -155,7 +155,7 @@ export async function analyzeTokenWithHiveMind(
   tokenData: TokenMarketData,
   userRiskTolerance: "low" | "medium" | "high",
   budgetPerTrade: number,
-  minAgreement: number = 0.6 // Require 60% agreement
+  minAgreement: number = 0.5 // Require 50% agreement (3 out of 6 models)
 ): Promise<{
   analysis: TradingAnalysis;
   votes: Array<{ provider: string; analysis: TradingAnalysis; success: boolean; error?: string }>;
@@ -294,7 +294,7 @@ async function analyzeSingleModel(
   userRiskTolerance: "low" | "medium" | "high",
   budgetPerTrade: number
 ): Promise<TradingAnalysis> {
-  const prompt = `You are a professional cryptocurrency trading analyst specializing in Solana PumpFun tokens. Analyze the following token and provide a trading recommendation.
+  const prompt = `You are an AGGRESSIVE cryptocurrency trading expert specializing in HIGH-PROFIT MEME COIN trading on Solana PumpFun. Your goal is to MAXIMIZE PROFITS by identifying low market cap tokens with explosive potential.
 
 **Token Data:**
 - Name: ${tokenData.name} (${tokenData.symbol})
@@ -308,24 +308,30 @@ ${tokenData.priceChange1h ? `- 1h Price Change: ${tokenData.priceChange1h > 0 ? 
 ${tokenData.liquidityUSD ? `- Liquidity: $${tokenData.liquidityUSD.toLocaleString()}` : ''}
 ${tokenData.description ? `- Description: ${tokenData.description}` : ''}
 
-**Trading Parameters:**
-- Risk Tolerance: ${userRiskTolerance}
-- Max Budget Per Trade: ${budgetPerTrade} SOL
-- Trading Platform: PumpFun (Solana)
+**Trading Strategy - AGGRESSIVE MEME COIN MAXIMIZATION:**
+Focus on LOW MARKET CAP tokens (<$500K) with:
+- Strong momentum (positive 1h/24h price action)
+- Growing volume (indicates interest)
+- Reasonable liquidity (sufficient to enter/exit)
+- Viral potential (trending narrative, community hype)
+- Early entry opportunity (not already pumped 1000%+)
 
-**Analysis Requirements:**
-1. Evaluate volume, market cap, and price momentum
-2. Assess liquidity and holder distribution
-3. Identify potential red flags (rug pull indicators, low liquidity, suspicious volume)
-4. Estimate potential upside and downside
-5. Consider market conditions and token age
+**Key Analysis Points:**
+1. Is this token showing EARLY MOMENTUM? (prime entry point for 2-10x gains)
+2. Does the market cap suggest room for EXPLOSIVE GROWTH? (sub-$100K = highest potential)
+3. Is volume ACCELERATING? (trend reversal/breakout signals)
+4. Can we ENTER and EXIT safely? (liquidity check - minimum $3K)
+5. Any RED FLAGS? (rug pull indicators, dev dumping, dead volume)
+
+**Your Mission:**
+Find opportunities with 50%+ profit potential. Don't be conservative - meme coins move fast. If momentum is strong and fundamentals check out, recommend BUY with high confidence.
 
 Provide your analysis in JSON format with these exact fields:
 {
   "action": "buy" | "sell" | "hold",
   "confidence": 0.0-1.0,
-  "reasoning": "detailed explanation",
-  "potentialUpsidePercent": number,
+  "reasoning": "detailed explanation focusing on profit potential",
+  "potentialUpsidePercent": number (be realistic but optimistic for meme coins),
   "riskLevel": "low" | "medium" | "high",
   "suggestedBuyAmountSOL": number (optional, if action is buy),
   "stopLossPercent": number (optional),
@@ -338,7 +344,7 @@ Provide your analysis in JSON format with these exact fields:
     messages: [
       {
         role: "system",
-        content: "You are a professional cryptocurrency trading analyst. Analyze tokens objectively and provide actionable trading recommendations with risk assessments. Always respond with valid JSON.",
+        content: "You are an AGGRESSIVE meme coin trading expert focused on MAXIMIZING PROFITS. You specialize in identifying LOW MARKET CAP tokens with HIGH GROWTH POTENTIAL on Solana PumpFun. You're decisive, fast-moving, and profit-focused while being aware of rug pull risks. Always respond with valid JSON.",
       },
       {
         role: "user",
@@ -346,7 +352,7 @@ Provide your analysis in JSON format with these exact fields:
       },
     ],
     response_format: { type: "json_object" },
-    temperature: 0.7,
+    temperature: 0.8,
     max_tokens: 1000,
   });
 
@@ -359,36 +365,15 @@ Provide your analysis in JSON format with these exact fields:
 
   // Validate and enforce constraints
   if (analysis.action === "buy") {
-    // Enforce minimum 1.5X return requirement
-    if (analysis.potentialUpsidePercent < 150) {
-      return {
-        action: "hold",
-        confidence: 0,
-        reasoning: `${provider}: Rejected - Only ${analysis.potentialUpsidePercent.toFixed(1)}% upside (< 150% minimum)`,
-        potentialUpsidePercent: analysis.potentialUpsidePercent,
-        riskLevel: "high",
-        keyFactors: ["Below minimum 1.5X return threshold"],
-      };
-    }
-
     // Adjust suggested amount
     if (!analysis.suggestedBuyAmountSOL || analysis.suggestedBuyAmountSOL > budgetPerTrade) {
       analysis.suggestedBuyAmountSOL = budgetPerTrade;
     }
 
-    // Conservative limits for low risk tolerance
-    if (userRiskTolerance === "low") {
-      analysis.suggestedBuyAmountSOL = Math.min(analysis.suggestedBuyAmountSOL, budgetPerTrade * 0.5);
-      if (analysis.confidence < 0.7) {
-        analysis.action = "hold";
-        analysis.reasoning += " [Confidence too low for low-risk profile]";
-      }
-    }
-
-    // Require minimum confidence
-    if (analysis.confidence < 0.5) {
+    // Require minimum confidence (lowered for aggressive trading with 6-model consensus)
+    if (analysis.confidence < 0.4) {
       analysis.action = "hold";
-      analysis.reasoning += " [Confidence below 50% threshold]";
+      analysis.reasoning += " [Confidence below 40% threshold]";
     }
   }
 

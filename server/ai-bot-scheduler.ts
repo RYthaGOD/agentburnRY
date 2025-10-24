@@ -190,8 +190,8 @@ function calculateOrganicVolumeScore(pair: any): number {
     score += 10; // Healthy growth
   }
   
-  // 5. Liquidity Depth (minimum requirement)
-  if (liquidityUSD < 5000) {
+  // 5. Liquidity Depth (minimum requirement - lowered for aggressive meme coin trading)
+  if (liquidityUSD < 3000) {
     score -= 40; // Very low liquidity = risky/manipulated
   } else if (liquidityUSD < 10000) {
     score -= 20;
@@ -906,8 +906,8 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
       minTransactions24h: config.minTransactions24h || 20,
     });
     
-    // Filter by volume threshold
-    const minVolumeUSD = parseFloat(config.minVolumeUSD || "1000");
+    // Filter by volume threshold (lowered for aggressive meme coin trading)
+    const minVolumeUSD = parseFloat(config.minVolumeUSD || "500");
     const filteredTokens = trendingTokens.filter((t) => t.volumeUSD24h >= minVolumeUSD);
 
     if (filteredTokens.length === 0) {
@@ -960,16 +960,16 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         reasoning: analysis.reasoning,
       });
 
-      // Check minimum potential threshold (hardcoded 50% minimum)
-      const minPotential = Math.max(parseFloat(config.minPotentialPercent || "50"), 50);
+      // Check minimum potential threshold (aggressive: 30% minimum for fast-moving meme coins)
+      const minPotential = parseFloat(config.minPotentialPercent || "30");
       if (analysis.potentialUpsidePercent < minPotential) {
         addLog(`⏭️ SKIP ${token.symbol}: Potential ${analysis.potentialUpsidePercent.toFixed(1)}% below threshold ${minPotential}%`, "warning");
         continue;
       }
 
-      // Check confidence threshold
-      if (analysis.confidence < 0.6) {
-        addLog(`⏭️ SKIP ${token.symbol}: Confidence ${(analysis.confidence * 100).toFixed(1)}% below 60% threshold`, "warning");
+      // Check confidence threshold (keep at 55% for 6-model hivemind consensus)
+      if (analysis.confidence < 0.55) {
+        addLog(`⏭️ SKIP ${token.symbol}: Confidence ${(analysis.confidence * 100).toFixed(1)}% below 55% threshold`, "warning");
         continue;
       }
 

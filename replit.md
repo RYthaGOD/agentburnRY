@@ -59,43 +59,57 @@ The platform includes three types of automated trading bots with comprehensive c
 - Wallet signature authentication required for all config operations
 - Stores encrypted treasury keys directly in AI bot config (separate from project secrets)
 
-**Hive Mind AI System (Multi-Model Consensus):**
-The AI bot uses a revolutionary "hive mind" approach where **multiple AI models vote together** on each trading decision:
-- **Cerebras AI** (Llama 3.3-70B) - Primary, ultra-fast, free tier
+**Hive Mind AI System (6-Model Aggressive Consensus):**
+The AI bot uses a revolutionary "hive mind" approach where **6 AI models vote together** on each trading decision with **AGGRESSIVE MEME COIN TRADING** strategy:
+
+**Active AI Providers (All Configured):**
+- **Cerebras AI** (Llama 3.3-70B) - Ultra-fast, free tier
 - **Google Gemini** (Gemini 2.0 Flash) - 1M tokens/min free, highest volume
-- **DeepSeek V3** (deepseek-chat) - 5M free tokens, ultra-cheap after, OpenAI compatible
-- **ChatAnywhere GPT-4o-mini** (OpenAI GPT-4o-mini) - 200 req/day free, high quality
-- **Together AI** (Llama 3.1-70B Turbo) - 200+ models, free tier  
-- **OpenRouter** (Llama 3.3-70B) - 300+ models, free tier, variety fallback
-- **Groq** (Llama 3.3-70B) - Completely free backup
-- **xAI Grok** (grok-4-fast-reasoning) - Paid fallback (optional)
+- **DeepSeek V3** (deepseek-chat) - 5M free tokens, ultra-cheap, OpenAI compatible
+- **ChatAnywhere** (GPT-4o-mini) - 200 req/day free, high quality
+- **Groq** (Llama 3.3-70B) - Completely free, fast inference
+- **OpenAI** (GPT-4o-mini) - Paid, premium quality
+
+**Aggressive Trading Configuration:**
+- **50% consensus threshold** - Only 3 out of 6 models need to agree (more trades)
+- **55% confidence minimum** - Lower barrier for entry on strong opportunities
+- **30% minimum upside** - No 150% requirement, focus on consistent gains
+- **$500 minimum volume** - Catches early-stage meme coins
+- **$3,000 minimum liquidity** - Lower threshold for micro-cap opportunities
+- **Temperature 0.8** - More decisive, action-oriented AI responses
+
+**Trading Strategy - Low Market Cap Meme Coin Focus:**
+AI models are prompted to identify:
+- LOW MARKET CAP tokens (<$500K) with explosive potential
+- Early momentum signals (positive 1h/24h price action)
+- Growing volume (indicates community interest)
+- Viral potential (trending narratives, hype)
+- 2-10x profit opportunities (not just 1.5x minimum)
 
 **Consensus Voting Rules:**
-- All available models analyze each token in parallel (up to 8 providers)
-- Requires 60% agreement for BUY/SELL decisions
+- All 6 models analyze each token in parallel
 - Weighted by confidence scores (not simple majority)
 - Aggregates risk assessment (uses most conservative)
 - Averages potential upside predictions
-- Degrades gracefully if providers fail (works with 1-8 models)
+- Degrades gracefully if providers fail (works with 1-6 models)
 
 **Benefits:**
-- 50% lower trading variance vs single-model decisions
-- Distributes load across up to 8 free-tier APIs (avoids rate limits)
-- More reliable signals - filters out false positives
-- No single point of failure - redundancy with 8 providers
-- Higher quality trades with better risk-adjusted returns
-- 1M+ tokens/min capacity (Google Gemini alone)
+- **Maximum profit potential** - No artificial 150% minimum blocks good trades
+- **6-model redundancy** - Continues operating if 1-3 providers fail
+- **Diverse perspectives** - 2 GPT-4 class + 3 Llama + 1 Gemini models
+- **Fast execution** - 10-minute intervals catch opportunities quickly
+- **Cost efficient** - Distributes load across 6 free/cheap APIs
 
-**Trading Logic:** Scans trending tokens from DexScreener, analyzes with hive mind consensus, and executes buy orders ONLY when:
-  - Hive mind consensus reaches BUY (≥60% model agreement)
-  - Combined AI confidence ≥ 65%
-  - Minimum 50% upside potential (hardcoded minimum)
+**Trading Logic:** Scans trending tokens from DexScreener, analyzes with 6-model consensus, and executes buy orders when:
+  - Hive mind consensus reaches BUY (≥50% model agreement = 3/6)
+  - Combined AI confidence ≥ 55%
+  - Minimum 30% upside potential (aggressive threshold)
   - Total budget not exhausted
   - Daily trade limit not reached
   
 **Budget Management:** Total SOL budget allocation with real-time usage tracking. Prevents overspending by checking remaining budget before each trade and updating budget used after execution. Visual progress bars show budget consumption.
   
-**Configurable Parameters:** Total budget (SOL), budget per trade, analysis interval, minimum volume threshold (USD), minimum potential upside (≥50%), daily trade limit, and risk tolerance (low/medium/high). Uses Jupiter Ultra API for trading execution (better routing and pricing). Completely free with generous limits (Cerebras + Together AI + Groq + DexScreener + Jupiter).
+**Configurable Parameters:** Total budget (SOL), budget per trade, analysis interval (10 min default), minimum volume threshold ($500 USD default), minimum potential upside (30% default - aggressive), daily trade limit, and risk tolerance. Uses Jupiter Ultra API for trading execution (better routing and pricing). API costs: Free tier usage across 6 providers (Cerebras, Gemini, DeepSeek, ChatAnywhere, Groq free; OpenAI paid for premium quality).
 
 Price fetching for all bots uses Jupiter Price v3 API for SOL-denominated prices.
 
@@ -172,15 +186,13 @@ A 0.5% transaction fee applies to all transaction types (buybacks, volume bot, b
 - Jupiter Ultra API (Swap API) - Used for all AI bot trades (buybacks, volume bot, buy bot use Jupiter)
 - Jupiter Price API v3 (lite-api.jup.ag) - SOL-denominated prices via USD conversion
 - PumpFun Lightning API (creator rewards only)
-- **AI Hive Mind Providers (Multi-Model Consensus):**
-  - Cerebras AI (Llama 3.3-70B - ultra-fast, free tier, primary)
-  - Google Gemini (Gemini 2.0 Flash - 1M tokens/min free, highest volume)
-  - DeepSeek V3 (deepseek-chat - 5M free tokens, ultra-cheap, OpenAI compatible)
-  - ChatAnywhere API (GPT-4o-mini - 200 req/day free, high quality)
-  - Together AI (Llama 3.1-70B Turbo - 200+ models, free tier)
-  - OpenRouter (Llama 3.3-70B - 300+ models, free tier, variety fallback)
-  - Groq API (Llama 3.3-70B - completely free backup)
-  - xAI Grok API (grok-4-fast-reasoning - paid fallback, optional)
+- **AI Hive Mind Providers (6-Model Active Consensus):**
+  - Cerebras AI (Llama 3.3-70B - ultra-fast, free tier) ✅ Active
+  - Google Gemini (Gemini 2.0 Flash - 1M tokens/min free) ✅ Active
+  - DeepSeek V3 (deepseek-chat - 5M free tokens, ultra-cheap) ✅ Active
+  - ChatAnywhere (GPT-4o-mini - 200 req/day free) ✅ Active
+  - Groq (Llama 3.3-70B - completely free) ✅ Active
+  - OpenAI (GPT-4o-mini - paid, premium quality) ✅ Active
 - DexScreener API (free real-time token market data)
 
 **UI Dependencies:**
