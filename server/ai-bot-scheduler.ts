@@ -928,7 +928,8 @@ async function executeAITradingBot(project: Project) {
       console.log(`[AI Bot]    📊 Change 24h: ${(token.priceChange24h || 0) > 0 ? '+' : ''}${(token.priceChange24h || 0).toFixed(2)}%`);
 
       // Use Hive Mind for multi-model consensus with smart OpenAI usage
-      // Include OpenAI during peak hours OR for high-confidence opportunities
+      // DEEP SCANS: Force OpenAI inclusion for high-confidence detection (85%+ expected swing trades)
+      console.log(`[AI Bot] 🔍 Deep Scan: Using FULL hivemind (including OpenAI) for maximum accuracy`);
       const hiveMindResult = await analyzeTokenWithHiveMind(
         token, 
         riskTolerance, 

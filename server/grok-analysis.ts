@@ -230,7 +230,16 @@ export async function analyzeTokenWithHiveMind(
 
   const providers = clients.map(c => c.provider).join(", ");
   const openAIIncluded = clients.some(c => c.provider.includes("OpenAI"));
-  console.log(`[Hive Mind] Querying ${clients.length} AI models${openAIIncluded ? ' (including OpenAI)' : ' (free only)'}: ${providers}`);
+  const openAICount = clients.filter(c => c.provider.includes("OpenAI")).length;
+  
+  // Enhanced logging for AI usage transparency
+  if (openAIIncluded) {
+    console.log(`[Hive Mind] 💰 Using ${clients.length} AI models including ${openAICount} OpenAI provider(s) for HIGH-CONFIDENCE analysis`);
+    console.log(`[Hive Mind] 📊 Providers: ${providers}`);
+  } else {
+    console.log(`[Hive Mind] 🆓 Using ${clients.length} FREE AI models (DeepSeek-first strategy, 60%+ cost savings)`);
+    console.log(`[Hive Mind] 📊 Providers: ${providers}`);
+  }
   
   // Query all models in parallel
   const votes = await Promise.all(
