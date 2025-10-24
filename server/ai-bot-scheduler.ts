@@ -762,6 +762,7 @@ export function startAITradingBotScheduler() {
   if (process.env.TOGETHER_API_KEY) activeProviders.push("Together AI");
   if (process.env.OPENROUTER_API_KEY) activeProviders.push("OpenRouter");
   if (process.env.GROQ_API_KEY) activeProviders.push("Groq");
+  if (process.env.OPENAI_API_KEY) activeProviders.push("OpenAI");
   if (process.env.XAI_API_KEY) activeProviders.push("xAI Grok");
 
   console.log("[AI Bot Scheduler] Starting...");

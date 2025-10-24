@@ -92,6 +92,17 @@ function getAllAIClients(): Array<{ client: OpenAI; model: string; provider: str
       provider: "Groq",
     });
   }
+
+  // OpenAI (GPT-4, high quality, paid)
+  if (process.env.OPENAI_API_KEY) {
+    clients.push({
+      client: new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+      }),
+      model: "gpt-4o-mini",
+      provider: "OpenAI",
+    });
+  }
   
   // Fallback to xAI Grok (paid)
   if (process.env.XAI_API_KEY) {
@@ -115,7 +126,7 @@ function getAIClient(): { client: OpenAI; model: string; provider: string } {
   const clients = getAllAIClients();
   
   if (clients.length === 0) {
-    throw new Error("No AI API key configured. Set CEREBRAS_API_KEY, GOOGLE_AI_KEY, DEEPSEEK_API_KEY, CHATANYWHERE_API_KEY, TOGETHER_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, or XAI_API_KEY");
+    throw new Error("No AI API key configured. Set CEREBRAS_API_KEY, GOOGLE_AI_KEY, DEEPSEEK_API_KEY, CHATANYWHERE_API_KEY, TOGETHER_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, or XAI_API_KEY");
   }
 
   // Return first available
@@ -131,7 +142,8 @@ export function isGrokConfigured(): boolean {
     process.env.CHATANYWHERE_API_KEY ||
     process.env.TOGETHER_API_KEY ||
     process.env.OPENROUTER_API_KEY ||
-    process.env.GROQ_API_KEY || 
+    process.env.GROQ_API_KEY ||
+    process.env.OPENAI_API_KEY ||
     process.env.XAI_API_KEY
   );
 }
