@@ -1848,6 +1848,7 @@ export function startAITradingBotScheduler() {
   if (process.env.CEREBRAS_API_KEY) activeProviders.push("Cerebras");
   if (process.env.GOOGLE_AI_KEY) activeProviders.push("Google Gemini");
   if (process.env.DEEPSEEK_API_KEY) activeProviders.push("DeepSeek");
+  if (process.env.DEEPSEEK_API_KEY_2) activeProviders.push("DeepSeek #2");
   if (process.env.CHATANYWHERE_API_KEY) activeProviders.push("ChatAnywhere");
   if (process.env.TOGETHER_API_KEY) activeProviders.push("Together AI");
   if (process.env.OPENROUTER_API_KEY) activeProviders.push("OpenRouter");
@@ -3335,7 +3336,7 @@ Respond ONLY with valid JSON:
   "reasoning": "brief explanation"
 }`;
 
-  // Try DeepSeek first (free tier)
+  // Try DeepSeek Primary first (free tier)
   if (process.env.DEEPSEEK_API_KEY) {
     try {
       const deepSeekClient = new OpenAI({
@@ -3365,8 +3366,45 @@ Respond ONLY with valid JSON:
       }
       return; // Success - exit
     } catch (deepSeekError: any) {
-      console.warn(`[Position Monitor] DeepSeek failed for ${position.tokenSymbol}: ${deepSeekError.message}`);
-      console.log(`[Position Monitor] 🔄 Falling back to OpenAI for ${position.tokenSymbol}...`);
+      console.warn(`[Position Monitor] DeepSeek Primary failed for ${position.tokenSymbol}: ${deepSeekError.message}`);
+      
+      // Try DeepSeek Backup key
+      if (process.env.DEEPSEEK_API_KEY_2) {
+        try {
+          console.log(`[Position Monitor] 🔄 Trying DeepSeek Backup for ${position.tokenSymbol}...`);
+          const deepSeekBackupClient = new OpenAI({
+            baseURL: "https://api.deepseek.com",
+            apiKey: process.env.DEEPSEEK_API_KEY_2,
+          });
+
+          const response = await deepSeekBackupClient.chat.completions.create({
+            model: "deepseek-chat",
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.4,
+            max_tokens: 300,
+          });
+
+          const content = response.choices[0]?.message?.content || "{}";
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          const analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : { action: "HOLD", confidence: 0, reasoning: "Parse error" };
+
+          console.log(`[Position Monitor] 🧠 DeepSeek #2: ${position.tokenSymbol} → ${analysis.action} (${analysis.confidence}% confidence) - ${analysis.reasoning}`);
+
+          // Execute sell if AI recommends it with high confidence
+          if (analysis.action === "SELL" && analysis.confidence >= 60) {
+            console.log(`[Position Monitor] ✅ DeepSeek #2 recommends SELL with ${analysis.confidence}% confidence → executing...`);
+            await executeSellForPosition(config, position, treasuryKeyBase58, `DeepSeek #2: ${analysis.reasoning} (${analysis.confidence}% confidence)`);
+          } else if (analysis.action === "SELL" && analysis.confidence < 60) {
+            console.log(`[Position Monitor] ⏸️ DeepSeek #2 suggests SELL but confidence too low (${analysis.confidence}% < 60%) → HOLDING`);
+          }
+          return; // Success - exit
+        } catch (deepSeek2Error: any) {
+          console.warn(`[Position Monitor] DeepSeek Backup also failed for ${position.tokenSymbol}: ${deepSeek2Error.message}`);
+          console.log(`[Position Monitor] 🔄 Falling back to OpenAI for ${position.tokenSymbol}...`);
+        }
+      } else {
+        console.log(`[Position Monitor] 🔄 No DeepSeek backup key, falling back to OpenAI for ${position.tokenSymbol}...`);
+      }
     }
   }
 

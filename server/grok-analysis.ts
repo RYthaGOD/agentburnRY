@@ -74,7 +74,7 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
     });
   }
 
-  // DeepSeek V3 (5M free tokens, PRIMARY MODEL - superior reasoning, handles tie-breaking)
+  // DeepSeek V3 Primary (5M free tokens, PRIMARY MODEL - superior reasoning, handles tie-breaking)
   // Now the main workhorse for analysis, position monitoring, and quick scans
   if (process.env.DEEPSEEK_API_KEY) {
     clients.push({
@@ -84,6 +84,18 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "deepseek-chat",
       provider: "DeepSeek",
+    });
+  }
+
+  // DeepSeek V3 Backup (5M free tokens, automatic failover for maximum uptime)
+  if (process.env.DEEPSEEK_API_KEY_2) {
+    clients.push({
+      client: new OpenAI({
+        baseURL: "https://api.deepseek.com",
+        apiKey: process.env.DEEPSEEK_API_KEY_2,
+      }),
+      model: "deepseek-chat",
+      provider: "DeepSeek #2",
     });
   }
 
