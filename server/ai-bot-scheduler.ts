@@ -2416,8 +2416,8 @@ async function monitorPositionsWithCerebras() {
 }
 
 /**
- * Start position monitoring scheduler (every 10 minutes using free Cerebras)
- * Reduced from 5 to 10 minutes to cut API calls in half
+ * Start position monitoring scheduler (every 2.5 minutes using free Cerebras)
+ * Active management of all positions for optimal performance
  */
 export function startPositionMonitoringScheduler() {
   if (!process.env.CEREBRAS_API_KEY) {
@@ -2428,12 +2428,25 @@ export function startPositionMonitoringScheduler() {
   console.log("[Position Monitor] Starting...");
   console.log("[Position Monitor] Using free Cerebras API for position monitoring");
 
-  // Run every 10 minutes (reduced from 5 to save API calls)
-  cron.schedule("*/10 * * * *", () => {
-    monitorPositionsWithCerebras().catch((error) => {
-      console.error("[Position Monitor] Unexpected error:", error);
-    });
+  // Run every 2.5 minutes for active position management
+  // Using 2-minute intervals with offset to achieve 2.5-minute frequency
+  let isOffset = false;
+  cron.schedule("*/2 * * * *", () => {
+    if (isOffset) {
+      // Run at 2.5-minute mark (30 seconds delay)
+      setTimeout(() => {
+        monitorPositionsWithCerebras().catch((error) => {
+          console.error("[Position Monitor] Unexpected error:", error);
+        });
+      }, 30000);
+    } else {
+      // Run immediately at 2-minute mark
+      monitorPositionsWithCerebras().catch((error) => {
+        console.error("[Position Monitor] Unexpected error:", error);
+      });
+    }
+    isOffset = !isOffset; // Alternate between immediate and delayed execution
   });
 
-  console.log("[Position Monitor] Active (checks every 10 minutes)");
+  console.log("[Position Monitor] Active (checks every 2.5 minutes for active management)");
 }
