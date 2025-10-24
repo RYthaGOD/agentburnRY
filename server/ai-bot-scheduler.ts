@@ -3105,42 +3105,32 @@ export async function getActivePositions(ownerWalletAddress: string): Promise<Ar
       return [];
     }
 
-    const positions = [];
+    // Collect all token mints for batch price fetching
+    const mints = dbPositions.map(p => p.tokenMint);
     
-    for (const position of dbPositions) {
-      try {
-        // Get current price for profit calculation
-        const currentPriceSOL = await getTokenPrice(position.tokenMint);
-        const entryPrice = parseFloat(position.entryPriceSOL);
-        const profitPercent = currentPriceSOL 
-          ? ((currentPriceSOL - entryPrice) / entryPrice) * 100
-          : 0;
+    // Fetch ALL prices in a single batch API call (avoids rate limiting!)
+    const { getBatchTokenPrices } = await import("./jupiter");
+    const priceMap = await getBatchTokenPrices(mints);
 
-        positions.push({
-          mint: position.tokenMint,
-          tokenSymbol: position.tokenSymbol || 'UNKNOWN',
-          entryPriceSOL: entryPrice,
-          amountSOL: parseFloat(position.amountSOL),
-          currentPriceSOL: currentPriceSOL || 0,
-          profitPercent,
-          aiConfidenceAtBuy: position.aiConfidenceAtBuy || 0,
-          isSwingTrade: position.isSwingTrade,
-        });
-      } catch (error) {
-        console.error(`Error fetching price for ${position.tokenMint}:`, error);
-        // Still include position but with 0 current price
-        positions.push({
-          mint: position.tokenMint,
-          tokenSymbol: position.tokenSymbol || 'UNKNOWN',
-          entryPriceSOL: parseFloat(position.entryPriceSOL),
-          amountSOL: parseFloat(position.amountSOL),
-          currentPriceSOL: 0,
-          profitPercent: 0,
-          aiConfidenceAtBuy: position.aiConfidenceAtBuy || 0,
-          isSwingTrade: position.isSwingTrade,
-        });
-      }
-    }
+    // Build positions array with prices from batch response
+    const positions = dbPositions.map((position) => {
+      const currentPriceSOL = priceMap.get(position.tokenMint) || 0;
+      const entryPrice = parseFloat(position.entryPriceSOL);
+      const profitPercent = currentPriceSOL 
+        ? ((currentPriceSOL - entryPrice) / entryPrice) * 100
+        : 0;
+
+      return {
+        mint: position.tokenMint,
+        tokenSymbol: position.tokenSymbol || 'UNKNOWN',
+        entryPriceSOL: entryPrice,
+        amountSOL: parseFloat(position.amountSOL),
+        currentPriceSOL: currentPriceSOL || 0,
+        profitPercent,
+        aiConfidenceAtBuy: position.aiConfidenceAtBuy || 0,
+        isSwingTrade: position.isSwingTrade,
+      };
+    });
 
     return positions;
   } catch (error) {
