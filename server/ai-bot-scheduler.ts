@@ -1264,8 +1264,8 @@ async function runQuickTechnicalScan() {
       return;
     }
     
-    // Check if Cerebras is available for fast AI analysis
-    const hasCerebras = !!process.env.CEREBRAS_API_KEY;
+    // Check if DeepSeek is available for fast AI analysis
+    const hasDeepSeek = !!process.env.DEEPSEEK_API_KEY;
     
     for (const config of whitelistedConfigs) {
       try {
@@ -1334,15 +1334,15 @@ async function runQuickTechnicalScan() {
         // Fetch existing positions once (optimization)
         const existingPositions = await storage.getAIBotPositions(config.ownerWalletAddress);
 
-        // If Cerebras available, analyze top 2 opportunities with fast AI
-        if (hasCerebras && opportunities.length > 0) {
+        // If DeepSeek available, analyze top 2 opportunities with fast AI
+        if (hasDeepSeek && opportunities.length > 0) {
           const topOpportunities = opportunities.slice(0, 2); // Only check top 2 to stay fast
-          console.log(`[Quick Scan] 🧠 Analyzing top ${topOpportunities.length} with Cerebras (free, fast)...`);
+          console.log(`[Quick Scan] 🧠 Analyzing top ${topOpportunities.length} with DeepSeek (free, superior reasoning)...`);
 
           for (const token of topOpportunities) {
-            // Quick Cerebras-only analysis for high confidence trades
+            // Quick DeepSeek-only analysis for high confidence trades
             const riskTolerance = riskLevel === "aggressive" ? "high" : riskLevel === "conservative" ? "low" : "medium";
-            const quickAnalysis = await analyzeTokenWithCerebrasOnly(
+            const quickAnalysis = await analyzeTokenWithDeepSeekOnly(
               token,
               riskTolerance,
               budgetPerTrade
@@ -1399,11 +1399,11 @@ function cacheAnalysis(tokenMint: string, analysis: any): void {
 }
 
 /**
- * Fast single-model analysis using Cerebras (free)
+ * Fast single-model analysis using DeepSeek (free 5M tokens, superior reasoning)
  * Used for quick 75%+ confidence trades
  * Results cached for 30 minutes to reduce API calls
  */
-async function analyzeTokenWithCerebrasOnly(
+async function analyzeTokenWithDeepSeekOnly(
   tokenData: TokenMarketData,
   riskTolerance: "low" | "medium" | "high",
   budgetPerTrade: number
@@ -1421,12 +1421,12 @@ async function analyzeTokenWithCerebrasOnly(
   }
   
   try {
-    const cerebrasClient = new OpenAI({
-      baseURL: "https://api.cerebras.ai/v1",
-      apiKey: process.env.CEREBRAS_API_KEY,
+    const deepSeekClient = new OpenAI({
+      baseURL: "https://api.deepseek.com",
+      apiKey: process.env.DEEPSEEK_API_KEY,
     });
 
-    const prompt = `Analyze this Solana token for trading (quick scan - single model decision):
+    const prompt = `Analyze this Solana token for trading (quick scan - use your superior reasoning):
 
 Token: ${tokenData.name} (${tokenData.symbol})
 Price: $${tokenData.priceUSD.toFixed(6)} (${tokenData.priceSOL.toFixed(9)} SOL)
@@ -1449,8 +1449,8 @@ Respond ONLY with valid JSON:
   "riskLevel": "low" | "medium" | "high"
 }`;
 
-    const response = await cerebrasClient.chat.completions.create({
-      model: "llama-3.3-70b",
+    const response = await deepSeekClient.chat.completions.create({
+      model: "deepseek-chat",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       max_tokens: 500,
@@ -1461,7 +1461,7 @@ Respond ONLY with valid JSON:
     const analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : {
       action: "hold",
       confidence: 0,
-      reasoning: "Failed to parse Cerebras response",
+      reasoning: "Failed to parse DeepSeek response",
       potentialUpsidePercent: 0,
       riskLevel: "high",
     };
@@ -1471,11 +1471,11 @@ Respond ONLY with valid JSON:
 
     return analysis;
   } catch (error) {
-    console.error("[Cerebras] Quick analysis failed:", error);
+    console.error("[DeepSeek] Quick analysis failed:", error);
     const errorAnalysis = {
       action: "hold" as const,
       confidence: 0,
-      reasoning: "Cerebras analysis error",
+      reasoning: "DeepSeek analysis error",
       potentialUpsidePercent: 0,
       riskLevel: "high" as const,
     };
@@ -1873,8 +1873,8 @@ export function startAITradingBotScheduler() {
   });
 
   console.log("[AI Bot Scheduler] Active");
-  console.log("  - Quick scans: Every 10 minutes (technical + Cerebras AI for 75%+ trades)");
-  console.log("  - Deep scans: Every 30 minutes (6-model consensus for all opportunities)");
+  console.log("  - Quick scans: Every 10 minutes (technical + DeepSeek AI for 75%+ trades)");
+  console.log("  - Deep scans: Every 30 minutes (7-model consensus for all opportunities)");
 }
 
 /**
@@ -3168,17 +3168,17 @@ export async function getActivePositions(ownerWalletAddress: string): Promise<Ar
 }
 
 /**
- * Monitor open positions using Cerebras (free API)
- * Runs every 5 minutes to check position status and make sell recommendations
+ * Monitor open positions using DeepSeek (free 5M tokens, excellent reasoning)
+ * Runs every 2.5 minutes to check position status and make sell recommendations
  */
-async function monitorPositionsWithCerebras() {
-  if (!process.env.CEREBRAS_API_KEY) {
-    console.log("[Position Monitor] Cerebras API key not configured - skipping monitoring");
+async function monitorPositionsWithDeepSeek() {
+  if (!process.env.DEEPSEEK_API_KEY) {
+    console.log("[Position Monitor] DeepSeek API key not configured - skipping monitoring");
     return;
   }
 
   try {
-    console.log("[Position Monitor] Checking open positions with Cerebras...");
+    console.log("[Position Monitor] Checking open positions with DeepSeek...");
     
     // Get all active AI bot configs
     const configs = await storage.getAllAIBotConfigs();
@@ -3248,17 +3248,17 @@ async function monitorPositionsWithCerebras() {
 }
 
 /**
- * Start position monitoring scheduler (every 2.5 minutes using free Cerebras)
+ * Start position monitoring scheduler (every 2.5 minutes using free DeepSeek)
  * Active management of all positions for optimal performance
  */
 export function startPositionMonitoringScheduler() {
-  if (!process.env.CEREBRAS_API_KEY) {
-    console.warn("[Position Monitor] CEREBRAS_API_KEY not configured - position monitoring disabled");
+  if (!process.env.DEEPSEEK_API_KEY) {
+    console.warn("[Position Monitor] DEEPSEEK_API_KEY not configured - position monitoring disabled");
     return;
   }
 
   console.log("[Position Monitor] Starting...");
-  console.log("[Position Monitor] Using free Cerebras API for position monitoring");
+  console.log("[Position Monitor] Using free DeepSeek API (5M tokens, superior reasoning) for position monitoring");
 
   // Run every 2.5 minutes for active position management
   // Using 2-minute intervals with offset to achieve 2.5-minute frequency
@@ -3267,13 +3267,13 @@ export function startPositionMonitoringScheduler() {
     if (isOffset) {
       // Run at 2.5-minute mark (30 seconds delay)
       setTimeout(() => {
-        monitorPositionsWithCerebras().catch((error) => {
+        monitorPositionsWithDeepSeek().catch((error) => {
           console.error("[Position Monitor] Unexpected error:", error);
         });
       }, 30000);
     } else {
       // Run immediately at 2-minute mark
-      monitorPositionsWithCerebras().catch((error) => {
+      monitorPositionsWithDeepSeek().catch((error) => {
         console.error("[Position Monitor] Unexpected error:", error);
       });
     }
