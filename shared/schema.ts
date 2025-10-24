@@ -154,6 +154,36 @@ export const aiBotPositions = pgTable("ai_bot_positions", {
   lastCheckProfitPercent: decimal("last_check_profit_percent", { precision: 10, scale: 2 }),
   aiConfidenceAtBuy: integer("ai_confidence_at_buy"),
   aiPotentialAtBuy: decimal("ai_potential_at_buy", { precision: 10, scale: 2 }),
+  rebuyCount: integer("rebuy_count").notNull().default(0), // Track number of times we've added to this position (max 2)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Hivemind strategy recommendations (AI-tailored strategies between deep scans)
+export const hivemindStrategies = pgTable("hivemind_strategies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerWalletAddress: text("owner_wallet_address").notNull(),
+  
+  // Market assessment from hivemind
+  marketCondition: text("market_condition"), // "bullish", "bearish", "neutral", "volatile"
+  marketConfidence: integer("market_confidence"), // 0-100, how confident the hivemind is in this assessment
+  reasoning: text("reasoning"), // Why the hivemind chose this strategy
+  
+  // Recommended strategy adjustments
+  recommendedRiskTolerance: text("recommended_risk_tolerance"), // "low", "medium", "high"
+  recommendedMinConfidence: integer("recommended_min_confidence"), // 0-100
+  recommendedMinPotential: decimal("recommended_min_potential", { precision: 10, scale: 2 }), // Min upside %
+  recommendedMaxMarketCap: decimal("recommended_max_market_cap", { precision: 18, scale: 2 }), // Focus on tokens below this
+  recommendedMinLiquidity: decimal("recommended_min_liquidity", { precision: 18, scale: 2 }), // Min liquidity USD
+  recommendedTradeMultiplier: decimal("recommended_trade_multiplier", { precision: 5, scale: 2 }), // 0.5-2.0x base trade size
+  
+  // Token category focus
+  focusCategories: text("focus_categories"), // JSON array: ["very_low_cap", "new_launches", "trending", "recovery_plays"]
+  
+  // Validity
+  validFrom: timestamp("valid_from").notNull().defaultNow(),
+  validUntil: timestamp("valid_until").notNull(), // Expires after 30 minutes (next deep scan)
+  isActive: boolean("is_active").notNull().default(true),
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

@@ -765,10 +765,20 @@ async function executeAITradingBot(project: Project) {
           const priceChangePercent = ((currentPrice - entryPrice) / entryPrice) * 100;
           const previousConfidence = existingPosition.aiConfidenceAtBuy || 0;
           const newConfidence = analysis.confidence * 100; // Convert to 0-100 scale
+          const currentRebuyCount = existingPosition.rebuyCount || 0;
           
-          // Only buy more if BOTH conditions are met:
+          // Check if we've hit max re-buys (2)
+          if (currentRebuyCount >= 2) {
+            console.log(`[AI Bot] ⏭️ SKIP ${token.symbol} - Max re-buys reached (${currentRebuyCount}/2)`);
+            console.log(`[AI Bot]    Position opened at: ${entryPrice.toFixed(8)} SOL`);
+            console.log(`[AI Bot]    Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`);
+            continue;
+          }
+          
+          // Only buy more if ALL conditions are met:
           // 1. Price has dropped at least 10% (drawback/dip)
           // 2. New AI confidence is higher than previous
+          // 3. Haven't exceeded max 2 re-buys
           const hasDrawback = priceChangePercent <= -10; // Price down 10%+
           const hasHigherConfidence = newConfidence > previousConfidence;
           
@@ -777,12 +787,13 @@ async function executeAITradingBot(project: Project) {
             console.log(`[AI Bot]    Previous entry: ${entryPrice.toFixed(8)} SOL (confidence: ${previousConfidence}%)`);
             console.log(`[AI Bot]    Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`);
             console.log(`[AI Bot]    New confidence: ${newConfidence.toFixed(1)}%`);
+            console.log(`[AI Bot]    Re-buys: ${currentRebuyCount}/2`);
             console.log(`[AI Bot]    Drawback requirement: ${hasDrawback ? '✅' : '❌'} (need -10% dip, have ${priceChangePercent.toFixed(2)}%)`);
             console.log(`[AI Bot]    Higher confidence: ${hasHigherConfidence ? '✅' : '❌'} (need >${previousConfidence}%, have ${newConfidence.toFixed(1)}%)`);
             continue;
           }
           
-          console.log(`[AI Bot] ✅ Adding to position ${token.symbol}:`);
+          console.log(`[AI Bot] ✅ Adding to position ${token.symbol} (re-buy ${currentRebuyCount + 1}/2):`);
           console.log(`[AI Bot]    Price dropped ${Math.abs(priceChangePercent).toFixed(2)}% from entry (${entryPrice.toFixed(8)} → ${currentPrice.toFixed(8)} SOL)`);
           console.log(`[AI Bot]    Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`);
         }
@@ -853,21 +864,42 @@ async function executeAITradingBot(project: Project) {
             amountSOL,
           });
 
-          // Save position to database for persistence across restarts
-          await storage.createAIBotPosition({
-            ownerWalletAddress: project.ownerWalletAddress,
-            tokenMint: token.mint,
-            tokenSymbol: token.symbol,
-            tokenName: token.name,
-            entryPriceSOL: token.priceSOL.toString(),
-            amountSOL: amountSOL.toString(),
-            tokenAmount: "0", // Would need to calculate from tx
-            buyTxSignature: result.signature,
-            lastCheckPriceSOL: token.priceSOL.toString(),
-            lastCheckProfitPercent: "0",
-            aiConfidenceAtBuy: analysis.confidence,
-            aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
-          });
+          // Save or update position in database
+          if (existingPosition) {
+            // Re-buy: Update existing position with new totals and increment rebuyCount
+            const oldAmount = parseFloat(existingPosition.amountSOL);
+            const oldEntryPrice = parseFloat(existingPosition.entryPriceSOL);
+            const newTotalAmount = oldAmount + amountSOL;
+            // Weighted average entry price
+            const newAvgEntryPrice = (oldEntryPrice * oldAmount + token.priceSOL * amountSOL) / newTotalAmount;
+            
+            await storage.updateAIBotPosition(existingPosition.id, {
+              entryPriceSOL: newAvgEntryPrice.toString(),
+              amountSOL: newTotalAmount.toString(),
+              buyTxSignature: result.signature, // Latest buy tx
+              lastCheckPriceSOL: token.priceSOL.toString(),
+              lastCheckProfitPercent: "0",
+              aiConfidenceAtBuy: Math.round(analysis.confidence * 100),
+              aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
+              rebuyCount: (existingPosition.rebuyCount || 0) + 1,
+            });
+          } else {
+            // New position: Create it
+            await storage.createAIBotPosition({
+              ownerWalletAddress: project.ownerWalletAddress,
+              tokenMint: token.mint,
+              tokenSymbol: token.symbol,
+              tokenName: token.name,
+              entryPriceSOL: token.priceSOL.toString(),
+              amountSOL: amountSOL.toString(),
+              tokenAmount: "0", // Would need to calculate from tx
+              buyTxSignature: result.signature,
+              lastCheckPriceSOL: token.priceSOL.toString(),
+              lastCheckProfitPercent: "0",
+              aiConfidenceAtBuy: Math.round(analysis.confidence * 100),
+              aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
+            });
+          }
 
           botState.dailyTradesExecuted++;
           console.log(`[AI Bot] Trade executed successfully (${botState.dailyTradesExecuted}/${maxDailyTrades})`);
@@ -1235,10 +1267,20 @@ async function executeQuickTrade(
       const priceChangePercent = ((currentPrice - entryPrice) / entryPrice) * 100;
       const previousConfidence = existingPosition.aiConfidenceAtBuy || 0;
       const newConfidence = analysis.confidence * 100; // Convert to 0-100 scale
+      const currentRebuyCount = existingPosition.rebuyCount || 0;
       
-      // Only buy more if BOTH conditions are met:
+      // Check if we've hit max re-buys (2)
+      if (currentRebuyCount >= 2) {
+        console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol} - Max re-buys reached (${currentRebuyCount}/2)`);
+        console.log(`[Quick Scan]    Position opened at: ${entryPrice.toFixed(8)} SOL`);
+        console.log(`[Quick Scan]    Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`);
+        return;
+      }
+      
+      // Only buy more if ALL conditions are met:
       // 1. Price has dropped at least 10% (drawback/dip)
       // 2. New AI confidence is higher than previous
+      // 3. Haven't exceeded max 2 re-buys
       const hasDrawback = priceChangePercent <= -10; // Price down 10%+
       const hasHigherConfidence = newConfidence > previousConfidence;
       
@@ -1247,12 +1289,13 @@ async function executeQuickTrade(
         console.log(`[Quick Scan]    Previous entry: ${entryPrice.toFixed(8)} SOL (confidence: ${previousConfidence}%)`);
         console.log(`[Quick Scan]    Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`);
         console.log(`[Quick Scan]    New confidence: ${newConfidence.toFixed(1)}%`);
+        console.log(`[Quick Scan]    Re-buys: ${currentRebuyCount}/2`);
         console.log(`[Quick Scan]    Drawback requirement: ${hasDrawback ? '✅' : '❌'} (need -10% dip, have ${priceChangePercent.toFixed(2)}%)`);
         console.log(`[Quick Scan]    Higher confidence: ${hasHigherConfidence ? '✅' : '❌'} (need >${previousConfidence}%, have ${newConfidence.toFixed(1)}%)`);
         return;
       }
       
-      console.log(`[Quick Scan] ✅ Adding to position ${token.symbol}:`);
+      console.log(`[Quick Scan] ✅ Adding to position ${token.symbol} (re-buy ${currentRebuyCount + 1}/2):`);
       console.log(`[Quick Scan]    Price dropped ${Math.abs(priceChangePercent).toFixed(2)}% from entry (${entryPrice.toFixed(8)} → ${currentPrice.toFixed(8)} SOL)`);
       console.log(`[Quick Scan]    Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`);
     }
@@ -1302,6 +1345,44 @@ async function executeQuickTrade(
         },
         timestamp: Date.now(),
       });
+
+      // Save or update position in database
+      if (existingPosition) {
+        // Re-buy: Update existing position with new totals and increment rebuyCount
+        const oldAmount = parseFloat(existingPosition.amountSOL);
+        const oldEntryPrice = parseFloat(existingPosition.entryPriceSOL);
+        const newTotalAmount = oldAmount + tradeAmount;
+        // Weighted average entry price
+        const newAvgEntryPrice = (oldEntryPrice * oldAmount + token.priceSOL * tradeAmount) / newTotalAmount;
+        
+        await storage.updateAIBotPosition(existingPosition.id, {
+          entryPriceSOL: newAvgEntryPrice.toString(),
+          amountSOL: newTotalAmount.toString(),
+          buyTxSignature: result.signature, // Latest buy tx
+          lastCheckPriceSOL: token.priceSOL.toString(),
+          lastCheckProfitPercent: "0",
+          aiConfidenceAtBuy: Math.round(analysis.confidence * 100),
+          aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
+          rebuyCount: (existingPosition.rebuyCount || 0) + 1,
+        });
+        console.log(`[Quick Scan] Updated position with ${currentRebuyCount + 1} re-buys (avg entry: ${newAvgEntryPrice.toFixed(8)} SOL)`);
+      } else {
+        // New position: Create it
+        await storage.createAIBotPosition({
+          ownerWalletAddress: config.ownerWalletAddress,
+          tokenMint: token.mint,
+          tokenSymbol: token.symbol,
+          tokenName: token.name,
+          entryPriceSOL: token.priceSOL.toString(),
+          amountSOL: tradeAmount.toString(),
+          tokenAmount: "0", // TBD from tx
+          buyTxSignature: result.signature,
+          lastCheckPriceSOL: token.priceSOL.toString(),
+          lastCheckProfitPercent: "0",
+          aiConfidenceAtBuy: Math.round(analysis.confidence * 100),
+          aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
+        });
+      }
 
       console.log(`[Quick Scan] ✅ Trade executed: ${token.symbol} - ${tradeAmount.toFixed(4)} SOL (tx: ${result.signature.slice(0, 8)}...)`);
     } else {
@@ -1667,10 +1748,20 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           const priceChangePercent = ((currentPrice - entryPrice) / entryPrice) * 100;
           const previousConfidence = existingPosition.aiConfidenceAtBuy || 0;
           const newConfidence = analysis.confidence * 100; // Convert to 0-100 scale
+          const currentRebuyCount = existingPosition.rebuyCount || 0;
           
-          // Only buy more if BOTH conditions are met:
+          // Check if we've hit max re-buys (2)
+          if (currentRebuyCount >= 2) {
+            addLog(`⏭️ SKIP ${token.symbol} - Max re-buys reached (${currentRebuyCount}/2)`, "warning");
+            addLog(`   Position opened at: ${entryPrice.toFixed(8)} SOL`, "info");
+            addLog(`   Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`, "info");
+            continue;
+          }
+          
+          // Only buy more if ALL conditions are met:
           // 1. Price has dropped at least 10% (drawback/dip)
           // 2. New AI confidence is higher than previous
+          // 3. Haven't exceeded max 2 re-buys
           const hasDrawback = priceChangePercent <= -10; // Price down 10%+
           const hasHigherConfidence = newConfidence > previousConfidence;
           
@@ -1679,12 +1770,13 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
             addLog(`   Previous entry: ${entryPrice.toFixed(8)} SOL (confidence: ${previousConfidence}%)`, "info");
             addLog(`   Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`, "info");
             addLog(`   New confidence: ${newConfidence.toFixed(1)}%`, "info");
+            addLog(`   Re-buys: ${currentRebuyCount}/2`, "info");
             addLog(`   Drawback requirement: ${hasDrawback ? '✅' : '❌'} (need -10% dip, have ${priceChangePercent.toFixed(2)}%)`, "info");
             addLog(`   Higher confidence: ${hasHigherConfidence ? '✅' : '❌'} (need >${previousConfidence}%, have ${newConfidence.toFixed(1)}%)`, "info");
             continue;
           }
           
-          addLog(`✅ Adding to position ${token.symbol}:`, "success");
+          addLog(`✅ Adding to position ${token.symbol} (re-buy ${currentRebuyCount + 1}/2):`, "success");
           addLog(`   Price dropped ${Math.abs(priceChangePercent).toFixed(2)}% from entry (${entryPrice.toFixed(8)} → ${currentPrice.toFixed(8)} SOL)`, "info");
           addLog(`   Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`, "info");
         }
@@ -1740,21 +1832,43 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
             amountSOL: tradeAmount,
           });
 
-          // Save position to database for persistence across restarts
-          await storage.createAIBotPosition({
-            ownerWalletAddress,
-            tokenMint: token.mint,
-            tokenSymbol: token.symbol,
-            tokenName: token.name,
-            entryPriceSOL: token.priceSOL.toString(),
-            amountSOL: tradeAmount.toString(),
-            tokenAmount: "0", // Would need to calculate from tx
-            buyTxSignature: result.signature,
-            lastCheckPriceSOL: token.priceSOL.toString(),
-            lastCheckProfitPercent: "0",
-            aiConfidenceAtBuy: analysis.confidence,
-            aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
-          });
+          // Save or update position in database
+          if (existingPosition) {
+            // Re-buy: Update existing position with new totals and increment rebuyCount
+            const oldAmount = parseFloat(existingPosition.amountSOL);
+            const oldEntryPrice = parseFloat(existingPosition.entryPriceSOL);
+            const newTotalAmount = oldAmount + tradeAmount;
+            // Weighted average entry price
+            const newAvgEntryPrice = (oldEntryPrice * oldAmount + token.priceSOL * tradeAmount) / newTotalAmount;
+            
+            await storage.updateAIBotPosition(existingPosition.id, {
+              entryPriceSOL: newAvgEntryPrice.toString(),
+              amountSOL: newTotalAmount.toString(),
+              buyTxSignature: result.signature, // Latest buy tx
+              lastCheckPriceSOL: token.priceSOL.toString(),
+              lastCheckProfitPercent: "0",
+              aiConfidenceAtBuy: Math.round(analysis.confidence * 100),
+              aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
+              rebuyCount: (existingPosition.rebuyCount || 0) + 1,
+            });
+            addLog(`   Updated position with ${currentRebuyCount + 1} re-buys (avg entry: ${newAvgEntryPrice.toFixed(8)} SOL)`, "info");
+          } else {
+            // New position: Create it
+            await storage.createAIBotPosition({
+              ownerWalletAddress,
+              tokenMint: token.mint,
+              tokenSymbol: token.symbol,
+              tokenName: token.name,
+              entryPriceSOL: token.priceSOL.toString(),
+              amountSOL: tradeAmount.toString(),
+              tokenAmount: "0", // Would need to calculate from tx
+              buyTxSignature: result.signature,
+              lastCheckPriceSOL: token.priceSOL.toString(),
+              lastCheckProfitPercent: "0",
+              aiConfidenceAtBuy: Math.round(analysis.confidence * 100),
+              aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
+            });
+          }
 
           botState.dailyTradesExecuted++;
           addLog(`✅ Trade executed successfully! ${token.symbol} bought (${botState.dailyTradesExecuted}/${maxDailyTrades} trades today)`, "success", {

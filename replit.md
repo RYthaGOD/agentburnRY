@@ -18,14 +18,21 @@ Preferred communication style: Simple, everyday language.
   - Filters for ultra-low market cap tokens (<$100k) for aggressive meme trading
   - Combines PumpFun new tokens with DexScreener trending tokens
   - All tokens analyzed by AI consensus system for trade decisions
-- **Implemented intelligent position re-buy logic**
+- **Implemented intelligent position re-buy logic with 2-rebuy maximum**
   - System checks if wallet already holds a token before buying more
-  - Only allows adding to existing positions if BOTH conditions are met:
+  - Maximum 2 re-buys per position to prevent excessive averaging down
+  - Only allows adding to existing positions if ALL conditions are met:
     - Price has dropped at least 10% from entry (drawback/dip detected)
     - New AI confidence is higher than previous buy confidence
+    - Haven't exceeded maximum 2 re-buys
+  - When re-buying:
+    - Updates position with weighted average entry price
+    - Adds new SOL amount to total position size
+    - Increments rebuyCount in database
+    - Updates aiConfidenceAtBuy to latest confidence
   - Prevents mindlessly averaging down on losing positions
-  - Enables smart dollar-cost averaging on high-conviction dips
-  - Works in both quick scans (10 min) and deep scans (30 min)
+  - Enables smart dollar-cost averaging on high-conviction dips (limited to 2 additions)
+  - Works in all execution paths: quick scans, deep scans, and legacy project-based bot
 - **Implemented smart wallet management and dynamic trade sizing**
   - Scans actual wallet balance before every trade for accuracy
   - Always keeps 0.01 SOL buffer for transaction fees
