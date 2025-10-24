@@ -4,10 +4,47 @@
 import OpenAI from "openai";
 
 /**
- * Get all available AI clients for hive mind consensus
+ * Intelligent OpenAI usage context for cost optimization
  */
-function getAllAIClients(): Array<{ client: OpenAI; model: string; provider: string }> {
+export interface OpenAIUsageContext {
+  isPeakHours?: boolean; // Use OpenAI during market hours (9am-5pm UTC)
+  isHighConfidence?: boolean; // Potential swing trade (85%+ confidence expected)
+  needsTieBreaker?: boolean; // Free models showed disagreement
+  forceInclude?: boolean; // Always include OpenAI regardless of context
+  forceExclude?: boolean; // Never include OpenAI (e.g., quick monitoring)
+}
+
+/**
+ * Determine if we should include OpenAI based on smart usage strategy
+ */
+function shouldIncludeOpenAI(context: OpenAIUsageContext = {}): boolean {
+  // Force decisions override everything
+  if (context.forceExclude) return false;
+  if (context.forceInclude) return true;
+
+  // Use OpenAI in any of these strategic scenarios:
+  // 1. Peak trading hours (better liquidity/volume = better trades worth OpenAI analysis)
+  // 2. High-confidence opportunities (potential swing trades)
+  // 3. Tie-breaker needed (free models disagree)
+  return !!(context.isPeakHours || context.isHighConfidence || context.needsTieBreaker);
+}
+
+/**
+ * Check if current time is peak trading hours (9am-5pm UTC)
+ */
+function isPeakTradingHours(): boolean {
+  const now = new Date();
+  const hour = now.getUTCHours();
+  return hour >= 9 && hour < 17; // 9am-5pm UTC
+}
+
+/**
+ * Get all available AI clients for hive mind consensus
+ * @param context Optional context to determine smart OpenAI usage
+ */
+function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: OpenAI; model: string; provider: string }> {
   const clients = [];
+  const includeOpenAI = shouldIncludeOpenAI(context);
 
   // Cerebras (fast, free, Llama 4)
   if (process.env.CEREBRAS_API_KEY) {
@@ -93,8 +130,8 @@ function getAllAIClients(): Array<{ client: OpenAI; model: string; provider: str
     });
   }
 
-  // OpenAI Primary (GPT-4o-mini, high quality, paid)
-  if (process.env.OPENAI_API_KEY) {
+  // OpenAI Primary (GPT-4o-mini, high quality, paid) - Smart usage only
+  if (includeOpenAI && process.env.OPENAI_API_KEY) {
     clients.push({
       client: new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
@@ -104,8 +141,8 @@ function getAllAIClients(): Array<{ client: OpenAI; model: string; provider: str
     });
   }
   
-  // OpenAI Backup (GPT-4o-mini, automatic failover when primary fails)
-  if (process.env.OPENAI_API_KEY_2) {
+  // OpenAI Backup (GPT-4o-mini, automatic failover when primary fails) - Smart usage only
+  if (includeOpenAI && process.env.OPENAI_API_KEY_2) {
     clients.push({
       client: new OpenAI({
         apiKey: process.env.OPENAI_API_KEY_2,
@@ -162,25 +199,33 @@ export function isGrokConfigured(): boolean {
 
 /**
  * Hive mind consensus: Query multiple AI models and combine their decisions
+ * @param context Optional context for smart OpenAI usage optimization
  */
 export async function analyzeTokenWithHiveMind(
   tokenData: TokenMarketData,
   userRiskTolerance: "low" | "medium" | "high",
   budgetPerTrade: number,
-  minAgreement: number = 0.5 // Require 50% agreement (3 out of 6 models)
+  minAgreement: number = 0.5, // Require 50% agreement
+  context: OpenAIUsageContext = {}
 ): Promise<{
   analysis: TradingAnalysis;
   votes: Array<{ provider: string; analysis: TradingAnalysis; success: boolean; error?: string }>;
   consensus: string;
 }> {
-  const clients = getAllAIClients();
+  // Auto-detect peak hours if not specified
+  if (context.isPeakHours === undefined) {
+    context.isPeakHours = isPeakTradingHours();
+  }
+
+  const clients = getAllAIClients(context);
   
   if (clients.length === 0) {
     throw new Error("No AI providers configured for hive mind");
   }
 
   const providers = clients.map(c => c.provider).join(", ");
-  console.log(`[Hive Mind] Querying ${clients.length} AI models for consensus: ${providers}`);
+  const openAIIncluded = clients.some(c => c.provider.includes("OpenAI"));
+  console.log(`[Hive Mind] Querying ${clients.length} AI models${openAIIncluded ? ' (including OpenAI)' : ' (free only)'}: ${providers}`);
   
   // Query all models in parallel
   const votes = await Promise.all(

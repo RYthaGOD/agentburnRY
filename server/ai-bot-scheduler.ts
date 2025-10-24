@@ -927,8 +927,15 @@ async function executeAITradingBot(project: Project) {
       console.log(`[AI Bot]    💧 Liquidity: $${(token.liquidityUSD || 0).toLocaleString()}`);
       console.log(`[AI Bot]    📊 Change 24h: ${(token.priceChange24h || 0) > 0 ? '+' : ''}${(token.priceChange24h || 0).toFixed(2)}%`);
 
-      // Use Hive Mind for multi-model consensus
-      const hiveMindResult = await analyzeTokenWithHiveMind(token, riskTolerance, budgetPerTrade, 0.6);
+      // Use Hive Mind for multi-model consensus with smart OpenAI usage
+      // Include OpenAI during peak hours OR for high-confidence opportunities
+      const hiveMindResult = await analyzeTokenWithHiveMind(
+        token, 
+        riskTolerance, 
+        budgetPerTrade, 
+        0.6,
+        { isPeakHours: true, isHighConfidence: true } // Deep scans use OpenAI strategically
+      );
       const analysis = hiveMindResult.analysis;
 
       console.log(`[AI Bot] 🧠 Hive Mind Consensus: ${hiveMindResult.consensus}`);
@@ -2224,8 +2231,14 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         priceChange24h: token.priceChange24h,
       });
 
-      // Use Hive Mind for multi-model consensus
-      const hiveMindResult = await analyzeTokenWithHiveMind(token, riskTolerance, budgetPerTrade, 0.6);
+      // Use Hive Mind for multi-model consensus with smart OpenAI usage
+      const hiveMindResult = await analyzeTokenWithHiveMind(
+        token, 
+        riskTolerance, 
+        budgetPerTrade, 
+        0.6,
+        { isPeakHours: true, isHighConfidence: true } // Deep scans use OpenAI strategically
+      );
       const analysis = hiveMindResult.analysis;
 
       addLog(`🧠 Hive Mind: ${hiveMindResult.consensus}`, "info", { symbol: token.symbol });
