@@ -1169,10 +1169,25 @@ async function runStandaloneAIBots() {
 
     console.log(`[Standalone AI Bot Scheduler] Running for ${enabledConfigs.length} standalone AI bots`);
 
+    // Get AI bot whitelist
+    const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+    
+    // Filter to only whitelisted wallets
+    const whitelistedConfigs = enabledConfigs.filter((c: any) => 
+      AI_BOT_WHITELISTED_WALLETS.includes(c.ownerWalletAddress)
+    );
+    
+    if (whitelistedConfigs.length === 0) {
+      console.log("[Standalone AI Bot Scheduler] No whitelisted wallets enabled for AI trading");
+      return;
+    }
+    
+    console.log(`[Standalone AI Bot Scheduler] ${whitelistedConfigs.length} whitelisted wallets active`);
+
     // Check and generate hivemind strategies for each bot before running deep scan
     const { shouldGenerateNewStrategy, generateHivemindStrategy, saveHivemindStrategy, getLatestStrategy } = await import("./hivemind-strategy");
     
-    for (const config of enabledConfigs) {
+    for (const config of whitelistedConfigs) {
       const ownerWalletAddress = config.ownerWalletAddress;
       
       // Check if we need a new strategy
@@ -1196,8 +1211,8 @@ async function runStandaloneAIBots() {
       }
     }
 
-    // Run bots in parallel (with reasonable concurrency)
-    await Promise.all(enabledConfigs.map((c: any) => executeStandaloneAIBot(c.ownerWalletAddress)));
+    // Run bots in parallel (with reasonable concurrency) - only whitelisted wallets
+    await Promise.all(whitelistedConfigs.map((c: any) => executeStandaloneAIBot(c.ownerWalletAddress)));
 
     console.log("[Standalone AI Bot Scheduler] All standalone bots completed");
   } catch (error) {
@@ -1221,10 +1236,23 @@ async function runQuickTechnicalScan() {
       return;
     }
     
+    // Get AI bot whitelist
+    const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+    
+    // Filter to only whitelisted wallets
+    const whitelistedConfigs = enabledConfigs.filter((c: any) => 
+      AI_BOT_WHITELISTED_WALLETS.includes(c.ownerWalletAddress)
+    );
+    
+    if (whitelistedConfigs.length === 0) {
+      console.log("[Quick Scan] No whitelisted wallets enabled for AI trading");
+      return;
+    }
+    
     // Check if Cerebras is available for fast AI analysis
     const hasCerebras = !!process.env.CEREBRAS_API_KEY;
     
-    for (const config of enabledConfigs) {
+    for (const config of whitelistedConfigs) {
       try {
         // Get or initialize bot state
         let botState = aiBotStates.get(config.ownerWalletAddress);
@@ -1953,6 +1981,15 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
 
   try {
     addLog(`[Standalone AI Bot] Running for wallet ${ownerWalletAddress}`, "info");
+
+    // Check AI bot whitelist (RESTRICTED FEATURE)
+    const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+    const isWhitelisted = AI_BOT_WHITELISTED_WALLETS.includes(ownerWalletAddress);
+    
+    if (!isWhitelisted) {
+      addLog(`[Standalone AI Bot] Access denied - wallet ${ownerWalletAddress} is not whitelisted for AI Trading Bot feature`, "error");
+      return logs;
+    }
 
     // Get AI bot config
     const config = await storage.getAIBotConfig(ownerWalletAddress);
@@ -2854,8 +2891,16 @@ async function monitorPositionsWithCerebras() {
       return;
     }
 
+    // Get AI bot whitelist
+    const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+    
     for (const config of activeConfigs) {
       try {
+        // Skip non-whitelisted wallets
+        if (!AI_BOT_WHITELISTED_WALLETS.includes(config.ownerWalletAddress)) {
+          continue;
+        }
+        
         const positions = await storage.getAIBotPositions(config.ownerWalletAddress);
         
         if (positions.length === 0) {

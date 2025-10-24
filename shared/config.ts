@@ -12,6 +12,14 @@ export const WHITELISTED_WALLETS = [
   "924yATAEdnrYmncJMX2je7dpiEfVRqCSPmQ2NK3QfoXA",  // Additional whitelisted wallet
 ];
 
+// Whitelisted wallet addresses with AI Trading Bot access (RESTRICTED FEATURE)
+export const AI_BOT_WHITELISTED_WALLETS = [
+  "4D5a61DsihdeEV2SbfkpYsZemTrrczxAwyBfR47xF5uS",  // Owner wallet
+  "jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38",  // Treasury wallet
+  "5PsB7jYtDy6DP3tt5EUuDBSh8skKNkNJiUuNpPRV3Xrf",  // Additional whitelisted wallet
+  "924yATAEdnrYmncJMX2je7dpiEfVRqCSPmQ2NK3QfoXA",  // Additional whitelisted wallet
+];
+
 export const PRICING = {
   STARTER: {
     name: "Starter",

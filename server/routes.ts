@@ -995,6 +995,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message expired. Please try again." });
       }
 
+      // Check AI bot whitelist (RESTRICTED FEATURE)
+      const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+      const isWhitelisted = AI_BOT_WHITELISTED_WALLETS.includes(ownerWalletAddress);
+      
+      if (!isWhitelisted) {
+        return res.status(403).json({ 
+          message: "AI Trading Bot access is restricted. Your wallet is not whitelisted for this feature." 
+        });
+      }
+
       // Get AI bot config
       const config = await storage.getAIBotConfig(ownerWalletAddress);
       if (!config) {
@@ -1058,6 +1068,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fiveMinutesInMs = 5 * 60 * 1000;
       if (now - messageTimestamp > fiveMinutesInMs) {
         return res.status(400).json({ message: "Message expired. Please try again." });
+      }
+
+      // Check AI bot whitelist (RESTRICTED FEATURE)
+      const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+      const isWhitelisted = AI_BOT_WHITELISTED_WALLETS.includes(ownerWalletAddress);
+      
+      if (!isWhitelisted) {
+        return res.status(403).json({ 
+          message: "AI Trading Bot access is restricted. Your wallet is not whitelisted for this feature." 
+        });
       }
 
       auditLog("update_ai_bot_config", {
@@ -1150,6 +1170,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fiveMinutesInMs = 5 * 60 * 1000;
       if (now - messageTimestamp > fiveMinutesInMs) {
         return res.status(400).json({ message: "Message expired. Please try again." });
+      }
+
+      // Check AI bot whitelist (RESTRICTED FEATURE)
+      const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+      const isWhitelisted = AI_BOT_WHITELISTED_WALLETS.includes(ownerWalletAddress);
+      
+      if (!isWhitelisted) {
+        return res.status(403).json({ 
+          message: "AI Trading Bot access is restricted. Your wallet is not whitelisted for this feature." 
+        });
       }
 
       // Validate the private key format (Solana private keys are base58 encoded)

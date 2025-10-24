@@ -31,6 +31,8 @@ A dedicated scheduler service automates buyback execution using `node-cron`. It 
 #### AI Trading Bot (Standalone)
 This bot operates independently, with configurations stored in a dedicated `aiBotConfigs` table. It uses a "hive mind" system where 6 AI models vote on trades.
 
+**RESTRICTED ACCESS:** AI Trading Bot access is limited to whitelisted wallets only. The whitelist is configured in `shared/config.ts` (`AI_BOT_WHITELISTED_WALLETS`). Non-whitelisted wallets receive a 403 error when attempting to use AI bot features.
+
 **STRICT WEALTH-GROWING APPROACH (Capital Preservation Priority):**
 - **Unlimited Trading:** No daily trade limits - trades based purely on AI confidence, available balance, and portfolio concentration.
 - **AI-Driven Exits:** All sell decisions made by AI analysis and hivemind strategy - no fixed profit targets.
