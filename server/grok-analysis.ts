@@ -298,57 +298,120 @@ async function analyzeSingleModel(
   userRiskTolerance: "low" | "medium" | "high",
   budgetPerTrade: number
 ): Promise<TradingAnalysis> {
-  const prompt = `You are an AGGRESSIVE cryptocurrency trading expert specializing in HIGH-PROFIT MEME COIN trading on Solana PumpFun. Your goal is to MAXIMIZE PROFITS by identifying low market cap tokens with explosive potential.
+  // Calculate additional metrics for deeper analysis
+  const volumeToMarketCapRatio = tokenData.volumeUSD24h / tokenData.marketCapUSD;
+  const liquidityToMarketCapRatio = (tokenData.liquidityUSD || 0) / tokenData.marketCapUSD;
+  const priceVolatility = Math.abs(tokenData.priceChange24h || 0);
+  const hasRecentMomentum = (tokenData.priceChange1h || 0) > 0 && (tokenData.priceChange24h || 0) > 0;
+  
+  const prompt = `You are a CONSERVATIVE cryptocurrency trading analyst specializing in HIGH-QUALITY token selection for Solana. Your goal is to identify tokens with strong fundamentals and sustainable growth potential through COMPREHENSIVE, IN-DEPTH ANALYSIS.
 
-**Token Data:**
+**COMPREHENSIVE TOKEN DATA:**
+
+**Basic Information:**
 - Name: ${tokenData.name} (${tokenData.symbol})
 - Mint Address: ${tokenData.mint}
 - Current Price: $${tokenData.priceUSD.toFixed(6)} (${tokenData.priceSOL.toFixed(9)} SOL)
-- 24h Volume: $${tokenData.volumeUSD24h.toLocaleString()}
-- Market Cap: $${tokenData.marketCapUSD.toLocaleString()}
-${tokenData.holderCount ? `- Holder Count: ${tokenData.holderCount.toLocaleString()}` : ''}
-${tokenData.priceChange24h ? `- 24h Price Change: ${tokenData.priceChange24h > 0 ? '+' : ''}${tokenData.priceChange24h.toFixed(2)}%` : ''}
-${tokenData.priceChange1h ? `- 1h Price Change: ${tokenData.priceChange1h > 0 ? '+' : ''}${tokenData.priceChange1h.toFixed(2)}%` : ''}
-${tokenData.liquidityUSD ? `- Liquidity: $${tokenData.liquidityUSD.toLocaleString()}` : ''}
 ${tokenData.description ? `- Description: ${tokenData.description}` : ''}
 
-**Trading Strategy - AGGRESSIVE MEME COIN MAXIMIZATION:**
-Focus on LOW MARKET CAP tokens (<$500K) with:
-- Strong momentum (positive 1h/24h price action)
-- Growing volume (indicates interest)
-- Reasonable liquidity (sufficient to enter/exit)
-- Viral potential (trending narrative, community hype)
-- Early entry opportunity (not already pumped 1000%+)
+**Market Metrics:**
+- Market Cap: $${tokenData.marketCapUSD.toLocaleString()}
+- 24h Trading Volume: $${tokenData.volumeUSD24h.toLocaleString()}
+- Volume/Market Cap Ratio: ${(volumeToMarketCapRatio * 100).toFixed(2)}% (${volumeToMarketCapRatio > 0.15 ? 'HIGH activity' : volumeToMarketCapRatio > 0.05 ? 'MODERATE activity' : 'LOW activity'})
+- Liquidity: $${(tokenData.liquidityUSD || 0).toLocaleString()}
+- Liquidity/Market Cap Ratio: ${(liquidityToMarketCapRatio * 100).toFixed(2)}% (${liquidityToMarketCapRatio > 0.1 ? 'STRONG' : liquidityToMarketCapRatio > 0.05 ? 'ADEQUATE' : 'WEAK'})
 
-**Key Analysis Points:**
-1. Is this token showing EARLY MOMENTUM? (prime entry point for 2-10x gains)
-2. Does the market cap suggest room for EXPLOSIVE GROWTH? (sub-$100K = highest potential)
-3. Is volume ACCELERATING? (trend reversal/breakout signals)
-4. Can we ENTER and EXIT safely? (liquidity check - minimum $3K)
-5. Any RED FLAGS? (rug pull indicators, dev dumping, dead volume)
+**Price Action Analysis:**
+- 1h Price Change: ${tokenData.priceChange1h ? (tokenData.priceChange1h > 0 ? '+' : '') + tokenData.priceChange1h.toFixed(2) + '%' : 'N/A'}
+- 24h Price Change: ${tokenData.priceChange24h ? (tokenData.priceChange24h > 0 ? '+' : '') + tokenData.priceChange24h.toFixed(2) + '%' : 'N/A'}
+- Momentum Status: ${hasRecentMomentum ? 'POSITIVE (both 1h and 24h gains)' : 'NEUTRAL or NEGATIVE'}
+- Price Volatility (24h): ${priceVolatility.toFixed(2)}% (${priceVolatility > 30 ? 'HIGH risk' : priceVolatility > 15 ? 'MODERATE risk' : 'LOW risk'})
 
-**Your Mission:**
-Find opportunities with 50%+ profit potential. Don't be conservative - meme coins move fast. If momentum is strong and fundamentals check out, recommend BUY with high confidence.
+**Holder & Distribution:**
+${tokenData.holderCount ? `- Holder Count: ${tokenData.holderCount.toLocaleString()} (${tokenData.holderCount > 1000 ? 'GOOD distribution' : tokenData.holderCount > 500 ? 'MODERATE distribution' : 'CONCENTRATED holdings - RISK'})` : '- Holder Count: Not available'}
 
-Provide your analysis in JSON format with these exact fields:
+**REQUIRED IN-DEPTH ANALYSIS FRAMEWORK:**
+
+Perform a COMPREHENSIVE evaluation across ALL of these critical dimensions:
+
+1. **FUNDAMENTAL QUALITY ASSESSMENT (40% weight)**
+   - Token utility and use case strength
+   - Project legitimacy and transparency
+   - Development activity and roadmap
+   - Community engagement and organic growth
+   - Token distribution and concentration risks
+   - Liquidity depth and sustainability
+
+2. **TECHNICAL PRICE ACTION ANALYSIS (25% weight)**
+   - Short-term momentum (1h, 24h trends)
+   - Volume patterns and acceleration
+   - Support/resistance levels based on price history
+   - Volatility analysis and risk assessment
+   - Price-to-volume correlation strength
+
+3. **MARKET CONDITIONS & TIMING (20% weight)**
+   - Market cap position relative to similar tokens
+   - Volume/liquidity adequacy for safe entry/exit
+   - Current market cycle stage (early, mid, late)
+   - Competitive positioning in sector
+   - Potential catalysts or upcoming events
+
+4. **RISK EVALUATION (15% weight)**
+   - Rug pull indicators (liquidity locks, dev wallets)
+   - Holder concentration (whale manipulation risk)
+   - Smart contract security (if verifiable)
+   - Historical pump-and-dump patterns
+   - Exit liquidity availability
+
+**CONSERVATIVE COMPOUNDING STRATEGY:**
+We prioritize HIGH-PROBABILITY trades with SUSTAINABLE returns:
+- Look for tokens with strong fundamentals, not just hype
+- Require clear technical indicators supporting entry
+- Demand adequate liquidity for safe position management  
+- Strict quality filters: prefer proven concepts over speculation
+- Target realistic 25-50% gains over moonshot gambling
+- ONLY recommend BUY at 70%+ confidence for high-quality setups
+- Be highly selective - it's okay to say HOLD if conditions aren't ideal
+
+**DECISION CRITERIA:**
+For BUY recommendation (requires 70%+ confidence):
+- Strong fundamentals (utility, team, community)
+- Positive technical momentum (rising volume, bullish price action)
+- Adequate liquidity (>$8k minimum, preferably >$15k)
+- Healthy holder distribution (>500 holders preferred)
+- Volume/market cap ratio >5% (indicates active interest)
+- Clear upside catalyst or growth narrative
+- Low rug pull risk indicators
+
+For HOLD/SELL recommendation:
+- Any red flags in fundamentals or technical analysis
+- Insufficient liquidity or extreme volatility
+- Concentration risks or whale manipulation signs
+- Overextended price (already pumped significantly)
+- Weakening volume or momentum deterioration
+
+**OUTPUT FORMAT:**
+Provide your DETAILED analysis in JSON with these exact fields:
 {
   "action": "buy" | "sell" | "hold",
-  "confidence": 0.0-1.0,
-  "reasoning": "detailed explanation focusing on profit potential",
-  "potentialUpsidePercent": number (be realistic but optimistic for meme coins),
-  "riskLevel": "low" | "medium" | "high",
+  "confidence": 0.0-1.0 (ONLY use 0.70+ for BUY recommendations),
+  "reasoning": "comprehensive multi-paragraph analysis covering all 4 dimensions above with specific data points and conclusions",
+  "potentialUpsidePercent": number (realistic estimate based on technical analysis and comparable tokens),
+  "riskLevel": "low" | "medium" | "high" (based on thorough risk evaluation),
   "suggestedBuyAmountSOL": number (optional, if action is buy),
-  "stopLossPercent": number (optional),
-  "takeProfitPercent": number (optional),
-  "keyFactors": ["factor1", "factor2", ...]
-}`;
+  "stopLossPercent": number (optional, suggested stop loss level),
+  "takeProfitPercent": number (optional, suggested take profit level),
+  "keyFactors": ["specific factor 1", "specific factor 2", ...] (list 5-8 specific factors that influenced your decision)
+}
+
+Be thorough, analytical, and CONSERVATIVE. Quality analysis over quick decisions.`;
 
   const response = await client.chat.completions.create({
     model: model,
     messages: [
       {
         role: "system",
-        content: "You are an AGGRESSIVE meme coin trading expert focused on MAXIMIZING PROFITS. You specialize in identifying LOW MARKET CAP tokens with HIGH GROWTH POTENTIAL on Solana PumpFun. You're decisive, fast-moving, and profit-focused while being aware of rug pull risks. Always respond with valid JSON.",
+        content: "You are a CONSERVATIVE cryptocurrency trading analyst focused on HIGH-PROBABILITY trades through comprehensive analysis. You specialize in identifying quality tokens with strong fundamentals and sustainable growth potential on Solana. You perform detailed, multi-dimensional analysis covering fundamentals, technicals, market conditions, and risk factors. You're thorough, analytical, and selective - preferring to pass on mediocre opportunities to wait for high-quality setups. Always respond with valid JSON containing detailed reasoning.",
       },
       {
         role: "user",
@@ -356,8 +419,8 @@ Provide your analysis in JSON format with these exact fields:
       },
     ],
     response_format: { type: "json_object" },
-    temperature: 0.8,
-    max_tokens: 1000,
+    temperature: 0.3, // Lower temperature for more consistent, analytical responses
+    max_tokens: 2000, // Increased for more detailed analysis
   });
 
   const analysisText = response.choices[0].message.content;
