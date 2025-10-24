@@ -31,14 +31,17 @@ A dedicated scheduler service automates buyback execution using `node-cron`. It 
 #### AI Trading Bot (Standalone)
 This bot operates independently, with configurations stored in a dedicated `aiBotConfigs` table. It uses a "hive mind" system where 6 AI models vote on trades.
 
-**100% AI & Hivemind Control Strategy:**
+**STRICT WEALTH-GROWING APPROACH (Capital Preservation Priority):**
 - **Unlimited Trading:** No daily trade limits - trades based purely on AI confidence, available balance, and portfolio concentration.
 - **AI-Driven Exits:** All sell decisions made by AI analysis and hivemind strategy - no fixed profit targets.
-- Focuses on high-probability trades with strict quality filters (50%+ organic score, 40%+ quality, $15k+ volume, $8k+ liquidity).
-- Employs small position sizes (0.02-0.04 SOL) for capital preservation and compounding.
-- Utilizes higher confidence thresholds (65-80%) across all market conditions.
-- Becomes aggressive only when AI confidence is ≥85%.
-- Implements comprehensive portfolio analysis to ensure diversification, with a 25% maximum concentration limit per position.
+- **Conservative Position Sizing:** Base position 0.02 SOL (max 0.03 SOL even with 85%+ AI confidence) for capital preservation and compounding.
+- **High Confidence Requirements:** Minimum 75% AI confidence threshold across all market conditions (raised from 68% for stricter filtering).
+- **Enhanced Quality Filters:** 60%+ organic score (wash trading protection), 50%+ quality score, $15k+ volume, $15k+ liquidity (strengthened from 50%/40%/$8k).
+- **Aggressive Only When Exceptional:** Only increases aggression when AI confidence ≥85%.
+- **Portfolio Diversification:** 25% maximum concentration limit per position to prevent over-exposure.
+- **Stop-Loss Protection:** Automatically sells positions at -30% loss to prevent catastrophic drawdowns (emergency capital preservation).
+- **Portfolio Drawdown Circuit Breaker:** Pauses ALL new trading if portfolio drops >20% from peak value, resumes when recovering to -15% from peak (prevents cascading losses).
+- **Faster Exit Threshold:** AI sell confidence raised from 40% to 50% for quicker exits when momentum weakens.
 
 **Token Discovery (4 Sources):**
 - **DexScreener Trending:** Scans trending Solana tokens across all DEXes with advanced organic volume detection and wash trading filters.
@@ -49,12 +52,19 @@ This bot operates independently, with configurations stored in a dedicated `aiBo
 
 The bot executes unlimited trades via Jupiter Ultra API when conditions are met and within budget, dynamically sizing trades based on AI confidence and wallet balance. It includes intelligent position re-buy logic with a maximum of two re-buys per position, triggered by price drops and increased AI confidence.
 
-**Sell Decision Framework:**
+**Sell Decision Framework (AI-Driven + Safety Overrides):**
 - AI continuously monitors all positions (every 2.5 minutes via Cerebras).
-- Sells when AI confidence drops below threshold (default 40%).
+- **Automatic Stop-Loss Override:** Immediately sells at -30% loss regardless of AI recommendation (prevents catastrophic losses).
+- Sells when AI confidence drops below 50% threshold (raised from 40% for faster capital preservation).
 - Sells when AI explicitly recommends SELL based on market analysis.
-- Holds when AI recommends HOLD, regardless of current profit level.
+- Holds when AI recommends HOLD and position is above stop-loss threshold.
 - No fixed profit targets - AI analyzes momentum, liquidity, buy pressure, and trend data to optimize exits.
+
+**Portfolio-Wide Risk Management:**
+- **Peak Tracking:** System tracks all-time portfolio peak value in database.
+- **Drawdown Monitoring:** Warns at -10% from peak, pauses trading at -20% from peak.
+- **Automatic Recovery:** Resumes trading when portfolio recovers to -15% from peak.
+- **Multi-Layer Protection:** Stop-loss (-30%) + AI exits (50% confidence) + drawdown circuit breaker (-20% portfolio-wide).
 
 ### Data Storage
 PostgreSQL, accessed via Neon's serverless driver and Drizzle ORM, handles data persistence. Key tables include `Projects`, `Transactions`, `Payments`, `ProjectSecrets` (encrypted keys), and `AIBotConfigs`. UUID primary keys, decimal types for balances, and automatic timestamps are standard.
