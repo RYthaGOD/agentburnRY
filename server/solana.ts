@@ -276,6 +276,43 @@ export async function verifyTransactionSignature(signature: string): Promise<boo
 }
 
 /**
+ * Get all SPL token accounts for a wallet
+ */
+export async function getAllTokenAccounts(walletAddress: string): Promise<any[]> {
+  try {
+    const response = await fetch(SOLANA_RPC_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getTokenAccountsByOwner",
+        params: [
+          walletAddress,
+          {
+            programId: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", // SPL Token Program
+          },
+          {
+            encoding: "jsonParsed",
+          },
+        ],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(`Failed to get token accounts: ${data.error.message}`);
+    }
+
+    return data.result.value || [];
+  } catch (error) {
+    console.error("Error getting token accounts:", error);
+    throw error;
+  }
+}
+
+/**
  * Check if a wallet address is valid using PublicKey validation
  * This is more robust than regex-based validation
  */

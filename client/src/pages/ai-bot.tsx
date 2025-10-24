@@ -100,16 +100,38 @@ export default function AIBot() {
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
+  // Fetch wallet holdings analysis (real blockchain data)
+  const { data: holdings, isLoading: isLoadingHoldings } = useQuery<{
+    solBalance: number;
+    totalValueSOL: number;
+    solPercentage: number;
+    holdings: Array<{
+      mint: string;
+      balance: number;
+      priceSOL: number;
+      valueSOL: number;
+      decimals: number;
+    }>;
+    holdingCount: number;
+    largestTokenPercentage: number;
+    diversificationScore: number;
+  }>({
+    queryKey: ["/api/ai-bot/holdings", publicKey?.toString()],
+    enabled: connected && !!publicKey,
+    refetchInterval: 60000, // Refetch every 60 seconds
+  });
+
   const isEnabled = aiConfig?.enabled || false;
   const budgetUsed = parseFloat(aiConfig?.budgetUsed || "0");
   const totalBudget = parseFloat(aiConfig?.totalBudget || "0");
   const remainingBudget = totalBudget - budgetUsed;
   
-  // Autonomous capital calculations
-  const portfolioValue = totalBudget; // This is actually portfolio value now
-  const capitalInPositions = budgetUsed;
+  // Autonomous capital calculations using REAL wallet data
+  const portfolioValue = holdings?.totalValueSOL || 0; // Real total value from blockchain
+  const walletSOL = holdings?.solBalance || 0; // Real SOL balance
+  const capitalInPositions = budgetUsed; // Active AI bot trades
   const feeReserve = 0.01;
-  const availableCapital = Math.max(0, portfolioValue - feeReserve - capitalInPositions);
+  const availableCapital = Math.max(0, walletSOL - feeReserve - capitalInPositions);
   
   // Dynamic position sizing calculations (10% base, up to 15% with high confidence)
   const basePositionSize = portfolioValue * 0.10;
@@ -524,6 +546,93 @@ export default function AIBot() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Real Wallet Holdings Breakdown */}
+      {holdings && holdings.holdingCount > 0 && (
+        <Card className="border-green-500/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-green-500" />
+              Wallet Holdings Analysis
+            </CardTitle>
+            <CardDescription>
+              Real-time token positions from Solana blockchain
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Portfolio Composition */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-lg bg-muted/30">
+                <div className="text-xs font-medium text-muted-foreground">SOL Holdings</div>
+                <div className="text-lg font-bold">{walletSOL.toFixed(4)} SOL</div>
+                <div className="text-xs text-muted-foreground mt-1">{holdings.solPercentage.toFixed(1)}% of portfolio</div>
+              </div>
+              
+              <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="text-xs font-medium text-green-500">Token Holdings</div>
+                <div className="text-lg font-bold">{holdings.holdingCount} Tokens</div>
+                <div className="text-xs text-muted-foreground mt-1">{(100 - holdings.solPercentage).toFixed(1)}% of portfolio</div>
+              </div>
+              
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <div className="text-xs font-medium text-blue-500">Diversification</div>
+                <div className="text-lg font-bold">{holdings.diversificationScore.toFixed(0)}/100</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {holdings.diversificationScore > 70 ? 'Well diversified' : holdings.diversificationScore > 40 ? 'Moderate' : 'Concentrated'}
+                </div>
+              </div>
+              
+              <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <div className="text-xs font-medium text-orange-500">Largest Position</div>
+                <div className="text-lg font-bold">{holdings.largestTokenPercentage.toFixed(1)}%</div>
+                <div className="text-xs text-muted-foreground mt-1">Of total value</div>
+              </div>
+            </div>
+
+            {/* Top Holdings Table */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Top Token Holdings</h3>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {holdings.holdings.slice(0, 10).map((holding, index) => (
+                  <div 
+                    key={holding.mint}
+                    className="p-3 rounded-lg bg-muted/30 border hover-elevate"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">#{index + 1}</Badge>
+                          <span className="text-sm font-mono text-muted-foreground">
+                            {holding.mint.substring(0, 8)}...{holding.mint.substring(holding.mint.length - 6)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Balance: {holding.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold">
+                          {holding.valueSOL > 0 ? `${holding.valueSOL.toFixed(6)} SOL` : 'No price'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {holding.valueSOL > 0 && portfolioValue > 0 
+                            ? `${((holding.valueSOL / portfolioValue) * 100).toFixed(2)}%`
+                            : '-'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {holdings.holdingCount > 10 && (
+                <div className="text-xs text-center text-muted-foreground pt-2">
+                  ... and {holdings.holdingCount - 10} more tokens
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Bot Control & Status */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

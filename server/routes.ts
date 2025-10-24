@@ -959,6 +959,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get wallet holdings analysis (SOL + all SPL tokens)
+  app.get("/api/ai-bot/holdings/:ownerWalletAddress", async (req, res) => {
+    try {
+      const { getAllTokenAccounts, getWalletBalance } = await import("./solana");
+      const { getTokenPrice } = await import("./jupiter");
+      const walletAddress = req.params.ownerWalletAddress;
+
+      // Get SOL balance
+      const solBalance = await getWalletBalance(walletAddress);
+
+      // Get all SPL token accounts
+      const tokenAccounts = await getAllTokenAccounts(walletAddress);
+
+      // Process token holdings and collect mints for batch price fetching
+      const tokenData = [];
+      
+      for (const account of tokenAccounts) {
+        try {
+          const parsedData = account.account.data.parsed.info;
+          const mint = parsedData.mint;
+          const balance = parsedData.tokenAmount.uiAmount;
+
+          // Skip zero balance tokens
+          if (balance === 0 || balance === null) continue;
+
+          tokenData.push({
+            mint,
+            balance,
+            decimals: parsedData.tokenAmount.decimals,
+          });
+        } catch (tokenError) {
+          console.error(`[Holdings] Error processing token:`, tokenError);
+        }
+      }
+
+      // Fetch all token prices in parallel (batch processing)
+      const pricePromises = tokenData.map(async (token) => {
+        try {
+          const priceSOL = await getTokenPrice(token.mint);
+          return {
+            ...token,
+            priceSOL,
+            valueSOL: token.balance * priceSOL,
+          };
+        } catch (priceError) {
+          // Price not available - token might not be traded
+          console.log(`[Holdings] No price data for token ${token.mint.substring(0, 8)}...`);
+          return {
+            ...token,
+            priceSOL: 0,
+            valueSOL: 0,
+          };
+        }
+      });
+
+      const holdings = await Promise.all(pricePromises);
+
+      // Calculate total token value (only count tokens with known prices)
+      const totalTokenValueSOL = holdings.reduce((sum, h) => sum + h.valueSOL, 0);
+      const totalValueSOL = solBalance + totalTokenValueSOL;
+
+      // Sort by value (highest first)
+      holdings.sort((a, b) => b.valueSOL - a.valueSOL);
+
+      // Calculate portfolio metrics
+      const solPercentage = totalValueSOL > 0 ? (solBalance / totalValueSOL) * 100 : 100;
+      const largestTokenValue = holdings.length > 0 ? holdings[0].valueSOL : 0;
+      const largestTokenPercentage = totalValueSOL > 0 ? (largestTokenValue / totalValueSOL) * 100 : 0;
+      
+      // Calculate diversification score (0-100)
+      // Considers concentration of largest position (whether SOL or token)
+      const largestPositionPercentage = Math.max(solPercentage, largestTokenPercentage);
+      const diversificationScore = Math.min(100, Math.max(0, 100 - largestPositionPercentage));
+
+      res.json({
+        solBalance,
+        totalValueSOL,
+        solPercentage,
+        holdings,
+        holdingCount: holdings.length,
+        largestTokenPercentage,
+        diversificationScore,
+      });
+    } catch (error: any) {
+      console.error("Error fetching wallet holdings:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Manual execution of standalone AI bot (no project required)
   app.post("/api/ai-bot/execute", authRateLimit, async (req, res) => {
     try {
