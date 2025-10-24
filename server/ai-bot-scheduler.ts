@@ -1296,16 +1296,67 @@ async function executeQuickTrade(
       }
     }
 
+    // Analyze complete wallet portfolio for accurate allocation decisions
+    console.log(`[Quick Scan] 📊 Analyzing wallet portfolio for allocation strategy...`);
+    const portfolio = await analyzePortfolio(treasuryPublicKey, actualBalance);
+    
+    console.log(`[Quick Scan] 💼 Portfolio: ${portfolio.totalValueSOL.toFixed(4)} SOL total, ${portfolio.holdingCount} positions, largest ${portfolio.largestPosition.toFixed(1)}%`);
+
     // Calculate dynamic trade amount based on AI confidence (using refreshed balance if rewards were claimed)
     const baseAmount = parseFloat(config.budgetPerTrade || "0");
-    const tradeAmount = calculateDynamicTradeAmount(baseAmount, analysis.confidence, availableBalance);
+    let tradeAmount = calculateDynamicTradeAmount(baseAmount, analysis.confidence, availableBalance);
 
     if (tradeAmount <= 0) {
       console.log(`[Quick Scan] Insufficient funds for trade after all attempts (available: ${availableBalance.toFixed(4)} SOL)`);
       return;
     }
 
-    console.log(`[Quick Scan] Dynamic trade amount: ${tradeAmount.toFixed(4)} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
+    // PORTFOLIO CONCENTRATION CHECK: Prevent over-allocation
+    // Max 25% of portfolio in any single position for diversification
+    const MAX_POSITION_PERCENT = 25;
+    
+    // Skip concentration check if portfolio value is negligible
+    if (portfolio.totalValueSOL > 0.001) {
+      // Check if this token is already in portfolio
+      const existingHolding = portfolio.holdings.find(h => h.mint === token.mint);
+      const currentValueSOL = existingHolding ? existingHolding.valueSOL : 0;
+      
+      // Calculate post-trade allocation
+      // IMPORTANT: Portfolio total stays roughly constant (SOL → tokens swap)
+      // Post-trade position = current token value + new tokens bought with SOL
+      // Post-trade portfolio = same total (just reallocated from SOL to tokens)
+      const postTradePositionValue = currentValueSOL + tradeAmount;
+      const postTradePercent = (postTradePositionValue / portfolio.totalValueSOL) * 100;
+      
+      if (postTradePercent > MAX_POSITION_PERCENT) {
+        // Calculate max allowed trade to stay at exactly 25%
+        // maxTrade = targetPercent * portfolioTotal - currentValue
+        const maxAllowedSOL = (MAX_POSITION_PERCENT / 100 * portfolio.totalValueSOL) - currentValueSOL;
+        
+        if (maxAllowedSOL <= 0.001) {
+          const currentPercent = (currentValueSOL / portfolio.totalValueSOL) * 100;
+          console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol}: Position would exceed ${MAX_POSITION_PERCENT}% concentration limit (current: ${currentPercent.toFixed(1)}%)`);
+          return;
+        }
+        
+        // Reduce trade size to stay under limit and cap at available balance
+        tradeAmount = Math.min(tradeAmount, maxAllowedSOL, availableBalance);
+        
+        // Recalculate actual post-trade percentage after resizing
+        const actualPostTradeValue = currentValueSOL + tradeAmount;
+        const actualPostTradePercent = (actualPostTradeValue / portfolio.totalValueSOL) * 100;
+        
+        console.log(`[Quick Scan] ⚖️ Position size reduced to ${tradeAmount.toFixed(4)} SOL to maintain diversification (will be ${actualPostTradePercent.toFixed(1)}% of portfolio)`);
+      }
+    }
+
+    // Calculate final projected allocation for logging
+    const existingHoldingFinal = portfolio.holdings.find(h => h.mint === token.mint);
+    const currentValueSOLFinal = existingHoldingFinal ? existingHoldingFinal.valueSOL : 0;
+    const finalPostTradeValue = currentValueSOLFinal + tradeAmount;
+    const finalProjectedPercent = portfolio.totalValueSOL > 0.001 ? (finalPostTradeValue / portfolio.totalValueSOL) * 100 : 0;
+
+    console.log(`[Quick Scan] Dynamic trade amount: ${tradeAmount.toFixed(4)} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%, will be ${finalProjectedPercent.toFixed(1)}% of portfolio)`);
 
     // Check if we already hold this token (using pre-fetched positions)
     const existingPosition = existingPositions.find(p => p.tokenMint === token.mint);
@@ -1922,35 +1973,54 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         // PORTFOLIO CONCENTRATION CHECK: Prevent over-allocation
         // Max 25% of portfolio in any single position for diversification
         const MAX_POSITION_PERCENT = 25;
-        const projectedValueSOL = tradeAmount; // Value of new position
-        const projectedPercent = (projectedValueSOL / portfolio.totalValueSOL) * 100;
         
-        // Check if this token is already in portfolio
-        const existingHolding = portfolio.holdings.find(h => h.mint === token.mint);
-        const currentPercent = existingHolding ? existingHolding.percentOfPortfolio : 0;
-        const totalPercent = currentPercent + projectedPercent;
-        
-        if (totalPercent > MAX_POSITION_PERCENT) {
-          // Calculate max allowed trade to stay under 25%
-          const maxAllowedPercent = MAX_POSITION_PERCENT - currentPercent;
-          const maxAllowedSOL = (maxAllowedPercent / 100) * portfolio.totalValueSOL;
+        // Skip concentration check if portfolio value is negligible
+        if (portfolio.totalValueSOL > 0.001) {
+          // Check if this token is already in portfolio
+          const existingHolding = portfolio.holdings.find(h => h.mint === token.mint);
+          const currentValueSOL = existingHolding ? existingHolding.valueSOL : 0;
           
-          if (maxAllowedSOL <= 0.001) {
-            addLog(`⏭️ SKIP ${token.symbol}: Position would exceed ${MAX_POSITION_PERCENT}% concentration limit (current: ${currentPercent.toFixed(1)}%)`, "warning");
-            continue;
+          // Calculate post-trade allocation
+          // IMPORTANT: Portfolio total stays roughly constant (SOL → tokens swap)
+          // Post-trade position = current token value + new tokens bought with SOL
+          // Post-trade portfolio = same total (just reallocated from SOL to tokens)
+          const postTradePositionValue = currentValueSOL + tradeAmount;
+          const postTradePercent = (postTradePositionValue / portfolio.totalValueSOL) * 100;
+          
+          if (postTradePercent > MAX_POSITION_PERCENT) {
+            // Calculate max allowed trade to stay at exactly 25%
+            // maxTrade = targetPercent * portfolioTotal - currentValue
+            const maxAllowedSOL = (MAX_POSITION_PERCENT / 100 * portfolio.totalValueSOL) - currentValueSOL;
+            
+            if (maxAllowedSOL <= 0.001) {
+              const currentPercent = (currentValueSOL / portfolio.totalValueSOL) * 100;
+              addLog(`⏭️ SKIP ${token.symbol}: Position would exceed ${MAX_POSITION_PERCENT}% concentration limit (current: ${currentPercent.toFixed(1)}%)`, "warning");
+              continue;
+            }
+            
+            // Reduce trade size to stay under limit and cap at available balance
+            tradeAmount = Math.min(tradeAmount, maxAllowedSOL, availableBalance);
+            
+            // Recalculate actual post-trade percentage after resizing
+            const actualPostTradeValue = currentValueSOL + tradeAmount;
+            const actualPostTradePercent = (actualPostTradeValue / portfolio.totalValueSOL) * 100;
+            
+            addLog(`⚖️ Position size reduced to ${tradeAmount.toFixed(4)} SOL to maintain diversification (will be ${actualPostTradePercent.toFixed(1)}% of portfolio)`, "warning");
           }
-          
-          // Reduce trade size to stay under limit
-          tradeAmount = Math.min(tradeAmount, maxAllowedSOL);
-          addLog(`⚖️ Position size reduced to ${tradeAmount.toFixed(4)} SOL to maintain diversification (<${MAX_POSITION_PERCENT}% per position)`, "warning");
         }
 
-        addLog(`🚀 BUY SIGNAL: ${token.symbol} - ${tradeAmount.toFixed(4)} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%, multiplier: ${(tradeAmount / budgetPerTrade).toFixed(2)}x)`, "success", {
+        // Calculate final projected allocation for logging
+        const existingHolding = portfolio.holdings.find(h => h.mint === token.mint);
+        const currentValueSOL = existingHolding ? existingHolding.valueSOL : 0;
+        const finalPostTradeValue = currentValueSOL + tradeAmount;
+        const finalProjectedPercent = portfolio.totalValueSOL > 0.001 ? (finalPostTradeValue / portfolio.totalValueSOL) * 100 : 0;
+
+        addLog(`🚀 BUY SIGNAL: ${token.symbol} - ${tradeAmount.toFixed(4)} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%, will be ${finalProjectedPercent.toFixed(1)}% of portfolio)`, "success", {
           symbol: token.symbol,
           amount: tradeAmount,
           confidence: analysis.confidence,
           reasoning: analysis.reasoning,
-          portfolioAllocation: `${projectedPercent.toFixed(1)}% of portfolio`,
+          portfolioAllocation: `${finalProjectedPercent.toFixed(1)}% of portfolio`,
         });
 
         // Check if we already hold this token (using pre-fetched positions)
