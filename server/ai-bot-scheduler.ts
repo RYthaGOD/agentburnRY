@@ -1039,30 +1039,50 @@ async function runQuickTechnicalScan() {
           aiBotStates.set(config.ownerWalletAddress, botState);
         }
 
-        // Check daily trade limit
-        const maxDailyTrades = config.maxDailyTrades || 10;
-        if (botState.dailyTradesExecuted >= maxDailyTrades) {
-          console.log(`[Quick Scan] Daily trade limit reached for ${config.ownerWalletAddress.slice(0, 8)}...`);
+        // Get hivemind strategy (required for 100% autonomous operation)
+        const { getLatestStrategy } = await import("./hivemind-strategy");
+        const activeStrategy = await getLatestStrategy(config.ownerWalletAddress);
+        
+        if (!activeStrategy) {
+          console.log(`[Quick Scan] No hivemind strategy for ${config.ownerWalletAddress.slice(0, 8)}... (will be generated on next deep scan)`);
           continue;
         }
 
-        // Get cached tokens (no API call if cache is fresh)
+        // Hivemind controls all parameters
+        const maxDailyTrades = activeStrategy.maxDailyTrades;
+        const minVolumeUSD = activeStrategy.minVolumeUSD;
+        const minLiquidityUSD = activeStrategy.minLiquidityUSD;
+        const minOrganicScore = activeStrategy.minOrganicScore;
+        const minQualityScore = activeStrategy.minQualityScore;
+        const minTransactions24h = activeStrategy.minTransactions24h;
+        const budgetPerTrade = activeStrategy.budgetPerTrade;
+        const riskLevel = activeStrategy.riskLevel;
+        const minConfidenceThreshold = activeStrategy.minConfidenceThreshold / 100; // Convert to 0-1
+
+        // Check daily trade limit
+        if (botState.dailyTradesExecuted >= maxDailyTrades) {
+          console.log(`[Quick Scan] Daily trade limit reached for ${config.ownerWalletAddress.slice(0, 8)}... (${maxDailyTrades} max)`);
+          continue;
+        }
+
+        console.log(`[Quick Scan] 🧠 Hivemind: ${activeStrategy.marketSentiment} market, ${riskLevel} risk, ${maxDailyTrades} trades/day`);
+
+        // Get cached tokens with hivemind filters
         const tokens = await getCachedOrFetchTokens({
-          minOrganicScore: config.minOrganicScore || 40,
-          minQualityScore: config.minQualityScore || 30,
-          minLiquidityUSD: parseFloat(config.minLiquidityUSD || "5000"),
-          minTransactions24h: config.minTransactions24h || 20,
+          minOrganicScore,
+          minQualityScore,
+          minLiquidityUSD,
+          minTransactions24h,
         });
         
-        const minVolumeUSD = parseFloat(config.minVolumeUSD || "500");
         const filteredTokens = tokens.filter((t) => t.volumeUSD24h >= minVolumeUSD);
         
-        // Quick technical filters
+        // Quick technical filters with hivemind liquidity threshold
         const opportunities = filteredTokens.filter(token => {
           const has1hMomentum = (token.priceChange1h ?? 0) > 0;
           const has24hMomentum = (token.priceChange24h ?? 0) > 0;
           const hasVolume = token.volumeUSD24h >= minVolumeUSD;
-          const hasLiquidity = (token.liquidityUSD ?? 0) >= parseFloat(config.minLiquidityUSD || "5000");
+          const hasLiquidity = (token.liquidityUSD ?? 0) >= minLiquidityUSD;
           return has1hMomentum && has24hMomentum && hasVolume && hasLiquidity;
         });
         
@@ -1082,20 +1102,22 @@ async function runQuickTechnicalScan() {
           console.log(`[Quick Scan] 🧠 Analyzing top ${topOpportunities.length} with Cerebras (free, fast)...`);
 
           for (const token of topOpportunities) {
-            // Quick Cerebras-only analysis for 75%+ confidence trades
+            // Quick Cerebras-only analysis for high confidence trades
+            const riskTolerance = riskLevel === "aggressive" ? "high" : riskLevel === "conservative" ? "low" : "medium";
             const quickAnalysis = await analyzeTokenWithCerebrasOnly(
               token,
-              (config.riskTolerance || "medium") as "low" | "medium" | "high",
-              parseFloat(config.budgetPerTrade || "0")
+              riskTolerance,
+              budgetPerTrade
             );
 
-            if (quickAnalysis.action === "buy" && quickAnalysis.confidence >= 0.75) {
-              console.log(`[Quick Scan] 🚀 HIGH QUALITY: ${token.symbol} - ${(quickAnalysis.confidence * 100).toFixed(1)}% confidence (>= 75% threshold)`);
+            // Use hivemind confidence threshold for quick trades
+            if (quickAnalysis.action === "buy" && quickAnalysis.confidence >= minConfidenceThreshold) {
+              console.log(`[Quick Scan] 🚀 HIGH QUALITY: ${token.symbol} - ${(quickAnalysis.confidence * 100).toFixed(1)}% confidence (>= ${(minConfidenceThreshold * 100).toFixed(0)}% hivemind threshold)`);
               
               // Execute trade immediately - don't wait for deep scan!
               await executeQuickTrade(config, token, quickAnalysis, botState, existingPositions);
             } else {
-              console.log(`[Quick Scan] ⏭️ ${token.symbol}: ${quickAnalysis.action.toUpperCase()} ${(quickAnalysis.confidence * 100).toFixed(1)}% (below 75% threshold, will re-analyze in deep scan)`);
+              console.log(`[Quick Scan] ⏭️ ${token.symbol}: ${quickAnalysis.action.toUpperCase()} ${(quickAnalysis.confidence * 100).toFixed(1)}% (below ${(minConfidenceThreshold * 100).toFixed(0)}% hivemind threshold, will re-analyze in deep scan)`);
             }
           }
         }
@@ -1613,13 +1635,6 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
       aiBotStates.set(ownerWalletAddress, botState);
     }
 
-    // Check daily trade limit
-    const maxDailyTrades = config.maxDailyTrades || 10;
-    if (botState.dailyTradesExecuted >= maxDailyTrades) {
-      addLog(`[Standalone AI Bot] Daily trade limit reached (${maxDailyTrades})`, "warning");
-      return logs;
-    }
-
     // Get wallet keypair from encrypted key in config
     if (!config.treasuryKeyCiphertext || !config.treasuryKeyIv || !config.treasuryKeyAuthTag) {
       addLog(`[Standalone AI Bot] No treasury key configured for wallet ${ownerWalletAddress}`, "error");
@@ -1667,6 +1682,34 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
 
     addLog(`💰 Budget status: ${budgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used`, "success");
 
+    // Get active hivemind strategy FIRST (REQUIRED - hivemind controls 100%)
+    const { getLatestStrategy } = await import("./hivemind-strategy");
+    const activeStrategy = await getLatestStrategy(ownerWalletAddress);
+    
+    if (!activeStrategy) {
+      addLog(`❌ No hivemind strategy available yet. Strategy will be generated on next deep scan cycle.`, "error");
+      return logs;
+    }
+    
+    // Hivemind controls ALL parameters
+    const minConfidenceThreshold = activeStrategy.minConfidenceThreshold;
+    const minPotentialPercent = activeStrategy.minPotentialPercent;
+    const budgetPerTrade = activeStrategy.budgetPerTrade;
+    const minVolumeUSD = activeStrategy.minVolumeUSD;
+    const minLiquidityUSD = activeStrategy.minLiquidityUSD;
+    const minOrganicScore = activeStrategy.minOrganicScore;
+    const minQualityScore = activeStrategy.minQualityScore;
+    const minTransactions24h = activeStrategy.minTransactions24h;
+    const riskLevel = activeStrategy.riskLevel;
+    const maxDailyTrades = activeStrategy.maxDailyTrades;
+    
+    addLog(`🧠 Hivemind Strategy Active: ${activeStrategy.marketSentiment} market, ${riskLevel} risk`, "success");
+    addLog(`   Confidence: ${minConfidenceThreshold}%, Upside: ${minPotentialPercent}%, Trade: ${budgetPerTrade.toFixed(3)} SOL`, "info");
+    addLog(`   Volume: $${minVolumeUSD.toLocaleString()}, Liquidity: $${minLiquidityUSD.toLocaleString()}`, "info");
+    
+    // Map risk level to tolerance
+    const riskTolerance = riskLevel === "aggressive" ? "high" : riskLevel === "conservative" ? "low" : "medium";
+
     // Fetch all existing positions once (optimization: avoid repeated database queries)
     const allExistingPositions = await storage.getAIBotPositions(ownerWalletAddress);
     addLog(`📊 Currently holding ${allExistingPositions.length} active positions`, "info");
@@ -1689,33 +1732,6 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
     }
 
     addLog(`🔍 Analyzing ${filteredTokens.length} tokens with AI (Groq Llama 3.3-70B)...`, "info");
-
-    // Get active hivemind strategy (REQUIRED - hivemind controls 100%)
-    const { getLatestStrategy } = await import("./hivemind-strategy");
-    const activeStrategy = await getLatestStrategy(ownerWalletAddress);
-    
-    if (!activeStrategy) {
-      addLog(`❌ No hivemind strategy available yet. Strategy will be generated on next deep scan cycle.`, "error");
-      return logs;
-    }
-    
-    // Hivemind controls ALL parameters
-    const minConfidenceThreshold = activeStrategy.minConfidenceThreshold;
-    const minPotentialPercent = activeStrategy.minPotentialPercent;
-    const budgetPerTrade = activeStrategy.budgetPerTrade;
-    const minVolumeUSD = activeStrategy.minVolumeUSD;
-    const minLiquidityUSD = activeStrategy.minLiquidityUSD;
-    const minOrganicScore = activeStrategy.minOrganicScore;
-    const minQualityScore = activeStrategy.minQualityScore;
-    const minTransactions24h = activeStrategy.minTransactions24h;
-    const riskLevel = activeStrategy.riskLevel;
-    
-    addLog(`🧠 Hivemind Strategy Active: ${activeStrategy.marketSentiment} market, ${riskLevel} risk`, "success");
-    addLog(`   Confidence: ${minConfidenceThreshold}%, Upside: ${minPotentialPercent}%, Trade: ${budgetPerTrade.toFixed(3)} SOL`, "info");
-    addLog(`   Volume: $${minVolumeUSD.toLocaleString()}, Liquidity: $${minLiquidityUSD.toLocaleString()}`, "info");
-    
-    // Map risk level to tolerance
-    const riskTolerance = riskLevel === "aggressive" ? "high" : riskLevel === "conservative" ? "low" : "medium";
     
     for (let i = 0; i < filteredTokens.length; i++) {
       const token = filteredTokens[i];
