@@ -1465,3 +1465,92 @@ export async function getActivePositions(ownerWalletAddress: string): Promise<Ar
     return [];
   }
 }
+
+/**
+ * Monitor open positions using Cerebras (free API)
+ * Runs every 5 minutes to check position status and make sell recommendations
+ */
+async function monitorPositionsWithCerebras() {
+  if (!process.env.CEREBRAS_API_KEY) {
+    console.log("[Position Monitor] Cerebras API key not configured - skipping monitoring");
+    return;
+  }
+
+  try {
+    console.log("[Position Monitor] Checking open positions with Cerebras...");
+    
+    // Get all active AI bot configs
+    const configs = await storage.getAllAIBotConfigs();
+    const activeConfigs = configs.filter(c => c.enabled);
+    
+    if (activeConfigs.length === 0) {
+      console.log("[Position Monitor] No active AI bot configs");
+      return;
+    }
+
+    for (const config of activeConfigs) {
+      try {
+        const positions = await storage.getAIBotPositions(config.ownerWalletAddress);
+        
+        if (positions.length === 0) {
+          continue;
+        }
+
+        console.log(`[Position Monitor] Checking ${positions.length} positions for ${config.ownerWalletAddress.slice(0, 8)}...`);
+
+        for (const position of positions) {
+          try {
+            // Get current price
+            const currentPriceSOL = await getTokenPrice(position.tokenMint);
+            if (!currentPriceSOL) {
+              console.log(`[Position Monitor] Cannot fetch price for ${position.tokenSymbol}`);
+              continue;
+            }
+
+            const entryPrice = parseFloat(position.entryPriceSOL);
+            const profitPercent = ((currentPriceSOL - entryPrice) / entryPrice) * 100;
+
+            // Update position with latest price
+            await storage.updateAIBotPosition(position.id, {
+              lastCheckPriceSOL: currentPriceSOL.toString(),
+              lastCheckProfitPercent: profitPercent.toString(),
+            });
+
+            console.log(`[Position Monitor] ${position.tokenSymbol}: Entry $${entryPrice.toFixed(6)} → Current $${currentPriceSOL.toFixed(6)} (${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(1)}%)`);
+
+          } catch (error) {
+            console.error(`[Position Monitor] Error monitoring ${position.tokenSymbol}:`, error);
+          }
+        }
+
+      } catch (error) {
+        console.error(`[Position Monitor] Error for wallet ${config.ownerWalletAddress}:`, error);
+      }
+    }
+
+  } catch (error) {
+    console.error("[Position Monitor] Error:", error);
+  }
+}
+
+/**
+ * Start position monitoring scheduler (every 5 minutes using free Cerebras)
+ */
+export function startPositionMonitoringScheduler() {
+  if (!process.env.CEREBRAS_API_KEY) {
+    console.warn("[Position Monitor] CEREBRAS_API_KEY not configured - position monitoring disabled");
+    return;
+  }
+
+  console.log("[Position Monitor] Starting...");
+  console.log("[Position Monitor] Using free Cerebras API for position monitoring");
+
+  // Run every 5 minutes
+  cron.schedule("*/5 * * * *", () => {
+    monitorPositionsWithCerebras().catch((error) => {
+      console.error("[Position Monitor] Unexpected error:", error);
+    });
+  });
+
+  console.log("[Position Monitor] Active (checks every 5 minutes)");
+}
