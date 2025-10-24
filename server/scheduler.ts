@@ -311,7 +311,9 @@ class BuybackScheduler {
         project.treasuryWalletAddress
       );
 
-      const tokenAmount = swapOrder.outputAmount / 1e9; // Assuming 9 decimals
+      // Use actual token decimals from project config
+      const decimals = project.tokenDecimals || 9;
+      const tokenAmount = swapOrder.outputAmount / (10 ** decimals);
 
       console.log(`Order received: ${buybackAmountSOL} SOL → ${tokenAmount} tokens`);
       console.log(`Swap type: ${swapOrder.swapType}`);
@@ -351,11 +353,10 @@ class BuybackScheduler {
               project.treasuryWalletAddress
             );
             
-            console.log(`1. Executing swap: ${actualBuybackAmount} SOL → ${swapOrderAfterFee.outputAmount / 1e9} tokens`);
+            // Use actual token decimals for accurate calculation
+            const actualTokenAmount = swapOrderAfterFee.outputAmount / (10 ** decimals);
+            console.log(`1. Executing swap: ${actualBuybackAmount} SOL → ${actualTokenAmount} tokens`);
             const swapResult = await executeSwapOrder(swapOrderAfterFee, treasuryPrivateKey);
-            
-            // Update tokenAmount for burn
-            const actualTokenAmount = swapOrderAfterFee.outputAmount / 1e9;
             
             console.log(`   Swap completed: ${swapResult.transactionId}`);
             
