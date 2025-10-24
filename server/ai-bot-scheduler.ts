@@ -2517,10 +2517,12 @@ Respond in JSON format:
  */
 export async function getActivePositions(ownerWalletAddress: string): Promise<Array<{
   mint: string;
+  tokenSymbol: string;
   entryPriceSOL: number;
   amountSOL: number;
   currentPriceSOL: number;
   profitPercent: number;
+  aiConfidenceAtBuy: number;
 }>> {
   try {
     // Read positions from database (persisted across restarts)
@@ -2543,20 +2545,24 @@ export async function getActivePositions(ownerWalletAddress: string): Promise<Ar
 
         positions.push({
           mint: position.tokenMint,
+          tokenSymbol: position.tokenSymbol,
           entryPriceSOL: entryPrice,
           amountSOL: parseFloat(position.amountSOL),
           currentPriceSOL: currentPriceSOL || 0,
           profitPercent,
+          aiConfidenceAtBuy: position.aiConfidenceAtBuy || 0,
         });
       } catch (error) {
         console.error(`Error fetching price for ${position.tokenMint}:`, error);
         // Still include position but with 0 current price
         positions.push({
           mint: position.tokenMint,
+          tokenSymbol: position.tokenSymbol,
           entryPriceSOL: parseFloat(position.entryPriceSOL),
           amountSOL: parseFloat(position.amountSOL),
           currentPriceSOL: 0,
           profitPercent: 0,
+          aiConfidenceAtBuy: position.aiConfidenceAtBuy || 0,
         });
       }
     }
