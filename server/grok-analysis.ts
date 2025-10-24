@@ -93,7 +93,7 @@ function getAllAIClients(): Array<{ client: OpenAI; model: string; provider: str
     });
   }
 
-  // OpenAI (GPT-4, high quality, paid)
+  // OpenAI Primary (GPT-4o-mini, high quality, paid)
   if (process.env.OPENAI_API_KEY) {
     clients.push({
       client: new OpenAI({
@@ -101,6 +101,17 @@ function getAllAIClients(): Array<{ client: OpenAI; model: string; provider: str
       }),
       model: "gpt-4o-mini",
       provider: "OpenAI",
+    });
+  }
+  
+  // OpenAI Backup (GPT-4o-mini, automatic failover when primary fails)
+  if (process.env.OPENAI_API_KEY_2) {
+    clients.push({
+      client: new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY_2,
+      }),
+      model: "gpt-4o-mini",
+      provider: "OpenAI #2",
     });
   }
   
@@ -126,7 +137,7 @@ function getAIClient(): { client: OpenAI; model: string; provider: string } {
   const clients = getAllAIClients();
   
   if (clients.length === 0) {
-    throw new Error("No AI API key configured. Set CEREBRAS_API_KEY, GOOGLE_AI_KEY, DEEPSEEK_API_KEY, CHATANYWHERE_API_KEY, TOGETHER_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, or XAI_API_KEY");
+    throw new Error("No AI API key configured. Set CEREBRAS_API_KEY, GOOGLE_AI_KEY, DEEPSEEK_API_KEY, CHATANYWHERE_API_KEY, TOGETHER_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, OPENAI_API_KEY_2, or XAI_API_KEY");
   }
 
   // Return first available
@@ -144,6 +155,7 @@ export function isGrokConfigured(): boolean {
     process.env.OPENROUTER_API_KEY ||
     process.env.GROQ_API_KEY ||
     process.env.OPENAI_API_KEY ||
+    process.env.OPENAI_API_KEY_2 ||
     process.env.XAI_API_KEY
   );
 }
