@@ -1041,6 +1041,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Portfolio analysis and rebalancing with OpenAI (forced for testing)
+  app.post("/api/ai-bot/analyze-rebalance", async (req, res) => {
+    try {
+      const { ownerWalletAddress } = req.body;
+      
+      if (!ownerWalletAddress) {
+        return res.status(400).json({ 
+          message: "Missing required field: ownerWalletAddress" 
+        });
+      }
+
+      // Check AI bot whitelist
+      const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+      if (!AI_BOT_WHITELISTED_WALLETS.includes(ownerWalletAddress)) {
+        return res.status(403).json({ 
+          message: "AI Trading Bot access restricted to whitelisted wallets only" 
+        });
+      }
+
+      console.log(`[Portfolio Analysis] Testing OpenAI with full portfolio analysis for ${ownerWalletAddress.slice(0, 8)}...`);
+
+      // Get current positions
+      const { getActivePositions } = await import("./ai-bot-scheduler");
+      const positions = await getActivePositions(ownerWalletAddress);
+      
+      if (positions.length === 0) {
+        return res.json({
+          message: "No active positions to analyze",
+          positions: [],
+          recommendations: [],
+          portfolio: null,
+        });
+      }
+
+      // Get portfolio data
+      const { getWalletBalance } = await import("./solana");
+      const { getBatchTokenPrices } = await import("./jupiter");
+      
+      const solBalance = await getWalletBalance(ownerWalletAddress);
+      const mints = positions.map(p => p.mint);
+      const priceMap = await getBatchTokenPrices(mints);
+
+      // Prepare positions for batch AI analysis with FORCED OpenAI
+      const positionsForAnalysis = positions.map(p => {
+        const currentPriceSOL = priceMap.get(p.mint) || 0;
+        const profitPercent = p.entryPriceSOL > 0 
+          ? ((currentPriceSOL - p.entryPriceSOL) / p.entryPriceSOL) * 100 
+          : 0;
+        
+        return {
+          mint: p.mint,
+          symbol: p.tokenSymbol,
+          currentPriceSOL,
+          profitPercent,
+          entryPriceSOL: p.entryPriceSOL,
+          amountSOL: p.amountSOL,
+          isSwingTrade: p.isSwingTrade === 1,
+        };
+      });
+
+      console.log(`[Portfolio Analysis] 🧠 Running FULL HIVEMIND ANALYSIS (INCLUDING OPENAI) on ${positionsForAnalysis.length} positions...`);
+
+      // Batch analyze with FORCED OpenAI inclusion
+      const { analyzeTokenWithHiveMind } = await import("./grok-analysis");
+      
+      // Analyze each position with full hivemind (including OpenAI)
+      const batchAnalysis = new Map();
+      for (const pos of positionsForAnalysis) {
+        try {
+          // Fetch market data for this token
+          const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${pos.mint}`);
+          if (!response.ok) throw new Error(`DexScreener error`);
+          
+          const data = await response.json();
+          const pair = data.pairs?.[0];
+          
+          if (!pair) {
+            batchAnalysis.set(pos.mint, {
+              confidence: 0,
+              recommendation: "SELL",
+              reasoning: "No market data - likely illiquid",
+              errored: true
+            });
+            continue;
+          }
+
+          // Build market data for AI analysis
+          const tokenData = {
+            mint: pos.mint,
+            name: pair.baseToken?.name || pos.symbol,
+            symbol: pos.symbol,
+            priceUSD: parseFloat(pair.priceUsd || "0"),
+            priceSOL: pos.currentPriceSOL,
+            volumeUSD24h: parseFloat(pair.volume?.h24 || "0"),
+            marketCapUSD: parseFloat(pair.fdv || pair.marketCap || "0"),
+            liquidityUSD: parseFloat(pair.liquidity?.usd || "0"),
+            priceChange24h: parseFloat(pair.priceChange?.h24 || "0"),
+            priceChange1h: parseFloat(pair.priceChange?.h1 || "0"),
+          };
+
+          // FORCE OPENAI INCLUSION for testing
+          const result = await analyzeTokenWithHiveMind(
+            tokenData,
+            "medium",
+            0.05,
+            0.5,
+            { forceInclude: true } // Force include OpenAI
+          );
+
+          // Determine recommendation based on AI consensus
+          let recommendation: "HOLD" | "SELL" | "ADD" = "HOLD";
+          if (result.analysis.action === "sell") {
+            recommendation = "SELL";
+          } else if (result.analysis.action === "buy") {
+            recommendation = "ADD";
+          }
+
+          batchAnalysis.set(pos.mint, {
+            confidence: result.analysis.confidence * 100,
+            recommendation,
+            reasoning: result.analysis.reasoning,
+            errored: false
+          });
+        } catch (error) {
+          console.error(`[Portfolio Analysis] Error analyzing ${pos.symbol}:`, error);
+          batchAnalysis.set(pos.mint, {
+            confidence: 0,
+            recommendation: "HOLD",
+            reasoning: `Analysis error: ${error instanceof Error ? error.message : String(error)}`,
+            errored: true
+          });
+        }
+      }
+
+      // Build recommendations
+      const recommendations = [];
+      let totalValueSOL = solBalance;
+
+      for (const pos of positionsForAnalysis) {
+        const aiDecision = batchAnalysis.get(pos.mint) || {
+          confidence: 0,
+          recommendation: "HOLD",
+          reasoning: "Analysis failed",
+          errored: true
+        };
+
+        const currentValueSOL = pos.amountSOL * (1 + pos.profitPercent / 100);
+        totalValueSOL += currentValueSOL;
+
+        recommendations.push({
+          symbol: pos.symbol,
+          mint: pos.mint,
+          entryPriceSOL: pos.entryPriceSOL,
+          currentPriceSOL: pos.currentPriceSOL,
+          profitPercent: pos.profitPercent,
+          amountSOL: pos.amountSOL,
+          currentValueSOL,
+          isSwingTrade: pos.isSwingTrade,
+          aiRecommendation: aiDecision.recommendation,
+          aiConfidence: aiDecision.confidence,
+          aiReasoning: aiDecision.reasoning,
+          action: aiDecision.recommendation === "SELL" ? "SELL NOW" : "HOLD",
+        });
+      }
+
+      // Calculate portfolio concentration
+      const portfolioMetrics = {
+        totalValueSOL,
+        solBalance,
+        solPercentage: (solBalance / totalValueSOL) * 100,
+        positionCount: positions.length,
+        largestPosition: recommendations.reduce((max, r) => 
+          r.currentValueSOL > max ? r.currentValueSOL : max, 0
+        ),
+        largestPositionPercent: (recommendations.reduce((max, r) => 
+          r.currentValueSOL > max ? r.currentValueSOL : max, 0
+        ) / totalValueSOL) * 100,
+      };
+
+      console.log(`[Portfolio Analysis] ✅ Analysis complete - ${recommendations.filter(r => r.action === "SELL NOW").length} SELL signals, ${recommendations.filter(r => r.action === "HOLD").length} HOLD signals`);
+
+      res.json({
+        message: "Portfolio analysis complete (OpenAI included)",
+        portfolio: portfolioMetrics,
+        positions: recommendations,
+        sellCount: recommendations.filter(r => r.action === "SELL NOW").length,
+        holdCount: recommendations.filter(r => r.action === "HOLD").length,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error: any) {
+      console.error("[Portfolio Analysis] Error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Manual execution of standalone AI bot (no project required)
   app.post("/api/ai-bot/execute", authRateLimit, async (req, res) => {
     try {
