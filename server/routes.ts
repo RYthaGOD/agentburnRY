@@ -942,6 +942,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get hivemind strategy for a wallet
+  app.get("/api/ai-bot/hivemind-strategy/:ownerWalletAddress", async (req, res) => {
+    try {
+      const { getLatestStrategy } = await import("./hivemind-strategy");
+      const strategy = await getLatestStrategy(req.params.ownerWalletAddress);
+      
+      if (!strategy) {
+        return res.status(404).json({ message: "No hivemind strategy found yet. Strategy will be generated on next deep scan." });
+      }
+      
+      res.json(strategy);
+    } catch (error: any) {
+      console.error("Error fetching hivemind strategy:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Manual execution of standalone AI bot (no project required)
   app.post("/api/ai-bot/execute", authRateLimit, async (req, res) => {
     try {

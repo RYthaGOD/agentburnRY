@@ -4,8 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Brain, Loader2, Zap, AlertCircle, Play, Power, Scan, TrendingUp, Activity, CheckCircle, XCircle, Clock, Key, Eye, EyeOff, Shield, Lock, ChevronDown } from "lucide-react";
+import { Brain, Loader2, Zap, AlertCircle, Play, Power, TrendingUp, Activity, CheckCircle, XCircle, Key, Eye, EyeOff, Shield, ChevronDown, Sparkles } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -32,64 +31,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+// Simplified schema - hivemind controls all trading parameters
 const aiBotConfigSchema = z.object({
   totalBudget: z.string().min(1).refine(
     (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
     "Must be a positive number"
   ),
-  budgetPerTrade: z.string().min(1).refine(
-    (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
-    "Must be a positive number"
-  ),
-  minVolumeUSD: z.string().min(1).refine(
-    (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0,
-    "Must be a positive number"
-  ),
-  minPotentialPercent: z.string().min(1).refine(
-    (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 150,
-    "Must be at least 150% (1.5X minimum returns)"
-  ),
-  maxDailyTrades: z.string().min(1).refine(
-    (val) => !isNaN(parseInt(val)) && parseInt(val) >= 1,
-    "Must be at least 1"
-  ),
-  profitTargetPercent: z.string().min(1).refine(
-    (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 10,
-    "Must be at least 10%"
-  ),
-  minOrganicScore: z.string().min(1).refine(
-    (val) => !isNaN(parseInt(val)) && parseInt(val) >= 0 && parseInt(val) <= 100,
-    "Must be between 0-100"
-  ),
-  minQualityScore: z.string().min(1).refine(
-    (val) => !isNaN(parseInt(val)) && parseInt(val) >= 0 && parseInt(val) <= 100,
-    "Must be between 0-100"
-  ),
-  minLiquidityUSD: z.string().min(1).refine(
-    (val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 1000,
-    "Must be at least $1,000"
-  ),
-  minTransactions24h: z.string().min(1).refine(
-    (val) => !isNaN(parseInt(val)) && parseInt(val) >= 10,
-    "Must be at least 10"
-  ),
   enableAiSellDecisions: z.boolean(),
-  minAiSellConfidence: z.string().min(1).refine(
-    (val) => !isNaN(parseInt(val)) && parseInt(val) >= 0 && parseInt(val) <= 100,
-    "Must be between 0-100"
-  ),
-  holdIfHighConfidence: z.string().min(1).refine(
-    (val) => !isNaN(parseInt(val)) && parseInt(val) >= 0 && parseInt(val) <= 100,
-    "Must be between 0-100"
-  ),
-  riskTolerance: z.enum(["low", "medium", "high"]),
-}).refine(
-  (data) => parseInt(data.holdIfHighConfidence) > parseInt(data.minAiSellConfidence),
-  {
-    message: "Hold threshold must be greater than sell threshold to avoid conflicts",
-    path: ["holdIfHighConfidence"],
-  }
-);
+});
 
 type AIBotConfigFormData = z.infer<typeof aiBotConfigSchema>;
 
@@ -114,23 +63,44 @@ export default function AIBot() {
   const [convertedBase58, setConvertedBase58] = useState("");
   const [conversionError, setConversionError] = useState("");
   
-  // Fetch AI bot config for this wallet (completely independent of projects)
+  // Fetch AI bot config for this wallet
   const { data: aiConfig, isLoading } = useQuery<AIBotConfig>({
     queryKey: ["/api/ai-bot/config", publicKey?.toString()],
     enabled: connected && !!publicKey,
   });
 
+  // Fetch hivemind strategy status
+  const { data: hivemindStrategy, isLoading: isLoadingStrategy } = useQuery<{
+    marketSentiment: string;
+    riskLevel: string;
+    minConfidenceThreshold: number;
+    budgetPerTrade: number;
+    minVolumeUSD: number;
+    minLiquidityUSD: number;
+    maxDailyTrades: number;
+    minPotentialPercent: number;
+    profitTargetMultiplier: number;
+    reasoning: string;
+    generatedAt: string;
+  }>({
+    queryKey: ["/api/ai-bot/hivemind-strategy", publicKey?.toString()],
+    enabled: connected && !!publicKey,
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
   // Fetch active positions for this wallet
   const { data: activePositions = [], isLoading: isLoadingPositions } = useQuery<Array<{
     mint: string;
+    tokenSymbol: string;
     entryPriceSOL: number;
     amountSOL: number;
     currentPriceSOL: number;
     profitPercent: number;
+    aiConfidenceAtBuy: number;
   }>>({
     queryKey: ["/api/ai-bot/positions", publicKey?.toString()],
     enabled: connected && !!publicKey,
-    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   const isEnabled = aiConfig?.enabled || false;
@@ -142,19 +112,7 @@ export default function AIBot() {
     resolver: zodResolver(aiBotConfigSchema),
     defaultValues: {
       totalBudget: aiConfig?.totalBudget || "1.0",
-      budgetPerTrade: aiConfig?.budgetPerTrade || "0.1",
-      minVolumeUSD: aiConfig?.minVolumeUSD || "5000",
-      minPotentialPercent: aiConfig?.minPotentialPercent || "150",
-      maxDailyTrades: aiConfig?.maxDailyTrades?.toString() || "5",
-      profitTargetPercent: aiConfig?.profitTargetPercent || "50",
-      minOrganicScore: aiConfig?.minOrganicScore?.toString() || "40",
-      minQualityScore: aiConfig?.minQualityScore?.toString() || "30",
-      minLiquidityUSD: aiConfig?.minLiquidityUSD || "5000",
-      minTransactions24h: aiConfig?.minTransactions24h?.toString() || "20",
-      enableAiSellDecisions: aiConfig?.enableAiSellDecisions !== false, // Default true
-      minAiSellConfidence: aiConfig?.minAiSellConfidence?.toString() || "40",
-      holdIfHighConfidence: aiConfig?.holdIfHighConfidence?.toString() || "70",
-      riskTolerance: (aiConfig?.riskTolerance as "low" | "medium" | "high") || "medium",
+      enableAiSellDecisions: aiConfig?.enableAiSellDecisions !== false,
     },
   });
 
@@ -182,7 +140,7 @@ export default function AIBot() {
     }
 
     setIsScanning(true);
-    setScanLog([]); // Clear previous logs
+    setScanLog([]);
     
     try {
       addScanLog("🔍 Connecting to DexScreener API...", "info");
@@ -193,21 +151,19 @@ export default function AIBot() {
       const signatureBase58 = bs58.encode(signature);
 
       addScanLog("✅ Wallet signature verified", "success");
-      addScanLog("📡 Fetching trending tokens from DexScreener...", "info");
+      addScanLog("📡 Fetching trending tokens...", "info");
 
       toast({
         title: "🔍 Scanning Market...",
-        description: "AI is analyzing trending Solana tokens via DexScreener",
+        description: "Hivemind AI is analyzing trending tokens",
       });
 
-      // Manual AI bot trigger (standalone - no project ID)
       const response: any = await apiRequest("POST", `/api/ai-bot/execute`, {
         ownerWalletAddress: publicKey.toString(),
         signature: signatureBase58,
         message,
       });
 
-      // Add backend scan logs to the frontend display
       if (response.logs && Array.isArray(response.logs)) {
         response.logs.forEach((log: any) => {
           addScanLog(log.message, log.type);
@@ -215,15 +171,14 @@ export default function AIBot() {
       }
 
       addScanLog("✅ Market scan completed", "success");
-      addScanLog(`ℹ️ Check Transactions page for trade details`, "info");
 
       queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/config", publicKey.toString()] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/positions", publicKey.toString()] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
 
       toast({
-        title: "✅ Market Scan Complete",
-        description: "See scan activity log for details",
+        title: "✅ Scan Complete",
+        description: "Check scan log for details",
       });
     } catch (error: any) {
       addScanLog(`❌ Error: ${error.message}`, "error");
@@ -262,7 +217,7 @@ export default function AIBot() {
         title: isEnabled ? "✅ Auto Trading Stopped" : "🚀 Auto Trading Started",
         description: isEnabled 
           ? "Scheduled scans disabled. You can still scan manually." 
-          : "AI will scan market automatically based on your schedule",
+          : "Hivemind AI will scan and trade automatically",
       });
     } catch (error) {
       toast({
@@ -290,20 +245,8 @@ export default function AIBot() {
         signature: signatureBase58,
         message,
         totalBudget: data.totalBudget,
-        budgetPerTrade: data.budgetPerTrade,
-        minVolumeUSD: data.minVolumeUSD,
-        minPotentialPercent: data.minPotentialPercent,
-        maxDailyTrades: parseInt(data.maxDailyTrades),
-        profitTargetPercent: data.profitTargetPercent,
-        minOrganicScore: parseInt(data.minOrganicScore),
-        minQualityScore: parseInt(data.minQualityScore),
-        minLiquidityUSD: data.minLiquidityUSD,
-        minTransactions24h: parseInt(data.minTransactions24h),
         enableAiSellDecisions: data.enableAiSellDecisions,
-        minAiSellConfidence: parseInt(data.minAiSellConfidence),
-        holdIfHighConfidence: parseInt(data.holdIfHighConfidence),
-        riskTolerance: data.riskTolerance,
-        enabled: aiConfig?.enabled || false, // Preserve enabled state
+        enabled: aiConfig?.enabled || false,
       });
       
       queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/config", publicKey.toString()] });
@@ -351,7 +294,7 @@ export default function AIBot() {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/config", publicKey.toString()] });
       toast({
         title: "✅ Private Key Saved",
-        description: "Treasury key encrypted and stored securely for automated trading",
+        description: "Treasury key encrypted and stored securely",
       });
       setTreasuryKey("");
       setShowTreasuryKey(false);
@@ -403,33 +346,26 @@ export default function AIBot() {
     setConvertedBase58("");
 
     try {
-      // Parse the array input
       let parsedArray: number[];
       
-      // Try to parse as JSON array
       try {
         parsedArray = JSON.parse(arrayKeyInput.trim());
       } catch {
-        // If not valid JSON, throw error
-        throw new Error("Invalid format. Please paste a valid number array like [123, 45, 67, ...]");
+        throw new Error("Invalid format. Paste a valid number array like [123, 45, 67, ...]");
       }
 
-      // Validate it's an array
       if (!Array.isArray(parsedArray)) {
         throw new Error("Input must be an array of numbers");
       }
 
-      // Validate array length (Solana private keys are 64 bytes)
       if (parsedArray.length !== 64) {
         throw new Error(`Invalid key length: ${parsedArray.length} bytes (expected 64 bytes)`);
       }
 
-      // Validate all elements are numbers
       if (!parsedArray.every(n => typeof n === 'number' && n >= 0 && n <= 255)) {
         throw new Error("Array must contain only numbers between 0 and 255");
       }
 
-      // Convert to Uint8Array and then to base58
       const uint8Array = new Uint8Array(parsedArray);
       const base58Key = bs58.encode(uint8Array);
       
@@ -442,557 +378,174 @@ export default function AIBot() {
       setConversionError(error.message || "Conversion failed");
       toast({
         title: "Conversion Failed",
-        description: error.message || "Failed to convert private key",
+        description: error.message || "Invalid array format",
         variant: "destructive",
       });
     }
   };
 
-  const handleCopyBase58 = () => {
-    navigator.clipboard.writeText(convertedBase58);
-    toast({
-      title: "Copied!",
-      description: "Base58 private key copied to clipboard",
-    });
-  };
-
   if (!connected) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-4">
-          <Brain className="h-16 w-16 text-muted-foreground" />
-          <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
-          <p className="text-muted-foreground max-w-md">
-            Connect your Solana wallet to start AI-powered trading
-          </p>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Brain className="h-16 w-16 text-muted-foreground" />
+        <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
+        <p className="text-muted-foreground">Connect your Solana wallet to access autonomous AI trading</p>
       </div>
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-8 px-4">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </div>
-    );
-  }
+  const hasTreasuryKey = aiConfig?.treasuryKeyCiphertext && aiConfig?.treasuryKeyIv && aiConfig?.treasuryKeyAuthTag;
 
   return (
-    <div className="container mx-auto py-8 px-4 space-y-6 max-w-4xl">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <Brain className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold" data-testid="heading-ai-bot">AI Market Scanner</h1>
-            <p className="text-muted-foreground">
-              Powered by Groq Llama 3.3-70B + Jupiter Ultra API (100% Free)
-            </p>
-          </div>
+    <div className="container mx-auto p-4 space-y-6" data-testid="page-ai-bot">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <Brain className="h-8 w-8" />
+            Autonomous AI Trading Bot
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Fully autonomous hivemind-powered trading system
+          </p>
         </div>
-
-        <Alert>
-          <Zap className="h-4 w-4" />
-          <AlertTitle>Standalone AI Trading - No Projects Required</AlertTitle>
-          <AlertDescription>
-            This AI bot works <strong>independently</strong> without requiring any buyback/burn projects.
-            <br />
-            <strong>How it works:</strong> Scans trending Solana tokens from DexScreener → Groq AI analyzes volume, liquidity, momentum
-            → Jupiter Ultra API executes swaps when confidence ≥ 60% and potential ≥ 150% (1.5X minimum)
-          </AlertDescription>
-        </Alert>
-      </div>
-
-      {/* Live Status Dashboard */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bot Status</CardTitle>
-            <Power className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <Badge 
-                variant={isEnabled ? "default" : "secondary"}
-                className="text-xs"
-                data-testid="badge-bot-status"
-              >
-                {isEnabled ? "🟢 Active" : "⚫ Paused"}
-              </Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {isEnabled ? "Auto-scanning every 30 minutes" : "Manual scans only"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Positions</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-positions-count">
-              {isLoadingPositions ? <Loader2 className="h-6 w-6 animate-spin" /> : activePositions.length}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {activePositions.length > 0 
-                ? "Monitored every 5 min (Cerebras)" 
-                : "No open positions"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Budget</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-budget-remaining">
-              {remainingBudget.toFixed(2)} SOL
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {totalBudget > 0 
-                ? `${((budgetUsed / totalBudget) * 100).toFixed(0)}% of ${totalBudget.toFixed(2)} SOL used` 
-                : "Configure budget below"}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Budget Progress Bar */}
-      {totalBudget > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Budget Used</span>
-                <span className="font-medium">{budgetUsed.toFixed(4)} / {totalBudget.toFixed(4)} SOL</span>
-              </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all"
-                  style={{ width: `${Math.min(100, (budgetUsed / totalBudget) * 100)}%` }}
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Private Key Management */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10">
-            <Shield className="h-5 w-5 text-primary" />
-          </div>
-          <div className="flex-1">
-            <CardTitle>Automated Trading Key</CardTitle>
-            <CardDescription>
-              Required for automated AI bot execution
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Alert data-testid="alert-key-security">
-            <Lock className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              <strong>Security:</strong> Your private key is encrypted using AES-256-GCM encryption before storage.
-              Only you can access it with your wallet signature.
-            </AlertDescription>
-          </Alert>
-
-          {aiConfig && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-              {aiConfig.treasuryKeyCiphertext ? (
-                <CheckCircle className="h-4 w-4 text-green-500" />
-              ) : (
-                <AlertCircle className="h-4 w-4 text-amber-500" />
-              )}
-              <span className="text-sm" data-testid="text-treasury-key-status">
-                Treasury Key: {aiConfig.treasuryKeyCiphertext ? "Configured ✅" : "Not configured ⚠️"}
-              </span>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <label htmlFor="ai-treasury-key" className="text-sm font-medium">
-              Treasury Wallet Private Key (Base58)
-            </label>
-            <div className="relative">
-              <Input
-                id="ai-treasury-key"
-                type={showTreasuryKey ? "text" : "password"}
-                value={treasuryKey}
-                onChange={(e) => setTreasuryKey(e.target.value)}
-                placeholder="Enter treasury wallet private key"
-                className="font-mono pr-10"
-                data-testid="input-ai-treasury-key"
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2"
-                onClick={() => setShowTreasuryKey(!showTreasuryKey)}
-                data-testid="button-toggle-ai-treasury-visibility"
-              >
-                {showTreasuryKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Required for automated AI trading execution. This wallet must hold SOL for trades.
-            </p>
-          </div>
-
-          <div className="flex gap-3">
-            <Button
-              onClick={handleSaveTreasuryKey}
-              disabled={isSavingKey || !treasuryKey.trim()}
-              className="flex-1"
-              data-testid="button-save-ai-treasury-key"
-            >
-              {isSavingKey ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Key className="h-4 w-4 mr-2" />
-                  Save Private Key
-                </>
-              )}
-            </Button>
-
-            {aiConfig?.treasuryKeyCiphertext && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" disabled={isDeletingKey} data-testid="button-delete-ai-treasury-key">
-                    {isDeletingKey ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      "Delete Key"
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Treasury Key?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will remove the encrypted private key from secure storage.
-                      Automated AI trading will stop until you add a new key.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteTreasuryKey}>
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+        <div className="flex items-center gap-4">
+          <Badge variant={isEnabled ? "default" : "secondary"} className="px-4 py-2">
+            {isEnabled ? (
+              <><CheckCircle className="h-4 w-4 mr-2" /> Active</>
+            ) : (
+              <><XCircle className="h-4 w-4 mr-2" /> Disabled</>
             )}
-          </div>
-        </CardContent>
-      </Card>
+          </Badge>
+        </div>
+      </div>
 
-      {/* Private Key Converter */}
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-4">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500/10">
-            <Key className="h-5 w-5 text-amber-500" />
-          </div>
-          <div className="flex-1">
-            <CardTitle>Private Key Converter</CardTitle>
-            <CardDescription>
-              Convert your private key from array format to base58 format
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              Have your key in <code className="text-xs bg-muted px-1 py-0.5 rounded">[123, 45, 67, ...]</code> format? 
-              Paste it below to convert to base58 format for the AI bot.
-            </AlertDescription>
-          </Alert>
-
-          <div className="space-y-2">
-            <label htmlFor="array-key-input" className="text-sm font-medium">
-              Array Format Key
-            </label>
-            <textarea
-              id="array-key-input"
-              value={arrayKeyInput}
-              onChange={(e) => setArrayKeyInput(e.target.value)}
-              placeholder="[123, 45, 67, ...]"
-              className="w-full min-h-[100px] p-3 text-sm font-mono rounded-md border bg-background resize-y"
-              data-testid="textarea-array-key-input"
-            />
-            <p className="text-xs text-muted-foreground">
-              Paste your private key in array format (64 numbers from 0-255)
+      {/* Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Bot Status</CardTitle>
+            <Power className={`h-4 w-4 ${isEnabled ? 'text-green-500' : 'text-gray-400'}`} />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{isEnabled ? 'Running' : 'Stopped'}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {isEnabled ? 'Scans every 10min (quick) & 30min (deep)' : 'Manual scans only'}
             </p>
-          </div>
-
-          {conversionError && (
-            <Alert variant="destructive">
-              <XCircle className="h-4 w-4" />
-              <AlertDescription>{conversionError}</AlertDescription>
-            </Alert>
-          )}
-
-          {convertedBase58 && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-green-500">
-                ✅ Base58 Format (Ready to use)
-              </label>
-              <div className="relative">
-                <div className="p-3 text-sm font-mono rounded-md border bg-muted break-all">
-                  {convertedBase58}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-2"
-                  onClick={handleCopyBase58}
-                  data-testid="button-copy-base58"
-                >
-                  Copy
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Copy this and paste it in the "Treasury Wallet Private Key" field above
-              </p>
-            </div>
-          )}
-
-          <Button
-            onClick={handleConvertArrayKey}
-            disabled={!arrayKeyInput.trim()}
-            className="w-full"
-            data-testid="button-convert-key"
-          >
-            <Zap className="h-4 w-4 mr-2" />
-            Convert to Base58
-          </Button>
-        </CardContent>
-      </Card>
-
-      {/* Controls */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Trading Controls</CardTitle>
-          <CardDescription>Start auto trading or scan the market manually</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-2">
             <Button
               onClick={handleToggleBot}
+              disabled={isToggling || !hasTreasuryKey}
               variant={isEnabled ? "destructive" : "default"}
-              className="flex-1"
-              disabled={isToggling || !aiConfig}
-              data-testid="button-toggle-auto-trading"
+              className="w-full mt-3"
+              data-testid="button-toggle-bot"
             >
               {isToggling ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  {isEnabled ? "Stopping..." : "Starting..."}
-                </>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : isEnabled ? (
-                <>
-                  <Power className="h-4 w-4 mr-2" />
-                  Stop Auto Trading
-                </>
+                <Power className="h-4 w-4 mr-2" />
               ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  Start Auto Trading
-                </>
+                <Play className="h-4 w-4 mr-2" />
               )}
+              {isEnabled ? 'Stop Auto Trading' : 'Start Auto Trading'}
             </Button>
-          </div>
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={handleScanAndTrade}
-            disabled={isScanning || !publicKey || !aiConfig}
-            data-testid="button-scan-now"
-          >
-            {isScanning ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Scanning Market...
-              </>
-            ) : (
-              <>
-                <Scan className="h-4 w-4 mr-2" />
-                Scan & Trade Now
-              </>
-            )}
-          </Button>
-          <p className="text-xs text-muted-foreground text-center">
-            Manual scans work independently of auto-trading status
-          </p>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Active Positions */}
-      {activePositions.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Active Positions ({activePositions.length})
-            </CardTitle>
-            <CardDescription>
-              Positions being monitored for profit-taking (target: {aiConfig?.profitTargetPercent || "50"}%)
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Positions</CardTitle>
+            <Activity className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {activePositions.map((position) => (
-                <div
-                  key={position.mint}
-                  className="p-4 rounded-lg border bg-card hover-elevate"
-                  data-testid={`position-${position.mint}`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline" className="font-mono text-xs">
-                          {position.mint.slice(0, 8)}...{position.mint.slice(-4)}
-                        </Badge>
-                        <Badge
-                          variant={position.profitPercent >= 0 ? "default" : "destructive"}
-                          className="ml-auto"
-                        >
-                          {position.profitPercent >= 0 ? "+" : ""}
-                          {position.profitPercent.toFixed(2)}%
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Entry Price</p>
-                          <p className="font-medium">
-                            {position.entryPriceSOL.toFixed(8)} SOL
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Current Price</p>
-                          <p className="font-medium">
-                            {position.currentPriceSOL > 0
-                              ? `${position.currentPriceSOL.toFixed(8)} SOL`
-                              : "Loading..."}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Investment</p>
-                          <p className="font-medium">{position.amountSOL.toFixed(4)} SOL</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Est. Value</p>
-                          <p className="font-medium">
-                            {position.currentPriceSOL > 0
-                              ? `${(position.amountSOL * (1 + position.profitPercent / 100)).toFixed(4)} SOL`
-                              : "Loading..."}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                          <span>Progress to Target ({aiConfig?.profitTargetPercent || "50"}%)</span>
-                          <span>
-                            {Math.min(
-                              100,
-                              (position.profitPercent / parseFloat(aiConfig?.profitTargetPercent || "50")) * 100
-                            ).toFixed(0)}%
-                          </span>
-                        </div>
-                        <Progress
-                          value={Math.min(
-                            100,
-                            (position.profitPercent / parseFloat(aiConfig?.profitTargetPercent || "50")) * 100
-                          )}
-                          className="h-2"
-                        />
-                      </div>
-                    </div>
-                  </div>
+            <div className="text-2xl font-bold">{activePositions.length}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Monitored every 2.5 minutes
+            </p>
+            <div className="mt-3 text-sm">
+              {activePositions.length > 0 ? (
+                <div className="text-xs">
+                  {activePositions.filter(p => p.profitPercent > 0).length} profitable
                 </div>
-              ))}
-            </div>
-            <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-              <p className="text-xs text-muted-foreground">
-                💡 Positions will automatically sell when profit target is reached. Budget is recycled for new trades.
-              </p>
+              ) : (
+                <div className="text-xs text-muted-foreground">No open positions</div>
+              )}
             </div>
           </CardContent>
         </Card>
-      )}
 
-      {/* Scan Activity Log */}
-      {(scanLog.length > 0 || isScanning) && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Scan Activity Log
-            </CardTitle>
-            <CardDescription>
-              Real-time view of what the AI bot is scanning and analyzing
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Budget</CardTitle>
+            <TrendingUp className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[300px] w-full rounded-md border p-4">
-              <div className="space-y-2">
-                {scanLog.length === 0 && isScanning ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Initializing scan...</span>
-                  </div>
-                ) : (
-                  scanLog.map((log, index) => (
-                    <div key={index} className="flex items-start gap-2 text-sm">
-                      {log.type === "success" ? (
-                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                      ) : log.type === "error" ? (
-                        <XCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                      ) : log.type === "warning" ? (
-                        <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
-                      ) : (
-                        <Clock className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                      )}
-                      <div className="flex-1">
-                        <span className={
-                          log.type === "success" ? "text-green-600 dark:text-green-400" :
-                          log.type === "error" ? "text-red-600 dark:text-red-400" :
-                          log.type === "warning" ? "text-yellow-600 dark:text-yellow-400" :
-                          "text-muted-foreground"
-                        }>
-                          {log.message}
-                        </span>
-                        <span className="text-xs text-muted-foreground ml-2">
-                          {new Date(log.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))
-                )}
+            <div className="text-2xl font-bold">{remainingBudget.toFixed(4)} SOL</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {budgetUsed.toFixed(4)} / {totalBudget.toFixed(4)} used
+            </p>
+            <Progress value={(budgetUsed / totalBudget) * 100} className="mt-3" />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Hivemind Strategy Status */}
+      {hivemindStrategy && (
+        <Card className="border-primary/20 bg-gradient-to-r from-background to-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Hivemind Strategy
+            </CardTitle>
+            <CardDescription>
+              Autonomous AI-generated trading parameters (updates every 6 hours)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Market Sentiment</div>
+                <div className="text-lg font-bold capitalize">{hivemindStrategy.marketSentiment}</div>
               </div>
-            </ScrollArea>
-            {scanLog.length > 0 && !isScanning && (
-              <div className="mt-4 text-xs text-muted-foreground">
-                💡 Tip: The backend analyzes 35+ tokens. Check server logs or Transactions page for full details.
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Risk Level</div>
+                <div className="text-lg font-bold capitalize">{hivemindStrategy.riskLevel}</div>
               </div>
-            )}
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Min Confidence</div>
+                <div className="text-lg font-bold">{hivemindStrategy.minConfidenceThreshold}%</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Max Daily Trades</div>
+                <div className="text-lg font-bold">{hivemindStrategy.maxDailyTrades}</div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Trade Size</div>
+                <div className="text-lg font-bold">{hivemindStrategy.budgetPerTrade.toFixed(3)} SOL</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Min Volume</div>
+                <div className="text-lg font-bold">${(hivemindStrategy.minVolumeUSD / 1000).toFixed(0)}k</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Min Liquidity</div>
+                <div className="text-lg font-bold">${(hivemindStrategy.minLiquidityUSD / 1000).toFixed(0)}k</div>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Profit Target</div>
+                <div className="text-lg font-bold">{hivemindStrategy.profitTargetMultiplier.toFixed(1)}x</div>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t">
+              <div className="text-xs text-muted-foreground">
+                {hivemindStrategy.reasoning}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Updated: {new Date(hivemindStrategy.generatedAt).toLocaleString()}
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -1000,327 +553,310 @@ export default function AIBot() {
       {/* Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle>AI Bot Configuration</CardTitle>
-          <CardDescription>Configure budget, risk tolerance, and trading criteria</CardDescription>
+          <CardTitle>Configuration</CardTitle>
+          <CardDescription>
+            Essential settings - trading parameters are controlled by hivemind
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="totalBudget"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total Budget (SOL)</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="1.0" data-testid="input-total-budget" />
-                      </FormControl>
-                      <FormDescription>Maximum SOL to spend on AI trades</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="budgetPerTrade"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Budget Per Trade (SOL)</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="0.01" placeholder="0.1" data-testid="input-budget-per-trade" />
-                      </FormControl>
-                      <FormDescription>SOL amount for each trade</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="minVolumeUSD"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Min Volume (USD)</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="1000" placeholder="5000" data-testid="input-min-volume" />
-                      </FormControl>
-                      <FormDescription>Only scan tokens with this 24h volume</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="minPotentialPercent"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Min Potential Return (%)</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="10" placeholder="150" data-testid="input-min-potential" />
-                      </FormControl>
-                      <FormDescription>Minimum 150% (1.5X) enforced</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="maxDailyTrades"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Max Daily Trades</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" placeholder="5" data-testid="input-max-daily-trades" />
-                      </FormControl>
-                      <FormDescription>Limit trades per day</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="profitTargetPercent"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Profit Target (%)</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" step="10" placeholder="50" data-testid="input-profit-target" />
-                      </FormControl>
-                      <FormDescription>Auto-sell when profit reaches this %</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="riskTolerance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Risk Tolerance</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-risk-tolerance">
-                            <SelectValue placeholder="Select risk level" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>Affects AI's trading decisions</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Advanced Filters - Collapsible Section */}
-              <Collapsible className="border rounded-md">
-                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover-elevate active-elevate-2" data-testid="button-toggle-advanced-filters">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-primary" />
-                    <span className="font-medium">Advanced Organic Volume Filters</span>
-                  </div>
-                  <ChevronDown className="h-4 w-4 transition-transform" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-4 pb-4">
-                  <div className="pt-4 space-y-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Configure advanced filters to detect organic volume and filter out wash trading. Lower scores = stricter filtering.
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="minOrganicScore"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Min Organic Score (0-100)</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="number" placeholder="40" data-testid="input-min-organic-score" />
-                            </FormControl>
-                            <FormDescription>Filters wash trading based on volume patterns</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+              <FormField
+                control={form.control}
+                name="totalBudget"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Total Budget (SOL)</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="1.0"
+                        data-testid="input-total-budget"
                       />
-
-                      <FormField
-                        control={form.control}
-                        name="minQualityScore"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Min Quality Score (0-100)</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="number" placeholder="30" data-testid="input-min-quality-score" />
-                            </FormControl>
-                            <FormDescription>Overall token quality (volume + liquidity + momentum)</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="minLiquidityUSD"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Min Liquidity (USD)</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="number" step="1000" placeholder="5000" data-testid="input-min-liquidity" />
-                            </FormControl>
-                            <FormDescription>Minimum pool liquidity (prevents low-liquidity traps)</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="minTransactions24h"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Min Transactions (24h)</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="number" placeholder="20" data-testid="input-min-transactions" />
-                            </FormControl>
-                            <FormDescription>Minimum trading activity (buy + sell count)</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* AI Sell Decisions - Collapsible Section */}
-              <Collapsible className="border rounded-md">
-                <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover-elevate active-elevate-2" data-testid="button-toggle-ai-sell-decisions">
-                  <div className="flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-primary" />
-                    <span className="font-medium">AI-Powered Sell Decisions</span>
-                  </div>
-                  <ChevronDown className="h-4 w-4 transition-transform" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-4 pb-4">
-                  <div className="pt-4 space-y-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Let AI decide when to sell positions based on market analysis. AI re-analyzes held positions and can hold winners longer when confidence is high.
-                    </p>
-                    
-                    <FormField
-                      control={form.control}
-                      name="enableAiSellDecisions"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between p-3 border rounded-md">
-                          <div className="space-y-0.5">
-                            <FormLabel>Enable AI Sell Decisions</FormLabel>
-                            <FormDescription>
-                              Let AI analyze positions and decide optimal sell timing
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              data-testid="switch-enable-ai-sell"
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="minAiSellConfidence"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Min AI Sell Confidence (0-100)</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="number" placeholder="40" data-testid="input-min-ai-sell-confidence" />
-                            </FormControl>
-                            <FormDescription>Sell if AI confidence drops below this %</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="holdIfHighConfidence"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Hold If High Confidence (0-100)</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="number" placeholder="70" data-testid="input-hold-if-high-confidence" />
-                            </FormControl>
-                            <FormDescription>Hold beyond profit target if AI confidence ≥ this %</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <Alert>
-                      <Brain className="h-4 w-4" />
-                      <AlertTitle>How AI Sell Decisions Work</AlertTitle>
-                      <AlertDescription>
-                        <strong>AI re-analyzes</strong> every held position to assess current market conditions. It will:
-                        <br />
-                        • <strong>SELL</strong> if confidence drops below {form.watch("minAiSellConfidence") || "40"}% (weakening momentum)
-                        <br />
-                        • <strong>HOLD</strong> if confidence ≥ {form.watch("holdIfHighConfidence") || "70"}% even when profit target is reached
-                        <br />
-                        • <strong>SELL</strong> at profit target if confidence is between these thresholds
-                        <br /><br />
-                        This allows the bot to ride winners longer while cutting losers early.
-                      </AlertDescription>
-                    </Alert>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              <Button type="submit" className="w-full" disabled={isSaving} data-testid="button-save-config">
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Configuration"
+                    </FormControl>
+                    <FormDescription>
+                      Maximum SOL to allocate for trading
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
                 )}
+              />
+
+              <FormField
+                control={form.control}
+                name="enableAiSellDecisions"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">
+                        AI Sell Decisions
+                      </FormLabel>
+                      <FormDescription>
+                        Let AI decide when to sell positions based on market conditions
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-ai-sell"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <Button type="submit" disabled={isSaving} className="w-full" data-testid="button-save-config">
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Configuration
               </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
 
-      {/* Info */}
-      <Alert>
-        <TrendingUp className="h-4 w-4" />
-        <AlertTitle>Trading Strategy & Safety</AlertTitle>
-        <AlertDescription>
-          The bot uses <strong>Jupiter Ultra API</strong> for all swaps (better routing & pricing).
-          Trades are only executed when AI confidence ≥ 60% AND potential return ≥ {form.watch("minPotentialPercent") || "150"}%.
-          <br /><br />
-          <strong>Safety Features:</strong>
-          <br />
-          • Always keeps <strong>0.01 SOL reserve</strong> for transaction fees
-          <br />
-          • Won't trade if budget - used &lt; (trade amount + 0.01 SOL)
-          <br />
-          • All transactions appear on the Transactions page
-        </AlertDescription>
-      </Alert>
+      {/* Treasury Key Management */}
+      <Card className={hasTreasuryKey ? "border-green-500/50" : "border-yellow-500/50"}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="h-5 w-5" />
+            Treasury Wallet Private Key
+          </CardTitle>
+          <CardDescription>
+            Required for automated trading. Encrypted and stored securely.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {hasTreasuryKey ? (
+            <Alert>
+              <Shield className="h-4 w-4" />
+              <AlertTitle>Private Key Configured</AlertTitle>
+              <AlertDescription>
+                Your treasury key is encrypted and stored securely. The bot can execute trades automatically.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>No Private Key</AlertTitle>
+              <AlertDescription>
+                Add your treasury wallet's private key to enable automated trading.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button variant="outline" className="w-full">
+                <Key className="mr-2 h-4 w-4" />
+                {hasTreasuryKey ? 'Replace' : 'Add'} Private Key
+                <ChevronDown className="ml-auto h-4 w-4" />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    type={showTreasuryKey ? "text" : "password"}
+                    placeholder="Base58 private key"
+                    value={treasuryKey}
+                    onChange={(e) => setTreasuryKey(e.target.value)}
+                    data-testid="input-treasury-key"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowTreasuryKey(!showTreasuryKey)}
+                  >
+                    {showTreasuryKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSaveTreasuryKey}
+                    disabled={isSavingKey || !treasuryKey.trim()}
+                    className="flex-1"
+                    data-testid="button-save-key"
+                  >
+                    {isSavingKey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Key
+                  </Button>
+                  {hasTreasuryKey && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" disabled={isDeletingKey}>
+                          Delete Key
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Treasury Key?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will remove your encrypted private key from secure storage. You won't be able to use automated trading until you add a new key.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleDeleteTreasuryKey}>
+                            Delete Key
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
+              </div>
+
+              {/* Array to Base58 Converter */}
+              <div className="border-t pt-4 space-y-2">
+                <div className="text-sm font-medium">Convert Number Array to Base58</div>
+                <div className="text-xs text-muted-foreground">
+                  If you have a private key as a number array (e.g., from Phantom), paste it here
+                </div>
+                <textarea
+                  className="w-full h-24 p-2 border rounded-md text-sm font-mono"
+                  placeholder="[123, 45, 67, ...]"
+                  value={arrayKeyInput}
+                  onChange={(e) => setArrayKeyInput(e.target.value)}
+                />
+                <Button
+                  type="button"
+                  onClick={handleConvertArrayKey}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Convert to Base58
+                </Button>
+                {convertedBase58 && (
+                  <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-md">
+                    <div className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
+                      Converted Key:
+                    </div>
+                    <div className="text-xs font-mono break-all bg-background p-2 rounded">
+                      {convertedBase58}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-2">
+                      Copy this and paste it in the field above
+                    </div>
+                  </div>
+                )}
+                {conversionError && (
+                  <div className="text-sm text-destructive">{conversionError}</div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        </CardContent>
+      </Card>
+
+      {/* Manual Scan */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Manual Market Scan</CardTitle>
+          <CardDescription>
+            Trigger an immediate market scan and trading analysis
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Button
+            onClick={handleScanAndTrade}
+            disabled={isScanning || !hasTreasuryKey}
+            className="w-full"
+            size="lg"
+            data-testid="button-scan-trade"
+          >
+            {isScanning ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Scanning Market...
+              </>
+            ) : (
+              <>
+                <Zap className="mr-2 h-5 w-5" />
+                Scan & Trade Now
+              </>
+            )}
+          </Button>
+
+          {!hasTreasuryKey && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Add a treasury private key above to enable scanning and trading
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {scanLog.length > 0 && (
+            <div className="border rounded-lg p-4">
+              <div className="text-sm font-medium mb-2">Scan Activity Log</div>
+              <ScrollArea className="h-[200px]">
+                <div className="space-y-1">
+                  {scanLog.map((log, idx) => (
+                    <div
+                      key={idx}
+                      className={`text-xs font-mono ${
+                        log.type === "error"
+                          ? "text-red-500"
+                          : log.type === "success"
+                          ? "text-green-500"
+                          : log.type === "warning"
+                          ? "text-yellow-500"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {log.message}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Active Positions */}
+      {activePositions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Positions ({activePositions.length})</CardTitle>
+            <CardDescription>
+              Real-time monitoring every 2.5 minutes
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {activePositions.map((position, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-3 border rounded-lg hover-elevate"
+                  data-testid={`position-${idx}`}
+                >
+                  <div className="flex-1">
+                    <div className="font-medium">{position.tokenSymbol}</div>
+                    <div className="text-xs text-muted-foreground">
+                      Entry: {position.entryPriceSOL.toFixed(6)} SOL | 
+                      Current: {position.currentPriceSOL.toFixed(6)} SOL
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      AI Confidence: {position.aiConfidenceAtBuy.toFixed(0)}%
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-lg font-bold ${position.profitPercent >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {position.profitPercent >= 0 ? '+' : ''}{position.profitPercent.toFixed(1)}%
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {position.amountSOL.toFixed(4)} SOL
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

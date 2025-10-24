@@ -80,9 +80,14 @@ Preferred communication style: Simple, everyday language.
   - Updates current prices and profit percentages in database
   - Uses free Cerebras API to avoid costs
   - Reduced from 5 to 10 minutes to cut API calls in half
-- **Improved AI Bot UI/UX** with live status dashboard
-  - Added 3-card status dashboard: Bot Status, Active Positions, Budget
-  - Better visual indicators and clearer data presentation
+- **Simplified AI Bot UI/UX for Full Hivemind Autonomy**
+  - Removed all manual parameter inputs (now controlled by hivemind)
+  - Added real-time hivemind strategy status display showing active parameters
+  - Shows: market sentiment, risk level, confidence thresholds, trade sizes, token filters
+  - Clean 3-card dashboard: Bot Status, Active Positions, Budget
+  - Only essential controls: total budget limit, enable/disable toggle, treasury key
+  - Position monitoring increased to every 2.5 minutes for active management
+  - Real-time position updates with AI confidence tracking
 
 ## System Architecture
 
