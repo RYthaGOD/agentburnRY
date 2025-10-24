@@ -8,6 +8,16 @@ The platform also includes three types of trading bots:
 2.  **Buy Bot:** Executes limit orders based on target SOL prices.
 3.  **AI Trading Bot:** A standalone bot that scans trending tokens, analyzes them using a 6-model AI consensus system, and executes trades based on AI confidence and profit potential. This bot operates independently of buyback/burn projects.
 
+## Recent Updates
+
+### October 24, 2025 - Autonomous Capital Management
+- **Removed ALL budget restrictions:** System now uses entire wallet balance (minus 0.01 SOL fee reserve)
+- **Implemented dynamic position sizing:** Trades scale with portfolio value (10% base, up to 15% max with high confidence)
+- **Enabled true exponential compounding:** Position caps grow with portfolio (1 SOL → 0.15 max, 100 SOL → 15 SOL max)
+- **Updated frontend:** Removed budget controls, added autonomous management information panel
+- **Capital calculation:** Available = wallet balance - 0.01 SOL fee reserve - sum of active position values
+- **Maintained risk controls:** 25% concentration limit, stop-loss protection, AI-driven exits unchanged
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
