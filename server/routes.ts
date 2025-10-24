@@ -2222,13 +2222,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get the wallet's private key to derive public key
       const config = await storage.getAIBotConfig(walletAddress);
       if (!config) {
+        console.log(`[Fix Zero Positions] AI bot config not found for wallet ${walletAddress}`);
         return res.status(404).json({ message: "AI bot config not found" });
       }
 
-      const treasuryKey = await getTreasuryKey(config.id);
-      if (!treasuryKey) {
-        return res.status(404).json({ message: "Treasury key not found" });
+      console.log(`[Fix Zero Positions] Config found: ${config.id}`);
+      console.log(`[Fix Zero Positions] Has ciphertext: ${!!config.treasuryKeyCiphertext}`);
+      console.log(`[Fix Zero Positions] Has IV: ${!!config.treasuryKeyIv}`);
+      console.log(`[Fix Zero Positions] Has auth tag: ${!!config.treasuryKeyAuthTag}`);
+
+      // AI bot configs store treasury keys directly in the config table
+      if (!config.treasuryKeyCiphertext || !config.treasuryKeyIv || !config.treasuryKeyAuthTag) {
+        console.log(`[Fix Zero Positions] Missing encrypted key components`);
+        return res.status(404).json({ message: "No treasury key configured for this AI bot" });
       }
+
+      // Decrypt the treasury key
+      console.log(`[Fix Zero Positions] Decrypting treasury key...`);
+      const { decrypt } = await import("./crypto");
+      const treasuryKey = decrypt(
+        config.treasuryKeyCiphertext,
+        config.treasuryKeyIv,
+        config.treasuryKeyAuthTag
+      );
+      console.log(`[Fix Zero Positions] Treasury key decrypted successfully`);
 
       const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
       const keypair = loadKeypairFromPrivateKey(treasuryKey);
