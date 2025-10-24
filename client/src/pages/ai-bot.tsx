@@ -104,6 +104,17 @@ export default function AIBot() {
   const budgetUsed = parseFloat(aiConfig?.budgetUsed || "0");
   const totalBudget = parseFloat(aiConfig?.totalBudget || "0");
   const remainingBudget = totalBudget - budgetUsed;
+  
+  // Autonomous capital calculations
+  const portfolioValue = totalBudget; // This is actually portfolio value now
+  const capitalInPositions = budgetUsed;
+  const feeReserve = 0.01;
+  const availableCapital = Math.max(0, portfolioValue - feeReserve - capitalInPositions);
+  
+  // Dynamic position sizing calculations (10% base, up to 15% with high confidence)
+  const basePositionSize = portfolioValue * 0.10;
+  const maxPositionSize = portfolioValue * 0.15; // Max with 90%+ AI confidence
+  const maxConcentration = portfolioValue * 0.25; // 25% diversification limit
 
   const form = useForm<AIBotConfigFormData>({
     resolver: zodResolver(aiBotConfigSchema),
@@ -412,7 +423,109 @@ export default function AIBot() {
         </div>
       </div>
 
-      {/* Status Cards */}
+      {/* Portfolio Overview - Autonomous Capital Management */}
+      <Card className="border-blue-500/50 bg-gradient-to-r from-background to-blue-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-blue-500" />
+            Portfolio Overview - Autonomous Management
+          </CardTitle>
+          <CardDescription>
+            Self-managing capital allocation with dynamic position sizing
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Main Portfolio Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-lg bg-muted/30">
+              <div className="text-sm font-medium text-muted-foreground">Total Portfolio Value</div>
+              <div className="text-2xl font-bold mt-1">{portfolioValue.toFixed(4)} SOL</div>
+              <div className="text-xs text-muted-foreground mt-1">Wallet + Positions</div>
+            </div>
+            
+            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20">
+              <div className="text-sm font-medium text-green-500">Available Capital</div>
+              <div className="text-2xl font-bold mt-1">{availableCapital.toFixed(4)} SOL</div>
+              <div className="text-xs text-muted-foreground mt-1">Ready to trade</div>
+            </div>
+            
+            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <div className="text-sm font-medium text-blue-500">In Positions</div>
+              <div className="text-2xl font-bold mt-1">{capitalInPositions.toFixed(4)} SOL</div>
+              <div className="text-xs text-muted-foreground mt-1">{activePositions.length} active</div>
+            </div>
+            
+            <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+              <div className="text-sm font-medium text-orange-500">Fee Reserve</div>
+              <div className="text-2xl font-bold mt-1">{feeReserve.toFixed(2)} SOL</div>
+              <div className="text-xs text-muted-foreground mt-1">Always protected</div>
+            </div>
+          </div>
+
+          {/* Dynamic Position Sizing */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Dynamic Position Sizing</h3>
+              <Badge variant="outline">Scales with Growth</Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="p-3 rounded-md bg-muted/50 border">
+                <div className="text-xs font-medium text-muted-foreground">Base Position (10%)</div>
+                <div className="text-lg font-bold">{basePositionSize.toFixed(4)} SOL</div>
+                <div className="text-xs text-muted-foreground mt-1">Standard confidence</div>
+              </div>
+              
+              <div className="p-3 rounded-md bg-blue-500/10 border border-blue-500/30">
+                <div className="text-xs font-medium text-blue-500">Max Position (15%)</div>
+                <div className="text-lg font-bold">{maxPositionSize.toFixed(4)} SOL</div>
+                <div className="text-xs text-muted-foreground mt-1">90%+ AI confidence</div>
+              </div>
+              
+              <div className="p-3 rounded-md bg-orange-500/10 border border-orange-500/30">
+                <div className="text-xs font-medium text-orange-500">Max Concentration (25%)</div>
+                <div className="text-lg font-bold">{maxConcentration.toFixed(4)} SOL</div>
+                <div className="text-xs text-muted-foreground mt-1">Per position limit</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Compounding Growth Examples */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold">Exponential Growth Preview</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 rounded-md bg-gradient-to-br from-green-500/10 to-blue-500/10 border border-green-500/20">
+                <div className="font-medium text-green-500 mb-2">1 SOL Portfolio</div>
+                <div className="space-y-1 text-muted-foreground">
+                  <div>• Base trade: 0.10 SOL</div>
+                  <div>• High confidence: 0.15 SOL</div>
+                  <div>• Max per token: 0.25 SOL</div>
+                </div>
+              </div>
+              
+              <div className="p-3 rounded-md bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/20">
+                <div className="font-medium text-blue-500 mb-2">10 SOL Portfolio</div>
+                <div className="space-y-1 text-muted-foreground">
+                  <div>• Base trade: 1.00 SOL</div>
+                  <div>• High confidence: 1.50 SOL</div>
+                  <div>• Max per token: 2.50 SOL</div>
+                </div>
+              </div>
+              
+              <div className="p-3 rounded-md bg-gradient-to-br from-purple-500/10 to-orange-500/10 border border-purple-500/20">
+                <div className="font-medium text-purple-500 mb-2">100 SOL Portfolio 🚀</div>
+                <div className="space-y-1 text-muted-foreground">
+                  <div>• Base trade: 10.00 SOL</div>
+                  <div>• High confidence: 15.00 SOL</div>
+                  <div>• Max per token: 25.00 SOL</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Bot Control & Status */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -455,8 +568,13 @@ export default function AIBot() {
             </p>
             <div className="mt-3 text-sm">
               {activePositions.length > 0 ? (
-                <div className="text-xs">
-                  {activePositions.filter(p => p.profitPercent > 0).length} profitable
+                <div className="space-y-1">
+                  <div className="text-xs text-green-500">
+                    {activePositions.filter(p => p.profitPercent > 0).length} profitable
+                  </div>
+                  <div className="text-xs text-red-500">
+                    {activePositions.filter(p => p.profitPercent < 0).length} losing
+                  </div>
                 </div>
               ) : (
                 <div className="text-xs text-muted-foreground">No open positions</div>
@@ -467,134 +585,189 @@ export default function AIBot() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Capital In Positions
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium">Risk Controls</CardTitle>
+            <Shield className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {budgetUsed.toFixed(4)} SOL
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Actively trading
-            </p>
-            <div className="mt-3 p-2 rounded-md bg-blue-500/10 border border-blue-500/20">
-              <div className="text-xs font-medium text-blue-500">Autonomous System</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Uses all available capital (no limits)
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Stop-Loss</span>
+                <Badge variant="outline">-30%</Badge>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Swing Trade SL</span>
+                <Badge variant="outline">-50%</Badge>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Max Concentration</span>
+                <Badge variant="outline">25%</Badge>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">AI Confidence</span>
+                <Badge variant="outline">≥75%</Badge>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Hivemind Strategy Status */}
+      {/* AI Hivemind Strategy */}
       {hivemindStrategy && (
-        <Card className="border-primary/20 bg-gradient-to-r from-background to-primary/5">
+        <Card className="border-purple-500/30 bg-gradient-to-r from-background to-purple-500/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Hivemind Strategy
+              <Brain className="h-5 w-5 text-purple-500" />
+              AI Hivemind Strategy
             </CardTitle>
             <CardDescription>
-              Autonomous AI-generated trading parameters (updates every 6 hours)
+              6-model AI consensus adapts to market conditions (updates every 6 hours)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Market Sentiment</div>
+            {/* Primary Strategy Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-lg bg-muted/30">
+                <div className="text-xs font-medium text-muted-foreground">Market Sentiment</div>
                 <div className="text-lg font-bold capitalize">{hivemindStrategy.marketSentiment}</div>
               </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Risk Level</div>
+              <div className="p-3 rounded-lg bg-muted/30">
+                <div className="text-xs font-medium text-muted-foreground">Risk Level</div>
                 <div className="text-lg font-bold capitalize">{hivemindStrategy.riskLevel}</div>
               </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Min Confidence</div>
-                <div className="text-lg font-bold">{hivemindStrategy.minConfidenceThreshold}%</div>
+              <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                <div className="text-xs font-medium text-purple-500">AI Confidence Filter</div>
+                <div className="text-lg font-bold">≥{hivemindStrategy.minConfidenceThreshold}%</div>
               </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Max Daily Trades</div>
-                <div className="text-lg font-bold">{hivemindStrategy.maxDailyTrades}</div>
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                <div className="text-xs font-medium text-blue-500">Unlimited Trading</div>
+                <div className="text-lg font-bold">AI-Driven</div>
               </div>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Trade Size</div>
-                <div className="text-lg font-bold">{hivemindStrategy.budgetPerTrade.toFixed(3)} SOL</div>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Min Volume</div>
+            {/* Quality Filters */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="text-xs font-medium text-green-500">Min Volume</div>
                 <div className="text-lg font-bold">${(hivemindStrategy.minVolumeUSD / 1000).toFixed(0)}k</div>
+                <div className="text-xs text-muted-foreground mt-1">Quality filter</div>
               </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Min Liquidity</div>
+              <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                <div className="text-xs font-medium text-green-500">Min Liquidity</div>
                 <div className="text-lg font-bold">${(hivemindStrategy.minLiquidityUSD / 1000).toFixed(0)}k</div>
+                <div className="text-xs text-muted-foreground mt-1">Safety threshold</div>
               </div>
-              <div>
-                <div className="text-sm font-medium text-muted-foreground">Profit Target</div>
-                <div className="text-lg font-bold">{hivemindStrategy.profitTargetMultiplier.toFixed(1)}x</div>
+              <div className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <div className="text-xs font-medium text-orange-500">Organic Volume</div>
+                <div className="text-lg font-bold">≥60%</div>
+                <div className="text-xs text-muted-foreground mt-1">Wash trading filter</div>
               </div>
             </div>
 
-            <div className="pt-2 border-t">
-              <div className="text-xs text-muted-foreground">
+            <Alert className="bg-purple-500/5 border-purple-500/20">
+              <Sparkles className="h-4 w-4 text-purple-500" />
+              <AlertTitle>AI-Driven Strategy</AlertTitle>
+              <AlertDescription className="text-xs">
                 {hivemindStrategy.reasoning}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Updated: {new Date(hivemindStrategy.generatedAt).toLocaleString()}
-              </div>
-            </div>
+                <div className="mt-2 text-muted-foreground">
+                  Last updated: {new Date(hivemindStrategy.generatedAt).toLocaleString()}
+                </div>
+              </AlertDescription>
+            </Alert>
           </CardContent>
         </Card>
       )}
 
-      {/* Autonomous Capital Management Info */}
-      <Card className="border-blue-500/50">
+      {/* How It Works - Autonomous System */}
+      <Card className="border-green-500/30 bg-gradient-to-r from-background to-green-500/5">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-blue-500" />
-            Autonomous Capital Management
+            <Zap className="h-5 w-5 text-green-500" />
+            How Autonomous Trading Works
           </CardTitle>
           <CardDescription>
-            Self-managing system - no budget restrictions, maximum profit focus
+            100% AI-driven decision making with multi-layer risk protection
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Alert className="border-blue-500/50 bg-blue-500/10">
-            <Brain className="h-4 w-4" />
-            <AlertTitle>Fully Autonomous Trading</AlertTitle>
-            <AlertDescription className="space-y-2">
-              <p>The system autonomously manages all capital to maximize profits:</p>
-              <ul className="list-disc list-inside space-y-1 mt-2">
-                <li>Uses ALL available wallet balance (minus 0.01 SOL fee reserve)</li>
-                <li>Position sizing grows with portfolio (compounding gains)</li>
-                <li>AI-driven entry and exit decisions (6-model consensus)</li>
-                <li>Dynamic risk management with stop-loss protection</li>
-                <li>No manual budget limits - system self-optimizes</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
-
-          <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-muted/30">
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">Fee Reserve</div>
-              <div className="text-lg font-bold">0.01 SOL</div>
-              <div className="text-xs text-muted-foreground">Always maintained</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Capital Management */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-green-500">Capital Management</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">No Budget Limits</div>
+                    <div className="text-xs text-muted-foreground">Uses all available capital (minus 0.01 SOL fee reserve)</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Dynamic Sizing</div>
+                    <div className="text-xs text-muted-foreground">Positions scale 10-15% of portfolio based on AI confidence</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Exponential Compounding</div>
+                    <div className="text-xs text-muted-foreground">Trade sizes grow proportionally with portfolio value</div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">Max Position</div>
-              <div className="text-lg font-bold">15% Portfolio</div>
-              <div className="text-xs text-muted-foreground">Scales with growth</div>
+
+            {/* AI Decision Making */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-purple-500">AI Decision Making</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <Brain className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">6-Model Consensus</div>
+                    <div className="text-xs text-muted-foreground">Cerebras, Gemini, DeepSeek, ChatAnywhere, Groq, OpenAI</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Activity className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Continuous Monitoring</div>
+                    <div className="text-xs text-muted-foreground">Quick scans every 2.5min, deep analysis every 30min</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <TrendingUp className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Smart Entry & Exit</div>
+                    <div className="text-xs text-muted-foreground">AI analyzes momentum, liquidity, and trends for optimal timing</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="text-sm text-muted-foreground">
-            <p className="font-medium">How compounding works:</p>
-            <p className="mt-1">Position sizes grow with your portfolio value. Starting at 10% of portfolio per trade, up to 15% max with high AI confidence. As your wallet grows to 1 SOL → 10 SOL → 100 SOL, position sizes grow proportionally, enabling exponential compounding. Diversification enforced: max 25% of portfolio in any single position.</p>
+          {/* Risk Protection */}
+          <div className="pt-4 border-t">
+            <h3 className="text-sm font-semibold text-orange-500 mb-3">Multi-Layer Risk Protection</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="p-2 rounded bg-muted/50 border">
+                <div className="font-medium">Stop-Loss</div>
+                <div className="text-muted-foreground">-30% auto-sell</div>
+              </div>
+              <div className="p-2 rounded bg-muted/50 border">
+                <div className="font-medium">AI Exit</div>
+                <div className="text-muted-foreground">≥50% confidence</div>
+              </div>
+              <div className="p-2 rounded bg-muted/50 border">
+                <div className="font-medium">Concentration</div>
+                <div className="text-muted-foreground">25% max/token</div>
+              </div>
+              <div className="p-2 rounded bg-muted/50 border">
+                <div className="font-medium">Quality Filter</div>
+                <div className="text-muted-foreground">60% organic vol</div>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
