@@ -29,6 +29,7 @@ The platform also includes three types of trading bots:
 - **Capital calculation:** Available = wallet SOL balance - 0.01 SOL fee reserve - sum of active position values
 - **Maintained risk controls:** 25% concentration limit, stop-loss protection, AI-driven exits unchanged
 - **Portfolio Analysis API:** New `/api/ai-bot/analyze-rebalance` endpoint for on-demand full portfolio analysis with forced OpenAI inclusion for testing and comprehensive rebalancing recommendations
+- **Automatic Portfolio Rebalancing:** Every 30 minutes, system analyzes ALL positions with full 7-model hivemind consensus (including OpenAI) and automatically executes sells when AI recommends. No manual intervention required - positions are continuously optimized for maximum performance.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -89,6 +90,7 @@ The bot executes unlimited trades via Jupiter Ultra API when conditions are met 
 **Sell Decision Framework (AI-Driven + Safety Overrides):**
 - **Quick Monitoring:** AI continuously monitors all positions (every 2.5 minutes via Cerebras for fast checks).
 - **Deep Scan Analysis:** Full 7-model AI consensus analyzes all holdings during deep scans (every 30 minutes) for comprehensive position management with SELL/HOLD/ADD recommendations.
+- **Automatic Portfolio Rebalancing:** Every 30 minutes, separate rebalancing scheduler analyzes ALL positions with full 7-model hivemind consensus (including OpenAI) and automatically executes sells when AI recommends. Operates independently of monitoring and deep scans for maximum portfolio optimization.
 - **Batch Portfolio Analysis:** When evaluating positions for sells, ALL positions are analyzed together in one hivemind call (instead of one-by-one), providing better portfolio-wide insights with same API usage.
 - **Automatic Stop-Loss Override:** 
   - Regular positions: Immediately sells at -30% loss regardless of AI recommendation
