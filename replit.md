@@ -10,13 +10,18 @@ The platform also includes three types of trading bots:
 
 ## Recent Updates
 
-### October 24, 2025 - Autonomous Capital Management & Real-time Holdings Analysis
+### October 24, 2025 - Autonomous Capital Management & Intelligent AI Usage
 - **Removed ALL budget restrictions:** System now uses entire wallet balance (minus 0.01 SOL fee reserve)
 - **Implemented dynamic position sizing:** Trades scale with portfolio value (10% base, up to 15% max with high confidence)
 - **Enabled true exponential compounding:** Position caps grow with portfolio (1 SOL → 0.15 max, 100 SOL → 15 SOL max)
 - **Real-time Wallet Holdings:** New API endpoint fetches actual SPL token balances from Solana blockchain
 - **Batch Price Fetching:** Consolidated Jupiter API calls by 90%+ using batch endpoint (up to 100 tokens per call)
 - **Dual OpenAI Key Failover:** Added OPENAI_API_KEY_2 as separate hivemind provider for automatic redundancy
+- **Intelligent OpenAI Usage Strategy:** Hybrid 4-mode system maximizes value while minimizing costs:
+  - Deep scans during peak trading hours (9am-5pm UTC) include OpenAI for best liquidity opportunities
+  - OpenAI always included for high-confidence trades (85%+ expected swing trades)
+  - Position monitoring (every 2.5 min) uses only Cerebras for efficiency (90% cost reduction)
+  - Automatic tie-breaker mode when free models disagree on buy/sell decisions
 - **Portfolio Analytics:** Dashboard displays token breakdown, diversification metrics, concentration analysis
 - **Accurate Calculations:** Portfolio value = SOL balance + sum(all token values), avoiding double-counting
 - **Updated frontend:** Removed budget controls, added autonomous management panel + holdings analysis card
@@ -131,11 +136,12 @@ A 0.5% transaction fee applies after the first 60 free transactions per project,
     -   `/pumpfun/trending` - Top trending tokens
     -   `/pumpfun/migrated` - Newly graduated tokens (PumpFun → Raydium)
 -   **AI Hive Mind Providers (7-Model Active Consensus with Failover):**
-    -   Cerebras AI (Llama 3.3-70B)
-    -   Google Gemini (Gemini 2.0 Flash)
-    -   DeepSeek V3 (deepseek-chat)
-    -   ChatAnywhere (GPT-4o-mini)
-    -   Groq (Llama 3.3-70B)
-    -   OpenAI Primary (GPT-4o-mini) - OPENAI_API_KEY
-    -   OpenAI Backup (GPT-4o-mini) - OPENAI_API_KEY_2 (automatic failover)
+    -   Cerebras AI (Llama 3.3-70B) - Free, fast
+    -   Google Gemini (Gemini 2.0 Flash) - Free tier
+    -   DeepSeek V3 (deepseek-chat) - Free tier
+    -   ChatAnywhere (GPT-4o-mini) - Free tier
+    -   Groq (Llama 3.3-70B) - Free
+    -   OpenAI Primary (GPT-4o-mini) - OPENAI_API_KEY (paid, strategic use)
+    -   OpenAI Backup (GPT-4o-mini) - OPENAI_API_KEY_2 (paid, automatic failover)
+    -   **Intelligent OpenAI Usage:** OpenAI models included strategically during peak trading hours (9am-5pm UTC), for high-confidence opportunities (85%+ expected confidence), and as tie-breakers when free models disagree. Position monitoring uses only Cerebras for efficiency.
 -   DexScreener API (token market data & trending tokens)
