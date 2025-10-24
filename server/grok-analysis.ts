@@ -155,7 +155,8 @@ export async function analyzeTokenWithHiveMind(
     throw new Error("No AI providers configured for hive mind");
   }
 
-  console.log(`[Hive Mind] Querying ${clients.length} AI models for consensus...`);
+  const providers = clients.map(c => c.provider).join(", ");
+  console.log(`[Hive Mind] Querying ${clients.length} AI models for consensus: ${providers}`);
   
   // Query all models in parallel
   const votes = await Promise.all(

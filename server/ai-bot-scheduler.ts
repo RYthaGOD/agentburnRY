@@ -654,7 +654,7 @@ async function executeAITradingBot(project: Project) {
             lastCheckPriceSOL: token.priceSOL.toString(),
             lastCheckProfitPercent: "0",
             aiConfidenceAtBuy: analysis.confidence,
-            aiPotentialAtBuy: analysis.potentialPercent.toString(),
+            aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
           });
 
           botState.dailyTradesExecuted++;
@@ -753,7 +753,19 @@ export function startAITradingBotScheduler() {
     return;
   }
 
+  // Log active AI providers
+  const activeProviders = [];
+  if (process.env.CEREBRAS_API_KEY) activeProviders.push("Cerebras");
+  if (process.env.GOOGLE_AI_KEY) activeProviders.push("Google Gemini");
+  if (process.env.DEEPSEEK_API_KEY) activeProviders.push("DeepSeek");
+  if (process.env.CHATANYWHERE_API_KEY) activeProviders.push("ChatAnywhere");
+  if (process.env.TOGETHER_API_KEY) activeProviders.push("Together AI");
+  if (process.env.OPENROUTER_API_KEY) activeProviders.push("OpenRouter");
+  if (process.env.GROQ_API_KEY) activeProviders.push("Groq");
+  if (process.env.XAI_API_KEY) activeProviders.push("xAI Grok");
+
   console.log("[AI Bot Scheduler] Starting...");
+  console.log(`[AI Bot Scheduler] Active AI providers (${activeProviders.length}): ${activeProviders.join(", ")}`);
 
   // Run every 10 minutes to reduce API usage
   const cronExpression = "*/10 * * * *";
@@ -1034,7 +1046,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
             lastCheckPriceSOL: token.priceSOL.toString(),
             lastCheckProfitPercent: "0",
             aiConfidenceAtBuy: analysis.confidence,
-            aiPotentialAtBuy: analysis.potentialPercent.toString(),
+            aiPotentialAtBuy: analysis.potentialUpsidePercent.toString(),
           });
 
           botState.dailyTradesExecuted++;
