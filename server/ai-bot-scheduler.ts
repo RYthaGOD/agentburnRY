@@ -685,6 +685,10 @@ async function executeAITradingBot(project: Project) {
 
     console.log(`[AI Bot] Budget status: ${budgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used (${remainingBudget.toFixed(4)} remaining)`);
 
+    // Fetch all existing positions once (optimization: avoid repeated database queries)
+    const allExistingPositions = await storage.getAIBotPositions(project.ownerWalletAddress);
+    console.log(`[AI Bot] 📊 Currently holding ${allExistingPositions.length} active positions`);
+
     // Fetch trending tokens
     const trendingTokens = await fetchTrendingPumpFunTokens();
     
@@ -752,9 +756,8 @@ async function executeAITradingBot(project: Project) {
         console.log(`[AI Bot] BUY signal: ${token.symbol} - ${amountSOL} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
         console.log(`[AI Bot] Reasoning: ${analysis.reasoning}`);
 
-        // Check if we already hold this token
-        const existingPositions = await storage.getAIBotPositions(project.ownerWalletAddress);
-        const existingPosition = existingPositions.find(p => p.tokenMint === token.mint);
+        // Check if we already hold this token (using pre-fetched positions)
+        const existingPosition = allExistingPositions.find(p => p.tokenMint === token.mint);
         
         if (existingPosition) {
           const entryPrice = parseFloat(existingPosition.entryPriceSOL);
@@ -1011,6 +1014,9 @@ async function runQuickTechnicalScan() {
 
         console.log(`[Quick Scan] Found ${opportunities.length} technical opportunities for ${config.ownerWalletAddress.slice(0, 8)}...`);
 
+        // Fetch existing positions once (optimization)
+        const existingPositions = await storage.getAIBotPositions(config.ownerWalletAddress);
+
         // If Cerebras available, analyze top 2 opportunities with fast AI
         if (hasCerebras && opportunities.length > 0) {
           const topOpportunities = opportunities.slice(0, 2); // Only check top 2 to stay fast
@@ -1028,7 +1034,7 @@ async function runQuickTechnicalScan() {
               console.log(`[Quick Scan] 🚀 HIGH QUALITY: ${token.symbol} - ${(quickAnalysis.confidence * 100).toFixed(1)}% confidence (>= 75% threshold)`);
               
               // Execute trade immediately - don't wait for deep scan!
-              await executeQuickTrade(config, token, quickAnalysis, botState);
+              await executeQuickTrade(config, token, quickAnalysis, botState, existingPositions);
             } else {
               console.log(`[Quick Scan] ⏭️ ${token.symbol}: ${quickAnalysis.action.toUpperCase()} ${(quickAnalysis.confidence * 100).toFixed(1)}% (below 75% threshold, will re-analyze in deep scan)`);
             }
@@ -1167,7 +1173,8 @@ async function executeQuickTrade(
   config: any,
   token: TokenMarketData,
   analysis: any,
-  botState: AIBotState
+  botState: AIBotState,
+  existingPositions: any[]
 ) {
   try {
     // Get treasury key
@@ -1219,8 +1226,7 @@ async function executeQuickTrade(
 
     console.log(`[Quick Scan] Dynamic trade amount: ${tradeAmount.toFixed(4)} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%)`);
 
-    // Check if we already hold this token
-    const existingPositions = await storage.getAIBotPositions(config.ownerWalletAddress);
+    // Check if we already hold this token (using pre-fetched positions)
     const existingPosition = existingPositions.find(p => p.tokenMint === token.mint);
     
     if (existingPosition) {

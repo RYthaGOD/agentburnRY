@@ -53,10 +53,11 @@ Preferred communication style: Simple, everyday language.
       - Fetches positions once per scan (not per-token) for efficiency
   - Position monitoring reduced from every 5 to every 10 minutes (50% fewer API calls)
   - Significantly reduces API calls while maintaining responsiveness
-- **Implemented Cerebras-powered position monitoring system** (runs every 5 minutes, free API)
+- **Implemented Cerebras-powered position monitoring system** (runs every 10 minutes, free API)
   - Monitors all active AI bot positions in real-time
   - Updates current prices and profit percentages in database
   - Uses free Cerebras API to avoid costs
+  - Reduced from 5 to 10 minutes to cut API calls in half
 - **Improved AI Bot UI/UX** with live status dashboard
   - Added 3-card status dashboard: Bot Status, Active Positions, Budget
   - Better visual indicators and clearer data presentation
