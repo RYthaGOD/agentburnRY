@@ -1924,17 +1924,25 @@ async function analyzePortfolio(walletAddress: string, solBalance: number): Prom
     let totalTokenValueSOL = 0;
     
     if (balancesData && balancesData.balances && Array.isArray(balancesData.balances)) {
+      // Collect all token mints for batch price fetching (exclude SOL)
+      const tokenMints = balancesData.balances
+        .filter((b: any) => b.mint && b.amount && b.amount > 0 && b.mint !== "So11111111111111111111111111111111111111112")
+        .map((b: any) => b.mint);
+      
+      // Fetch ALL prices in a single batch API call (avoids rate limiting!)
+      const { getBatchTokenPrices } = await import("./jupiter");
+      const priceMap = await getBatchTokenPrices(tokenMints);
+      
+      // Build holdings array with prices from batch response
       for (const balance of balancesData.balances) {
         if (!balance.mint || !balance.amount || balance.amount === 0) continue;
         
         // Skip SOL (native token)
         if (balance.mint === "So11111111111111111111111111111111111111112") continue;
         
-        try {
-          // Get current price in SOL
-          const priceSOL = await getTokenPrice(balance.mint);
+        const priceSOL = priceMap.get(balance.mint);
+        if (priceSOL && priceSOL > 0) {
           const valueSOL = balance.amount * priceSOL;
-          
           totalTokenValueSOL += valueSOL;
           
           holdings.push({
@@ -1944,9 +1952,9 @@ async function analyzePortfolio(walletAddress: string, solBalance: number): Prom
             valueSOL,
             percentOfPortfolio: 0, // Will calculate after we know total
           });
-        } catch (error) {
+        } else {
           // Skip tokens we can't price
-          console.log(`[Portfolio] Could not price token ${balance.symbol || balance.mint}:`, error instanceof Error ? error.message : String(error));
+          console.log(`[Portfolio] Could not price token ${balance.symbol || balance.mint}`);
         }
       }
     }
@@ -2490,8 +2498,14 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
       
       // Collect all positions with current prices
       const dbPositions = await storage.getAIBotPositions(ownerWalletAddress);
+      
+      // Fetch ALL position prices in a single batch API call (avoids rate limiting!)
+      const mints = positionsArray.map(([mint]) => mint);
+      const { getBatchTokenPrices } = await import("./jupiter");
+      const priceMap = await getBatchTokenPrices(mints);
+      
       for (const [mint, position] of positionsArray) {
-        const currentPriceSOL = await getTokenPrice(mint);
+        const currentPriceSOL = priceMap.get(mint);
         if (currentPriceSOL) {
           const profitPercent = ((currentPriceSOL - position.entryPriceSOL) / position.entryPriceSOL) * 100;
           const dbPos = dbPositions.find(p => p.tokenMint === mint);
@@ -3179,10 +3193,15 @@ async function monitorPositionsWithCerebras() {
 
         console.log(`[Position Monitor] Checking ${positions.length} positions for ${config.ownerWalletAddress.slice(0, 8)}...`);
 
+        // Fetch ALL position prices in a single batch API call (avoids rate limiting!)
+        const mints = positions.map(p => p.tokenMint);
+        const { getBatchTokenPrices } = await import("./jupiter");
+        const priceMap = await getBatchTokenPrices(mints);
+
         for (const position of positions) {
           try {
-            // Get current price
-            const currentPriceSOL = await getTokenPrice(position.tokenMint);
+            // Get current price from batch results
+            const currentPriceSOL = priceMap.get(position.tokenMint);
             if (!currentPriceSOL) {
               console.log(`[Position Monitor] Cannot fetch price for ${position.tokenSymbol}`);
               continue;
