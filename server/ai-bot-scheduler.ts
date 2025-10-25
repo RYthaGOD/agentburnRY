@@ -1481,7 +1481,7 @@ async function executeQuickTrade(
     // Scan actual wallet balance
     const { getWalletBalance } = await import("./solana");
     let actualBalance = await getWalletBalance(treasuryPublicKey);
-    const FEE_BUFFER = 0.01; // Always keep 0.01 SOL for fees
+    const FEE_BUFFER = 0.03; // Always keep 0.03 SOL for fees
     let availableBalance = Math.max(0, actualBalance - FEE_BUFFER);
 
     console.log(`[Quick Scan] Wallet balance: ${actualBalance.toFixed(4)} SOL (available: ${availableBalance.toFixed(4)} SOL after fee buffer)`);
@@ -1524,20 +1524,42 @@ async function executeQuickTrade(
       );
       
       if (rotationCandidate) {
-        console.log(`[Quick Scan] 🔄 ROTATING position to capture better opportunity...`);
+        console.log(`[Quick Scan] 🔄 ROTATING position - selling ${rotationCandidate.position.tokenSymbol} first, then buying ${token.symbol}...`);
         
-        // Sell the weaker position
-        const { executeSellTrade } = await import("./trading-bot");
-        const sellResult = await executeSellTrade(
-          treasuryKeyBase58,
-          rotationCandidate.position.tokenMint,
-          rotationCandidate.position.tokenAmount
+        // Sell the weaker position FIRST before buying new token
+        const { sellTokenWithFallback, getTokenDecimals } = await import("./jupiter");
+        const { getAccount } = await import("@solana/spl-token");
+        const { getConnection } = await import("./solana-sdk");
+        
+        // Get token account balance to sell ALL tokens
+        const connection = getConnection();
+        const tokenAccountAddress = await import("@solana/spl-token").then(({ getAssociatedTokenAddress }) => 
+          getAssociatedTokenAddress(
+            new PublicKey(rotationCandidate.position.tokenMint),
+            keypair.publicKey
+          )
         );
         
-        if (sellResult.success && sellResult.solReceived) {
-          // Add freed capital to available balance
-          availableBalance += sellResult.solReceived;
-          console.log(`[Quick Scan] ✅ Freed ${sellResult.solReceived.toFixed(4)} SOL from rotation`);
+        const tokenAccountInfo = await getAccount(connection, tokenAccountAddress);
+        const tokenBalanceRaw = Number(tokenAccountInfo.amount);
+        
+        console.log(`[Quick Scan] 💰 Selling ${rotationCandidate.position.tokenSymbol}: ${tokenBalanceRaw} raw tokens`);
+        
+        const sellResult = await sellTokenWithFallback(
+          treasuryKeyBase58,
+          rotationCandidate.position.tokenMint,
+          tokenBalanceRaw,
+          3000 // 30% slippage for fast execution
+        );
+        
+        if (sellResult.success && sellResult.signature) {
+          // Calculate SOL received (will be refreshed when we check balance)
+          const balanceAfterSell = await getWalletBalance(treasuryPublicKey);
+          const solReceived = balanceAfterSell - actualBalance;
+          availableBalance = Math.max(0, balanceAfterSell - FEE_BUFFER);
+          actualBalance = balanceAfterSell;
+          
+          console.log(`[Quick Scan] ✅ Sold ${rotationCandidate.position.tokenSymbol} for ~${solReceived.toFixed(4)} SOL`);
           console.log(`[Quick Scan] 💰 New available balance: ${availableBalance.toFixed(4)} SOL`);
           
           // Delete the old position
@@ -1546,7 +1568,7 @@ async function executeQuickTrade(
           // Recalculate trade amount with new balance
           tradeAmount = calculateDynamicTradeAmount(baseAmount, analysis.confidence, availableBalance, portfolio.totalValueSOL, portfolioPercent);
           
-          logActivity('opportunistic_rotation', 'success', `🔄 Rotated ${rotationCandidate.position.tokenSymbol} (${rotationCandidate.position.aiConfidenceAtBuy}%) → ${token.symbol} (${(analysis.confidence * 100).toFixed(0)}%)`);
+          logActivity('quick_scan', 'success', `🔄 Rotated ${rotationCandidate.position.tokenSymbol} (${rotationCandidate.position.aiConfidenceAtBuy}%) → ${token.symbol} (${(analysis.confidence * 100).toFixed(0)}%)`);
         } else {
           console.log(`[Quick Scan] ❌ Rotation sell failed:`, sellResult.error);
           console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol}: Insufficient funds after failed rotation`);
@@ -2189,7 +2211,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
     const treasuryKeypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
 
     // Scan actual wallet balance
-    const FEE_BUFFER = 0.01; // Always keep 0.01 SOL for fees
+    const FEE_BUFFER = 0.03; // Always keep 0.03 SOL for fees
     let actualBalance = await getWalletBalance(treasuryKeypair.publicKey.toString());
     let availableBalance = Math.max(0, actualBalance - FEE_BUFFER);
 
@@ -2408,20 +2430,43 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           );
           
           if (rotationCandidate) {
-            addLog(`🔄 ROTATING position to capture better opportunity...`, "info");
+            addLog(`🔄 ROTATING position - selling ${rotationCandidate.position.tokenSymbol} first, then buying ${token.symbol}...`, "info");
             
-            // Sell the weaker position
-            const { executeSellTrade } = await import("./trading-bot");
-            const sellResult = await executeSellTrade(
-              treasuryKeyBase58,
-              rotationCandidate.position.tokenMint,
-              rotationCandidate.position.tokenAmount
+            // Sell the weaker position FIRST before buying new token
+            const { sellTokenWithFallback } = await import("./jupiter");
+            const { getAccount } = await import("@solana/spl-token");
+            const { getConnection, loadKeypairFromPrivateKey } = await import("./solana-sdk");
+            
+            // Get token account balance to sell ALL tokens
+            const connection = getConnection();
+            const treasuryKeypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
+            const tokenAccountAddress = await import("@solana/spl-token").then(({ getAssociatedTokenAddress }) => 
+              getAssociatedTokenAddress(
+                new PublicKey(rotationCandidate.position.tokenMint),
+                treasuryKeypair.publicKey
+              )
             );
             
-            if (sellResult.success && sellResult.solReceived) {
-              // Add freed capital to available balance
-              availableBalance += sellResult.solReceived;
-              addLog(`✅ Freed ${sellResult.solReceived.toFixed(4)} SOL from rotation (${rotationCandidate.position.tokenSymbol} → ${token.symbol})`, "success");
+            const tokenAccountInfo = await getAccount(connection, tokenAccountAddress);
+            const tokenBalanceRaw = Number(tokenAccountInfo.amount);
+            
+            addLog(`💰 Selling ${rotationCandidate.position.tokenSymbol}: ${tokenBalanceRaw} raw tokens`, "info");
+            
+            const sellResult = await sellTokenWithFallback(
+              treasuryKeyBase58,
+              rotationCandidate.position.tokenMint,
+              tokenBalanceRaw,
+              3000 // 30% slippage for fast execution
+            );
+            
+            if (sellResult.success && sellResult.signature) {
+              // Calculate SOL received (refresh balance)
+              const balanceAfterSell = await getWalletBalance(treasuryKeypair.publicKey.toString());
+              const solReceived = balanceAfterSell - actualBalance;
+              availableBalance = Math.max(0, balanceAfterSell - FEE_BUFFER);
+              actualBalance = balanceAfterSell;
+              
+              addLog(`✅ Sold ${rotationCandidate.position.tokenSymbol} for ~${solReceived.toFixed(4)} SOL (${rotationCandidate.position.tokenSymbol} → ${token.symbol})`, "success");
               
               // Delete the old position
               await storage.deleteAIBotPositionByMint(ownerWalletAddress, rotationCandidate.position.tokenMint);
@@ -2429,7 +2474,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
               // Recalculate trade amount with new balance
               tradeAmount = calculateDynamicTradeAmount(budgetPerTrade, analysis.confidence, availableBalance, portfolio.totalValueSOL, portfolioPercent);
               
-              logActivity('opportunistic_rotation', 'success', `🔄 Deep Scan: Rotated ${rotationCandidate.position.tokenSymbol} → ${token.symbol}`);
+              logActivity('deep_scan', 'success', `🔄 Deep Scan: Rotated ${rotationCandidate.position.tokenSymbol} → ${token.symbol}`);
             } else {
               addLog(`❌ Rotation sell failed: ${sellResult.error}`, "error");
               addLog(`⏭️ SKIP ${token.symbol}: Insufficient funds after failed rotation`, "warning");

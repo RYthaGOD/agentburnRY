@@ -32,7 +32,7 @@ A dedicated scheduler service automates buyback execution using `node-cron`. It 
 This bot operates independently with configurations stored in a dedicated `aiBotConfigs` table. It uses a "hive mind" system where 7 AI models vote on trades with automatic failover. Access is restricted to whitelisted wallets.
 
 **Autonomous Capital Management:**
-- Uses available wallet balance (minus 0.01 SOL fee reserve) for trades.
+- Uses available wallet balance (minus 0.03 SOL fee reserve) for trades.
 - Dynamic position sizing (10% base, up to 15% with high AI confidence) for compounding.
 - AI-driven exits with no fixed profit targets.
 - High confidence requirements (minimum 75% AI confidence threshold).
@@ -85,7 +85,12 @@ This bot operates independently with configurations stored in a dedicated `aiBot
   - SWING positions: Sell when AI confidence drops below 50%, AI recommends SELL with 60%+ confidence, or profit ≥100%
 
 **Opportunistic Position Rotation:**
-- Automatically sells weaker positions to capture better opportunities when capital is insufficient
+- Automatically sells weaker positions FIRST to free capital, then buys better opportunities when wallet balance is insufficient
+- **Rotation Implementation:**
+  - Uses Jupiter → PumpFun fallback for reliable position closure
+  - Sells entire token position and captures actual SOL received
+  - Refreshes available balance before executing new buy
+  - Deletes sold position from database immediately
 - **Rotation Criteria:**
   - New opportunity must be 15%+ higher AI confidence than weakest position
   - OR cutting a loss (-5% or worse) to capture good opportunity (70%+ confidence)
