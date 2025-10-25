@@ -4,7 +4,7 @@
 import cron from "node-cron";
 import { storage } from "./storage";
 import { analyzeTokenWithGrok, analyzeTokenWithHiveMind, isGrokConfigured, getAIClient, type TokenMarketData } from "./grok-analysis";
-import { buyTokenWithJupiter, getTokenPrice, getSwapOrder, executeSwapOrder, getWalletBalances } from "./jupiter";
+import { buyTokenWithJupiter, buyTokenWithFallback, getTokenPrice, getSwapOrder, executeSwapOrder, getWalletBalances } from "./jupiter";
 import OpenAI from "openai";
 import { sellTokenOnPumpFun } from "./pumpfun";
 import { getTreasuryKey } from "./key-manager";
@@ -1367,13 +1367,17 @@ async function executeQuickTrade(
       console.log(`[Quick Scan]    Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`);
     }
 
-    // Execute buy
-    const result = await buyTokenWithJupiter(
+    // Execute buy with Jupiter → PumpSwap fallback
+    const result = await buyTokenWithFallback(
       treasuryKeyBase58,
       token.mint,
       tradeAmount,
       1000 // 10% slippage
     );
+    
+    if (result.success && result.route) {
+      console.log(`[Quick Scan] ✅ Bought via ${result.route.toUpperCase()}`);
+    }
 
     if (result.success && result.signature) {
       // Calculate actual tokens received
@@ -2116,13 +2120,17 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           addLog(`   Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`, "info");
         }
 
-        // Buy using Jupiter Ultra API for better routing and pricing
-        const result = await buyTokenWithJupiter(
+        // Buy with Jupiter → PumpSwap fallback for better success rate
+        const result = await buyTokenWithFallback(
           treasuryKeyBase58,
           token.mint,
           tradeAmount,
           1000 // 10% slippage (1000 bps)
         );
+        
+        if (result.success && result.route) {
+          addLog(`✅ Bought via ${result.route.toUpperCase()}`, "success");
+        }
 
         if (result.success && result.signature) {
           // Calculate actual tokens received
@@ -3319,48 +3327,37 @@ async function executeSellForPosition(
     console.log(`[Position Monitor] 💰 Tokens to sell: ${tokenAmount.toFixed(2)} ${position.tokenSymbol}`);
     console.log(`[Position Monitor] 📊 Entry: ${entryPrice.toFixed(9)} SOL, Investment: ${amountSOL.toFixed(4)} SOL`);
 
-    // Execute sell via Jupiter
-    const { getSwapOrder, executeSwapOrder, getTokenDecimals } = await import("./jupiter");
-    const { Connection, LAMPORTS_PER_SOL } = await import("@solana/web3.js");
-    
-    const SOL_MINT = "So11111111111111111111111111111111111111112";
+    // Execute sell with Jupiter → PumpSwap fallback
+    const { sellTokenWithFallback, getTokenDecimals } = await import("./jupiter");
     
     // Get token decimals for proper amount calculation
     const decimals = await getTokenDecimals(position.tokenMint);
     const tokenAmountRaw = Math.floor(tokenAmount * Math.pow(10, decimals));
     
-    console.log(`[Position Monitor] 🔄 Executing Jupiter swap: ${tokenAmount.toFixed(2)} ${position.tokenSymbol} → SOL`);
+    console.log(`[Position Monitor] 🔄 Executing swap with fallback: ${tokenAmount.toFixed(2)} ${position.tokenSymbol} → SOL`);
     
-    // Get swap quote from Jupiter
-    const swapOrder = await getSwapOrder(
+    // Try Jupiter first, then PumpSwap if it fails
+    const sellResult = await sellTokenWithFallback(
+      treasuryKeyBase58,
       position.tokenMint,
-      SOL_MINT,
       tokenAmountRaw,
-      treasuryKeypair.publicKey.toString(),
       3000 // 30% slippage for illiquid meme coins
     );
 
-    if (!swapOrder) {
-      console.error(`[Position Monitor] ❌ Failed to get Jupiter quote for ${position.tokenSymbol} - likely no liquidity or delisted`);
-      console.log(`[Position Monitor] 🗑️ Closing position for ${position.tokenSymbol} (illiquid token)`);
+    if (!sellResult.success) {
+      console.error(`[Position Monitor] ❌ Failed to sell ${position.tokenSymbol} on both Jupiter and PumpSwap: ${sellResult.error}`);
+      console.log(`[Position Monitor] 🗑️ Closing position for ${position.tokenSymbol} (unable to sell)`);
       
       // Delete the position since we can't sell it
       await storage.deleteAIBotPosition(position.id);
       
       // Log the loss
-      logActivity('position_monitor', 'warning', `⚠️ ${position.tokenSymbol}: Unable to sell (no liquidity) - position closed`);
+      logActivity('position_monitor', 'warning', `⚠️ ${position.tokenSymbol}: Unable to sell (${sellResult.error}) - position closed`);
       return;
     }
 
-    // Execute the swap
-    const swapResult = await executeSwapOrder(swapOrder, treasuryKeyBase58);
-    
-    if (!swapResult || !swapResult.transactionId) {
-      console.error(`[Position Monitor] ❌ Failed to execute sell for ${position.tokenSymbol}`);
-      return;
-    }
-
-    const signature = swapResult.transactionId;
+    const signature = sellResult.signature!;
+    console.log(`[Position Monitor] ✅ Sold via ${sellResult.route?.toUpperCase()}: ${signature}`);
 
     console.log(`[Position Monitor] ✅ SOLD ${position.tokenSymbol}!`);
     console.log(`[Position Monitor] 📝 Transaction: https://solscan.io/tx/${signature}`);
@@ -3521,10 +3518,30 @@ async function rebalancePortfolioWithOpenAI() {
             console.log(`[Portfolio Rebalancer] Reason: ${analysis.reasoning}`);
 
             try {
-              // Execute sell via Jupiter
-              const sellResult = await sellTokenWithJupiter(
+              // Execute sell with Jupiter → PumpSwap fallback
+              const { sellTokenWithFallback, getTokenDecimals } = await import("./jupiter");
+              const { getAccount } = await import("@solana/spl-token");
+              const { getConnection } = await import("./solana-sdk");
+              
+              // Get treasury keypair for balance checking
+              const treasuryKeypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
+              
+              // Get token account balance
+              const connection = getConnection();
+              const tokenAccountAddress = await import("@solana/spl-token").then(({ getAssociatedTokenAddress }) => 
+                getAssociatedTokenAddress(
+                  new PublicKey(position.tokenMint),
+                  treasuryKeypair.publicKey
+                )
+              );
+              
+              const tokenAccountInfo = await getAccount(connection, tokenAccountAddress);
+              const tokenBalanceRaw = Number(tokenAccountInfo.amount);
+              
+              const sellResult = await sellTokenWithFallback(
                 treasuryKeyBase58,
                 position.tokenMint,
+                tokenBalanceRaw,
                 1000 // 10% slippage for fast execution
               );
 

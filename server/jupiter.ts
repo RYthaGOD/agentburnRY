@@ -481,3 +481,159 @@ export async function getTokenDecimals(mintAddress: string): Promise<number> {
     return 6;
   }
 }
+
+/**
+ * Buy tokens with automatic PumpSwap fallback
+ * Tries Jupiter first, falls back to PumpFun if Jupiter fails
+ * @param walletPrivateKey - Wallet private key (base58)
+ * @param tokenMint - Token mint address to buy
+ * @param amountSOL - Amount of SOL to spend
+ * @param slippageBps - Slippage in basis points (default: 500 = 5%)
+ * @returns Transaction result with signature
+ */
+export async function buyTokenWithFallback(
+  walletPrivateKey: string,
+  tokenMint: string,
+  amountSOL: number,
+  slippageBps: number = 500
+): Promise<{ success: boolean; signature?: string; outputAmount?: number; error?: string; route?: 'jupiter' | 'pumpfun' }> {
+  // Try Jupiter first
+  console.log(`[Swap] Attempting to buy ${amountSOL} SOL worth of ${tokenMint} via Jupiter...`);
+  const jupiterResult = await buyTokenWithJupiter(walletPrivateKey, tokenMint, amountSOL, slippageBps);
+  
+  if (jupiterResult.success) {
+    console.log(`[Swap] ✅ Jupiter buy successful: ${jupiterResult.signature}`);
+    return { ...jupiterResult, route: 'jupiter' };
+  }
+  
+  // Jupiter failed, try PumpFun
+  console.log(`[Swap] ⚠️ Jupiter failed: ${jupiterResult.error}`);
+  console.log(`[Swap] 🔄 Falling back to PumpSwap...`);
+  
+  try {
+    const { buyTokenOnPumpFun } = await import("./pumpfun");
+    const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
+    
+    const walletKeypair = loadKeypairFromPrivateKey(walletPrivateKey);
+    const slippagePercent = slippageBps / 100; // Convert basis points to percentage
+    
+    const pumpfunResult = await buyTokenOnPumpFun(
+      walletKeypair,
+      tokenMint,
+      amountSOL,
+      slippagePercent,
+      0.00001 // priority fee
+    );
+    
+    if (pumpfunResult.success) {
+      console.log(`[Swap] ✅ PumpSwap buy successful: ${pumpfunResult.signature}`);
+      return {
+        success: true,
+        signature: pumpfunResult.signature,
+        route: 'pumpfun'
+      };
+    }
+    
+    console.error(`[Swap] ❌ PumpSwap also failed: ${pumpfunResult.error}`);
+    return {
+      success: false,
+      error: `Both Jupiter and PumpSwap failed. Jupiter: ${jupiterResult.error}, PumpSwap: ${pumpfunResult.error}`
+    };
+  } catch (error) {
+    console.error(`[Swap] ❌ PumpSwap fallback error:`, error);
+    return {
+      success: false,
+      error: `Jupiter failed: ${jupiterResult.error}. PumpSwap error: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+}
+
+/**
+ * Sell tokens with automatic PumpSwap fallback
+ * Tries Jupiter first, falls back to PumpFun if Jupiter fails
+ * @param walletPrivateKey - Wallet private key (base58)
+ * @param tokenMint - Token mint address to sell
+ * @param tokenBalance - Raw token balance (with decimals)
+ * @param slippageBps - Slippage in basis points (default: 3000 = 30%)
+ * @returns Transaction result with signature
+ */
+export async function sellTokenWithFallback(
+  walletPrivateKey: string,
+  tokenMint: string,
+  tokenBalance: number,
+  slippageBps: number = 3000
+): Promise<{ success: boolean; signature?: string; error?: string; route?: 'jupiter' | 'pumpfun' }> {
+  const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
+  const walletKeypair = loadKeypairFromPrivateKey(walletPrivateKey);
+  const walletAddress = walletKeypair.publicKey.toString();
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  
+  // Try Jupiter first
+  console.log(`[Swap] Attempting to sell ${tokenBalance} tokens of ${tokenMint} via Jupiter...`);
+  
+  try {
+    const swapOrder = await getSwapOrder(
+      tokenMint,
+      SOL_MINT,
+      tokenBalance,
+      walletAddress,
+      slippageBps
+    );
+    
+    if (swapOrder) {
+      const result = await executeSwapOrder(swapOrder, walletPrivateKey);
+      console.log(`[Swap] ✅ Jupiter sell successful: ${result.transactionId}`);
+      return {
+        success: true,
+        signature: result.transactionId,
+        route: 'jupiter'
+      };
+    }
+  } catch (error) {
+    console.warn(`[Swap] ⚠️ Jupiter sell failed:`, error instanceof Error ? error.message : error);
+  }
+  
+  // Jupiter failed, try PumpFun
+  console.log(`[Swap] 🔄 Jupiter failed - falling back to PumpSwap...`);
+  
+  try {
+    const { sellTokenOnPumpFun } = await import("./pumpfun");
+    
+    // Get token decimals to convert raw balance to human-readable amount
+    const decimals = await getTokenDecimals(tokenMint);
+    const tokenAmount = tokenBalance / Math.pow(10, decimals);
+    
+    const slippagePercent = slippageBps / 100; // Convert basis points to percentage
+    
+    const pumpfunResult = await sellTokenOnPumpFun(
+      walletKeypair,
+      tokenMint,
+      {
+        amount: tokenAmount,
+        slippage: slippagePercent,
+        priorityFee: 0.00001
+      }
+    );
+    
+    if (pumpfunResult.success) {
+      console.log(`[Swap] ✅ PumpSwap sell successful: ${pumpfunResult.signature}`);
+      return {
+        success: true,
+        signature: pumpfunResult.signature,
+        route: 'pumpfun'
+      };
+    }
+    
+    console.error(`[Swap] ❌ PumpSwap also failed: ${pumpfunResult.error}`);
+    return {
+      success: false,
+      error: `Both Jupiter and PumpSwap failed to sell token. PumpSwap error: ${pumpfunResult.error}`
+    };
+  } catch (error) {
+    console.error(`[Swap] ❌ PumpSwap fallback error:`, error);
+    return {
+      success: false,
+      error: `Jupiter failed (no liquidity). PumpSwap error: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+}
