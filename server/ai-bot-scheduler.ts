@@ -1931,24 +1931,37 @@ function calculateDynamicTradeAmount(
   const modeConfig = determineTradeMode(confidence);
   const effectivePercentPerTrade = modeConfig.positionSizePercent;
   
-  // Calculate percentage-based trade size (enables compounding as portfolio grows)
-  const portfolioBasedAmount = (portfolioValue * effectivePercentPerTrade) / 100;
+  // CONSERVATIVE: Calculate EXACT percentage of CURRENT portfolio value
+  const percentageBasedAmount = (portfolioValue * effectivePercentPerTrade) / 100;
   
-  // Use the LARGER of: base amount OR portfolio-based amount (allows growth)
-  let tradeSize = Math.max(baseAmount, portfolioBasedAmount);
+  // Network minimum (0.01 SOL required for Solana transactions)
+  const NETWORK_MINIMUM = 0.01;
   
-  // Mode-specific caps
-  const dynamicMaxPosition = Math.max(
-    0.02, // Minimum 0.02 SOL
-    (portfolioValue * (modeConfig.positionSizePercent + 2)) / 100 // Small buffer above target
-  );
-  tradeSize = Math.min(tradeSize, dynamicMaxPosition);
+  // Start with percentage-based amount
+  let tradeSize = percentageBasedAmount;
   
-  // Ensure minimum trade size (0.01 SOL minimum for Solana network)
-  tradeSize = Math.max(tradeSize, 0.01);
+  // Apply network minimum if needed
+  if (tradeSize < NETWORK_MINIMUM && availableBalance >= NETWORK_MINIMUM) {
+    tradeSize = NETWORK_MINIMUM;
+  }
+  
+  // STRICT CAP: Never exceed percentage limit unless we're below network minimum
+  // For small portfolios where percentage < 0.01 SOL, allow the 0.01 SOL minimum
+  // For larger portfolios, strictly enforce the percentage cap
+  if (portfolioValue >= NETWORK_MINIMUM / (effectivePercentPerTrade / 100)) {
+    // Portfolio is large enough that percentage-based sizing produces viable trades
+    tradeSize = Math.min(tradeSize, percentageBasedAmount);
+  }
   
   // Cap at available balance (can't trade more than we have)
-  return Math.min(tradeSize, availableBalance);
+  tradeSize = Math.min(tradeSize, availableBalance);
+  
+  // Final safety: Ensure we never return less than network minimum (if balance allows)
+  if (tradeSize < NETWORK_MINIMUM && availableBalance >= NETWORK_MINIMUM) {
+    tradeSize = NETWORK_MINIMUM;
+  }
+  
+  return tradeSize;
 }
 
 /**
