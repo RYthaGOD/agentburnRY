@@ -23,6 +23,7 @@ interface AIBotState {
   projectId: string;
   dailyTradesExecuted: number;
   lastResetDate: string; // YYYY-MM-DD
+  lastActivityTimestamp: number; // Track when bot was last active for cleanup
   activePositions: Map<string, { mint: string; entryPriceSOL: number; amountSOL: number }>;
 }
 
@@ -31,6 +32,54 @@ interface AIBotState {
  * Key: ownerWalletAddress
  */
 const aiBotStates = new Map<string, AIBotState>();
+
+/**
+ * Cleanup stale bot states and expired cache entries to prevent memory leaks
+ * Runs every hour to remove inactive bots (24h+ inactivity) and expired cache
+ */
+function cleanupMemory() {
+  const now = Date.now();
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  
+  // Cleanup 1: Remove bot states that haven't been active in 24 hours
+  let removedBots = 0;
+  for (const [walletAddress, botState] of Array.from(aiBotStates.entries())) {
+    if (now - botState.lastActivityTimestamp > ONE_DAY_MS) {
+      aiBotStates.delete(walletAddress);
+      removedBots++;
+    }
+  }
+  if (removedBots > 0) {
+    console.log(`[Memory Cleanup] Removed ${removedBots} inactive bot state(s)`);
+  }
+  
+  // Cleanup 2: Remove expired cache entries from tokenDataCache
+  let removedTokenCache = 0;
+  for (const [key, cache] of Array.from(tokenDataCache.entries())) {
+    if (cache.expiresAt < now) {
+      tokenDataCache.delete(key);
+      removedTokenCache++;
+    }
+  }
+  if (removedTokenCache > 0) {
+    console.log(`[Memory Cleanup] Removed ${removedTokenCache} expired token cache entry(ies)`);
+  }
+  
+  // Cleanup 3: Remove expired cache entries from analysisCache
+  let removedAnalysisCache = 0;
+  for (const [key, cache] of Array.from(analysisCache.entries())) {
+    if (cache.expiresAt < now) {
+      analysisCache.delete(key);
+      removedAnalysisCache++;
+    }
+  }
+  if (removedAnalysisCache > 0) {
+    console.log(`[Memory Cleanup] Removed ${removedAnalysisCache} expired analysis cache entry(ies)`);
+  }
+  
+  // Log memory stats
+  console.log(`[Memory Cleanup] Current state: ${aiBotStates.size} active bots, ${tokenDataCache.size} token cache entries, ${analysisCache.size} analysis cache entries`);
+}
 
 /**
  * Global scheduler status for dashboard display
@@ -89,10 +138,10 @@ function logActivity(category: ActivityLog['category'], type: ActivityLog['type'
     message,
   };
   
-  // Keep only last 100 logs
+  // Keep only last 100 logs (optimized: pop instead of slice to avoid array recreation)
   schedulerStatus.activityLogs.unshift(log);
   if (schedulerStatus.activityLogs.length > 100) {
-    schedulerStatus.activityLogs = schedulerStatus.activityLogs.slice(0, 100);
+    schedulerStatus.activityLogs.pop(); // Remove oldest log instead of creating new array
   }
   
   // Broadcast to connected clients
@@ -978,9 +1027,13 @@ async function runQuickTechnicalScan() {
             projectId: config.ownerWalletAddress,
             dailyTradesExecuted: 0,
             lastResetDate: today,
+            lastActivityTimestamp: Date.now(),
             activePositions: new Map(),
           };
           aiBotStates.set(config.ownerWalletAddress, botState);
+        } else {
+          // Update last activity timestamp
+          botState.lastActivityTimestamp = Date.now();
         }
 
         // Get hivemind strategy (required for 100% autonomous operation)
@@ -1614,9 +1667,18 @@ export function startAITradingBotScheduler() {
     });
   });
 
+  // Memory cleanup every hour (remove stale bot states and expired cache)
+  cron.schedule("0 * * * *", () => {
+    cleanupMemory();
+  });
+
+  // Run initial cleanup on startup
+  cleanupMemory();
+
   console.log("[AI Bot Scheduler] Active");
   console.log("  - Quick scans: Every 5 minutes (technical + DeepSeek AI for 75%+ trades) 🚀 2X FASTER");
   console.log("  - Deep scans: Every 30 minutes (7-model consensus for all opportunities)");
+  console.log("  - Memory cleanup: Every hour (removes inactive bots and expired cache)");
 }
 
 /**
@@ -1797,9 +1859,13 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         projectId: ownerWalletAddress, // Use wallet address as ID
         dailyTradesExecuted: 0,
         lastResetDate: today,
+        lastActivityTimestamp: Date.now(),
         activePositions: new Map(),
       };
       aiBotStates.set(ownerWalletAddress, botState);
+    } else {
+      // Update last activity timestamp
+      botState.lastActivityTimestamp = Date.now();
     }
 
     // Get wallet keypair from encrypted key in config
