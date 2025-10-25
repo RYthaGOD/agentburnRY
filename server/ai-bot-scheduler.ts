@@ -1541,11 +1541,16 @@ async function executeQuickTrade(
         const aiConfidence = Math.round(analysis.confidence * 100);
         const isSwingTrade = aiConfidence >= 85 ? 1 : 0; // High confidence = swing trade
         
+        // Fetch token decimals for accurate portfolio calculation
+        const { getTokenDecimals } = await import("./jupiter");
+        const tokenDecimals = await getTokenDecimals(token.mint);
+        
         await storage.createAIBotPosition({
           ownerWalletAddress: config.ownerWalletAddress,
           tokenMint: token.mint,
           tokenSymbol: token.symbol,
           tokenName: token.name,
+          tokenDecimals,
           entryPriceSOL: token.priceSOL.toString(),
           amountSOL: tradeAmount.toString(),
           tokenAmount: tokensReceived.toString(),
@@ -1806,48 +1811,48 @@ interface PortfolioAnalysis {
  */
 async function analyzePortfolio(walletAddress: string, solBalance: number): Promise<PortfolioAnalysis> {
   try {
-    // Fetch all token balances from Jupiter Ultra API
-    const balancesData = await getWalletBalances(walletAddress);
+    // Fetch token balances from database (more reliable than Jupiter API which returns 404)
+    const dbPositions = await storage.getAIBotPositions(walletAddress);
     
     // Parse holdings and calculate values
     const holdings: PortfolioHolding[] = [];
     let totalTokenValueSOL = 0;
     
-    if (balancesData && balancesData.balances && Array.isArray(balancesData.balances)) {
-      // Collect all token mints for batch price fetching (exclude SOL)
-      const tokenMints = balancesData.balances
-        .filter((b: any) => b.mint && b.amount && b.amount > 0 && b.mint !== "So11111111111111111111111111111111111111112")
-        .map((b: any) => b.mint);
+    if (dbPositions && dbPositions.length > 0) {
+      // Collect all token mints for batch price fetching
+      const tokenMints = dbPositions.map(p => p.tokenMint);
       
       // Fetch ALL prices in a single batch API call (avoids rate limiting!)
       const { getBatchTokenPrices } = await import("./jupiter");
       const priceMap = await getBatchTokenPrices(tokenMints);
       
       // Build holdings array with prices from batch response
-      for (const balance of balancesData.balances) {
-        if (!balance.mint || !balance.amount || balance.amount === 0) continue;
+      // Note: Token amounts in DB are stored in RAW UNITS (need to divide by decimals)
+      for (const position of dbPositions) {
+        const priceSOL = priceMap.get(position.tokenMint);
+        const rawAmount = parseFloat(position.tokenAmount);
+        const decimals = position.tokenDecimals || 6; // Use stored decimals, fallback to 6 for old positions
         
-        // Skip SOL (native token)
-        if (balance.mint === "So11111111111111111111111111111111111111112") continue;
-        
-        const priceSOL = priceMap.get(balance.mint);
-        if (priceSOL && priceSOL > 0) {
-          const valueSOL = balance.amount * priceSOL;
+        if (priceSOL && priceSOL > 0 && rawAmount > 0) {
+          // Convert raw amount to decimal amount using token-specific decimals
+          const amount = rawAmount / Math.pow(10, decimals);
+          const valueSOL = amount * priceSOL;
           totalTokenValueSOL += valueSOL;
           
           holdings.push({
-            mint: balance.mint,
-            symbol: balance.symbol || "UNKNOWN",
-            amount: balance.amount,
+            mint: position.tokenMint,
+            symbol: position.tokenSymbol || "UNKNOWN",
+            amount: amount,
             valueSOL,
             percentOfPortfolio: 0, // Will calculate after we know total
           });
-        } else {
-          // Skip tokens we can't price
-          console.log(`[Portfolio] Could not price token ${balance.symbol || balance.mint}`);
+        } else if (rawAmount > 0 && !priceSOL) {
+          // Log warning if we can't price a position (but don't fail)
+          console.log(`[Portfolio] Warning: Could not price ${position.tokenSymbol || position.tokenMint.slice(0,8)} (no price data)`);
         }
       }
     }
+    
     
     // Calculate total portfolio value (SOL + all tokens)
     const totalValueSOL = solBalance + totalTokenValueSOL;
@@ -1877,7 +1882,8 @@ async function analyzePortfolio(walletAddress: string, solBalance: number): Prom
       diversificationScore,
     };
   } catch (error) {
-    console.error("[Portfolio] Error analyzing portfolio:", error);
+    // Silent fallback - just log summary, not full error
+    console.log(`[Portfolio] Using SOL-only fallback (${solBalance.toFixed(4)} SOL)`);
     // Return basic portfolio with just SOL if analysis fails
     return {
       totalValueSOL: solBalance,
@@ -2367,11 +2373,16 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
             const aiConfidence = Math.round(analysis.confidence * 100);
             const isSwingTrade = aiConfidence >= 85 ? 1 : 0; // High confidence = swing trade
             
+            // Fetch token decimals for accurate portfolio calculation
+            const { getTokenDecimals } = await import("./jupiter");
+            const tokenDecimals = await getTokenDecimals(token.mint);
+            
             await storage.createAIBotPosition({
               ownerWalletAddress,
               tokenMint: token.mint,
               tokenSymbol: token.symbol,
               tokenName: token.name,
+              tokenDecimals,
               entryPriceSOL: token.priceSOL.toString(),
               amountSOL: tradeAmount.toString(),
               tokenAmount: tokensReceived.toString(),

@@ -155,9 +155,10 @@ export const aiBotPositions = pgTable("ai_bot_positions", {
   tokenMint: text("token_mint").notNull(),
   tokenSymbol: text("token_symbol"),
   tokenName: text("token_name"),
+  tokenDecimals: integer("token_decimals").notNull().default(6), // Token decimal places (6 for PumpFun, 9 for most Solana tokens)
   entryPriceSOL: decimal("entry_price_sol", { precision: 18, scale: 9 }).notNull(),
   amountSOL: decimal("amount_sol", { precision: 18, scale: 9 }).notNull(),
-  tokenAmount: decimal("token_amount", { precision: 30, scale: 9 }).notNull(), // Increased to handle high-supply tokens (billions/trillions)
+  tokenAmount: decimal("token_amount", { precision: 30, scale: 9 }).notNull(), // Stored in RAW UNITS (needs division by 10^decimals)
   buyTxSignature: text("buy_tx_signature").notNull(),
   buyTimestamp: timestamp("buy_timestamp").notNull().defaultNow(),
   lastCheckTimestamp: timestamp("last_check_timestamp").notNull().defaultNow(),

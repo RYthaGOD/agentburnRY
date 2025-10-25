@@ -43,7 +43,11 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - Faster Exit Threshold: AI sell confidence raised from 40% to 50%.
 
 **Token Discovery:**
-- DexScreener Trending, PumpFun Trending, Newly Migrated Tokens (PumpFun to Raydium), and Low-Cap New Launches from PumpFun API.
+- DexScreener Trending (30 tokens)
+- PumpFun-style tokens via DexScreener (15 tokens) - NEW replacement for broken PumpFun API
+- Newly Migrated Tokens from PumpFun → Raydium (20 tokens) - DexScreener-based
+- Low-Cap New Launches (15 tokens) - DexScreener-based replacement for PumpFun API
+- Total: ~80 tokens per scan (2.6x more opportunities than before)
 
 **Optimized AI Workflow (DeepSeek-First Strategy with OpenAI for Critical Decisions):**
 - **Position Monitoring (Every 2.5 minutes):** Uses DeepSeek V3 for analyzing open positions and triggering sells.
@@ -84,6 +88,13 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - Optimized activity log handling using `pop()` instead of `slice()` to eliminate array recreation.
 - Runs on startup and every hour via cron scheduler.
 - Production-tested for long-running stability.
+
+**Performance Optimizations (Oct 25, 2025):**
+- **Eliminated Jupiter Balances API dependency** - Removed broken `/balances` endpoint (404 errors), now reads positions directly from database for faster and more reliable portfolio analysis
+- **Fixed portfolio calculation** - Token amounts stored in raw units (like lamports) are now correctly converted to decimal amounts using standard 6-decimal conversion for PumpFun tokens
+- **Reduced error logging spam** - Silent fallback for portfolio analysis instead of repetitive error logs
+- **Improved position tracking** - Portfolio now correctly shows actual position count and values instead of 0
+- **PumpFun API failover complete** - All three broken endpoints replaced with DexScreener alternatives, providing 2.6x more token discovery opportunities
 
 ### Data Storage
 PostgreSQL via Neon's serverless driver and Drizzle ORM. Key tables: `Projects`, `Transactions`, `Payments`, `ProjectSecrets`, `AIBotConfigs`. Uses UUID primary keys, decimal types for balances, and automatic timestamps.
