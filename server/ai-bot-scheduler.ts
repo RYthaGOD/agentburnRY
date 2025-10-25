@@ -1600,15 +1600,9 @@ export function startAITradingBotScheduler() {
 }
 
 /**
- * Manual trigger for testing (project-based - legacy)
+ * LEGACY: triggerAIBotManually removed (project-based system deprecated)
+ * Use standalone AI bot system instead via /api/ai-bot/* routes
  */
-export async function triggerAIBotManually(projectId: string) {
-  const project = await storage.getProject(projectId);
-  if (!project) {
-    throw new Error("Project not found");
-  }
-  await executeAITradingBot(project);
-}
 
 interface ScanLog {
   timestamp: number;
