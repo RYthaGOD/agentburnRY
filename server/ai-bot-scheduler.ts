@@ -1592,23 +1592,13 @@ async function executeQuickTrade(
         console.log(`[Quick Scan] 🔄 ROTATING position - selling ${rotationCandidate.position.tokenSymbol} first, then buying ${token.symbol}...`);
         
         // Sell the weaker position FIRST before buying new token
-        const { sellTokenWithFallback, getTokenDecimals } = await import("./jupiter");
-        const { getAccount } = await import("@solana/spl-token");
-        const { getConnection } = await import("./solana-sdk");
+        const { sellTokenWithFallback } = await import("./jupiter");
         
-        // Get token account balance to sell ALL tokens
-        const connection = getConnection();
-        const tokenAccountAddress = await import("@solana/spl-token").then(({ getAssociatedTokenAddress }) => 
-          getAssociatedTokenAddress(
-            new PublicKey(rotationCandidate.position.tokenMint),
-            keypair.publicKey
-          )
-        );
+        // Use token amount from database (stored in RAW UNITS)
+        // This is more reliable than querying blockchain (account may not exist or be closed)
+        const tokenBalanceRaw = Math.floor(parseFloat(rotationCandidate.position.tokenAmount));
         
-        const tokenAccountInfo = await getAccount(connection, tokenAccountAddress);
-        const tokenBalanceRaw = Number(tokenAccountInfo.amount);
-        
-        console.log(`[Quick Scan] 💰 Selling ${rotationCandidate.position.tokenSymbol}: ${tokenBalanceRaw} raw tokens`);
+        console.log(`[Quick Scan] 💰 Selling ${rotationCandidate.position.tokenSymbol}: ${tokenBalanceRaw} raw tokens (from DB)`);
         
         const sellResult = await sellTokenWithFallback(
           treasuryKeyBase58,
@@ -2521,23 +2511,14 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
             
             // Sell the weaker position FIRST before buying new token
             const { sellTokenWithFallback } = await import("./jupiter");
-            const { getAccount } = await import("@solana/spl-token");
-            const { getConnection, loadKeypairFromPrivateKey } = await import("./solana-sdk");
+            const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
             
-            // Get token account balance to sell ALL tokens
-            const connection = getConnection();
+            // Use token amount from database (stored in RAW UNITS)
+            // This is more reliable than querying blockchain (account may not exist or be closed)
+            const tokenBalanceRaw = Math.floor(parseFloat(rotationCandidate.position.tokenAmount));
             const treasuryKeypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
-            const tokenAccountAddress = await import("@solana/spl-token").then(({ getAssociatedTokenAddress }) => 
-              getAssociatedTokenAddress(
-                new PublicKey(rotationCandidate.position.tokenMint),
-                treasuryKeypair.publicKey
-              )
-            );
             
-            const tokenAccountInfo = await getAccount(connection, tokenAccountAddress);
-            const tokenBalanceRaw = Number(tokenAccountInfo.amount);
-            
-            addLog(`💰 Selling ${rotationCandidate.position.tokenSymbol}: ${tokenBalanceRaw} raw tokens`, "info");
+            addLog(`💰 Selling ${rotationCandidate.position.tokenSymbol}: ${tokenBalanceRaw} raw tokens (from DB)`, "info");
             
             const sellResult = await sellTokenWithFallback(
               treasuryKeyBase58,
