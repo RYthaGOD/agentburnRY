@@ -3066,6 +3066,49 @@ async function monitorPositionsWithDeepSeek() {
 }
 
 /**
+ * Fetch comprehensive market data from DexScreener for position analysis
+ */
+async function fetchPositionMarketData(tokenMint: string): Promise<{
+  volumeUSD24h: number;
+  liquidityUSD: number;
+  priceChange24h: number;
+  priceChange1h: number;
+  txns24h: number;
+  buyPressure: number;
+  buyTxns24h: number;
+  sellTxns24h: number;
+} | null> {
+  try {
+    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const pairs = data.pairs || [];
+    if (pairs.length === 0) return null;
+
+    const pair = pairs[0]; // Main liquidity pool
+
+    const buyTxns = pair.txns?.h24?.buys || 0;
+    const sellTxns = pair.txns?.h24?.sells || 0;
+    const totalTxns = buyTxns + sellTxns;
+
+    return {
+      volumeUSD24h: parseFloat(pair.volume?.h24 || "0"),
+      liquidityUSD: parseFloat(pair.liquidity?.usd || "0"),
+      priceChange24h: parseFloat(pair.priceChange?.h24 || "0"),
+      priceChange1h: parseFloat(pair.priceChange?.h1 || "0"),
+      txns24h: totalTxns,
+      buyTxns24h: buyTxns,
+      sellTxns24h: sellTxns,
+      buyPressure: totalTxns > 0 ? (buyTxns / totalTxns) * 100 : 50,
+    };
+  } catch (error) {
+    console.error(`[Position Monitor] Failed to fetch DexScreener data:`, error);
+    return null;
+  }
+}
+
+/**
  * Analyze position with AI to determine if we should sell
  * Uses DeepSeek first (free), falls back to OpenAI if DeepSeek fails
  */
@@ -3079,6 +3122,35 @@ async function analyzePositionWithAI(
   const isSwingTrade = position.isSwingTrade === 1;
   const aiConfidenceAtBuy = parseFloat(position.aiConfidenceAtBuy || "0");
 
+  // Fetch comprehensive market data from DexScreener
+  console.log(`[Position Monitor] 📊 Fetching market data for ${position.tokenSymbol} from DexScreener...`);
+  const marketData = await fetchPositionMarketData(position.tokenMint);
+
+  // Build comprehensive analysis prompt with market metrics
+  let marketMetrics = "";
+  if (marketData) {
+    console.log(`[Position Monitor] ✅ Market data fetched for ${position.tokenSymbol}:`);
+    console.log(`  - Volume: $${marketData.volumeUSD24h.toLocaleString()}, Liquidity: $${marketData.liquidityUSD.toLocaleString()}`);
+    console.log(`  - Buy Pressure: ${marketData.buyPressure.toFixed(1)}% (${marketData.buyTxns24h} buys vs ${marketData.sellTxns24h} sells)`);
+    console.log(`  - Price Change: 24h ${marketData.priceChange24h > 0 ? '+' : ''}${marketData.priceChange24h.toFixed(2)}%, 1h ${marketData.priceChange1h > 0 ? '+' : ''}${marketData.priceChange1h.toFixed(2)}%`);
+    
+    marketMetrics = `
+MARKET METRICS (24h):
+- Volume: $${marketData.volumeUSD24h.toLocaleString()}
+- Liquidity: $${marketData.liquidityUSD.toLocaleString()}
+- Price Change 24h: ${marketData.priceChange24h > 0 ? '+' : ''}${marketData.priceChange24h.toFixed(2)}%
+- Price Change 1h: ${marketData.priceChange1h > 0 ? '+' : ''}${marketData.priceChange1h.toFixed(2)}%
+- Total Transactions: ${marketData.txns24h}
+- Buy Transactions: ${marketData.buyTxns24h}
+- Sell Transactions: ${marketData.sellTxns24h}
+- Buy Pressure: ${marketData.buyPressure.toFixed(1)}% (healthy above 45%)
+- Volume/Liquidity Ratio: ${marketData.liquidityUSD > 0 ? (marketData.volumeUSD24h / marketData.liquidityUSD).toFixed(2) : 'N/A'}`;
+  } else {
+    console.log(`[Position Monitor] ⚠️ Failed to fetch market data for ${position.tokenSymbol} - AI will analyze with limited data`);
+    marketMetrics = `
+MARKET METRICS: Unavailable (low liquidity or delisted token)`;
+  }
+
   const prompt = `Analyze this cryptocurrency position to decide: HOLD or SELL?
 
 Position: ${position.tokenSymbol}
@@ -3088,11 +3160,13 @@ Profit/Loss: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}%
 AI Confidence at Buy: ${aiConfidenceAtBuy.toFixed(0)}%
 Position Type: ${isSwingTrade ? 'SWING TRADE (high confidence, wider stop-loss)' : 'Regular Position'}
 Stop-Loss: ${isSwingTrade ? '-50%' : '-30%'}
+${marketMetrics}
 
 DECISION RULES:
 - For ${isSwingTrade ? 'SWING TRADES' : 'REGULAR positions'}: SELL only if you have 60%+ confidence momentum is dead
+- RED FLAGS: Buy pressure <40%, declining volume, negative price trends, low liquidity
 - Consider: Is buying pressure declining? Is volume dropping? Are there red flags?
-- If momentum is still strong or unclear, HOLD
+- If momentum is still strong or data unclear, HOLD
 
 Respond ONLY with valid JSON:
 {
