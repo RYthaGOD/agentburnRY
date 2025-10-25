@@ -99,8 +99,19 @@ export async function executeSwapOrder(
     console.log(`Executing Jupiter swap for wallet: ${keypair.publicKey.toString()}`);
     console.log(`Request ID: ${swapOrder.requestId}`);
     
-    // Step 1: Deserialize the unsigned transaction
+    // Step 1: Validate and deserialize the unsigned transaction
+    if (!swapOrder.transaction || swapOrder.transaction.trim() === '') {
+      throw new Error('Invalid transaction: empty or undefined transaction data from Jupiter');
+    }
+    
     const transactionBuffer = Buffer.from(swapOrder.transaction, "base64");
+    
+    if (transactionBuffer.length === 0) {
+      throw new Error('Invalid transaction: buffer is empty after base64 decode');
+    }
+    
+    console.log(`Transaction buffer size: ${transactionBuffer.length} bytes`);
+    
     const { VersionedTransaction } = await import("@solana/web3.js");
     const transaction = VersionedTransaction.deserialize(transactionBuffer);
     

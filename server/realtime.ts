@@ -6,7 +6,7 @@ import type { Server } from "http";
 import { getTokenPrice } from "./jupiter";
 
 interface WebSocketMessage {
-  type: "price_update" | "bot_event" | "transaction_event" | "accuracy_check";
+  type: "price_update" | "bot_event" | "transaction_event" | "accuracy_check" | "ai_activity_log";
   data: any;
   timestamp: number;
 }

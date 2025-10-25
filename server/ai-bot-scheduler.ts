@@ -1100,6 +1100,13 @@ async function executeAITradingBot(project: Project) {
         if (result.success && result.signature) {
           // Calculate actual tokens received
           const tokensReceived = result.outputAmount || 0;
+          
+          if (tokensReceived === 0) {
+            console.log(`[AI Bot] ⚠️ Swap succeeded but received 0 tokens - skipping position creation`);
+            console.log(`[AI Bot] This can happen with rug pulls or tokens with no liquidity`);
+            continue;
+          }
+          
           console.log(`[AI Bot] ✅ Received ${tokensReceived} tokens from swap`);
           
           // Update budget tracking
@@ -1763,6 +1770,13 @@ async function executeQuickTrade(
     if (result.success && result.signature) {
       // Calculate actual tokens received
       const tokensReceived = result.outputAmount || 0;
+      
+      if (tokensReceived === 0) {
+        console.log(`[Quick Scan] ⚠️ Swap succeeded but received 0 tokens - skipping position creation`);
+        console.log(`[Quick Scan] This can happen with rug pulls or tokens with no liquidity`);
+        return;
+      }
+      
       console.log(`[Quick Scan] ✅ Received ${tokensReceived} tokens from swap`);
       
       // Update budget tracking
@@ -2513,6 +2527,13 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         if (result.success && result.signature) {
           // Calculate actual tokens received
           const tokensReceived = result.outputAmount || 0;
+          
+          if (tokensReceived === 0) {
+            addLog(`⚠️ Swap succeeded but received 0 tokens - skipping position creation`, "warning");
+            addLog(`This can happen with rug pulls or tokens with no liquidity`, "info");
+            continue;
+          }
+          
           addLog(`✅ Received ${tokensReceived} tokens from swap`, "success");
           
           // Update budget tracking and available balance

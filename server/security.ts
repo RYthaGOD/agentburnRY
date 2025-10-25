@@ -70,11 +70,11 @@ function getClientIp(req: Request): string {
 
 /**
  * Global rate limiter - Protects against DDoS and brute force attacks
- * 100 requests per 15 minutes per IP
+ * 500 requests per 15 minutes per IP (supports real-time polling at 5s intervals)
  */
 export const globalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 500, // Limit each IP to 500 requests per windowMs (~33 req/min, enough for real-time features)
   message: {
     error: "Too many requests from this IP, please try again later.",
   },
