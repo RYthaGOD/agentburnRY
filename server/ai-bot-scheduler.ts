@@ -3337,13 +3337,32 @@ async function monitorPositionsWithDeepSeek() {
 
             console.log(`[Position Monitor] ${position.tokenSymbol}: Entry $${entryPrice.toFixed(9)} → Current $${currentPriceSOL.toFixed(9)} (${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}%)`);
 
-            // Check stop-loss conditions (safety override)
+            // 🎯 AGGRESSIVE PROFIT-TAKING: Auto-sell at 100%+ to lock in big winners
+            if (profitPercent >= 100) {
+              console.log(`[Position Monitor] 🎉 ${position.tokenSymbol} hit +100% profit target → SELLING to lock gains!`);
+              await executeSellForPosition(config, position, treasuryKeyBase58, `Profit-taking at +${profitPercent.toFixed(2)}% (100%+ target)`);
+              continue;
+            }
+
+            // 🛡️ TRAILING STOP-LOSS: Lock in profits as position grows
             const isSwingTrade = position.isSwingTrade === 1;
-            const stopLossThreshold = isSwingTrade ? -50 : -30;
+            let stopLossThreshold = isSwingTrade ? -50 : -30;
+            
+            // Upgrade stop-loss based on profit level
+            if (profitPercent >= 200) {
+              stopLossThreshold = 100; // At +200%, protect +100% gains
+              console.log(`[Position Monitor] 🛡️ ${position.tokenSymbol} trailing stop upgraded to +100% (from ${profitPercent.toFixed(2)}%)`);
+            } else if (profitPercent >= 100) {
+              stopLossThreshold = 50; // At +100%, protect +50% gains
+              console.log(`[Position Monitor] 🛡️ ${position.tokenSymbol} trailing stop upgraded to +50% (from ${profitPercent.toFixed(2)}%)`);
+            } else if (profitPercent >= 50) {
+              stopLossThreshold = 20; // At +50%, protect +20% gains
+              console.log(`[Position Monitor] 🛡️ ${position.tokenSymbol} trailing stop upgraded to +20% (from ${profitPercent.toFixed(2)}%)`);
+            }
             
             if (profitPercent <= stopLossThreshold) {
-              console.warn(`[Position Monitor] ⚠️ ${position.tokenSymbol} hit ${stopLossThreshold}% stop-loss → SELLING immediately`);
-              await executeSellForPosition(config, position, treasuryKeyBase58, `Stop-loss at ${profitPercent.toFixed(2)}%`);
+              console.warn(`[Position Monitor] ⚠️ ${position.tokenSymbol} hit ${stopLossThreshold}% trailing stop → SELLING to protect gains!`);
+              await executeSellForPosition(config, position, treasuryKeyBase58, `Trailing stop-loss at ${profitPercent.toFixed(2)}%`);
               continue;
             }
 
@@ -3535,27 +3554,65 @@ async function executeSellForPosition(
     
     const treasuryKeypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
     const amountSOL = parseFloat(position.amountSOL);
-
-    // Calculate token amount based on SOL spent and entry price
-    // This is a workaround since we don't store actual tokenAmount from buy
     const entryPrice = parseFloat(position.entryPriceSOL);
-    const estimatedTokens = amountSOL / entryPrice;
-    
-    console.log(`[Position Monitor] Estimated tokens to sell: ${estimatedTokens.toFixed(2)} (based on ${amountSOL} SOL @ ${entryPrice} SOL/token)`);
+
+    console.log(`[Position Monitor] 💰 Tokens to sell: ${tokenAmount.toFixed(2)} ${position.tokenSymbol}`);
+    console.log(`[Position Monitor] 📊 Entry: ${entryPrice.toFixed(9)} SOL, Investment: ${amountSOL.toFixed(4)} SOL`);
 
     // Execute sell via Jupiter
-    const { getSwapOrder, executeSwapOrder } = await import("./jupiter");
+    const { getSwapOrder, executeSwapOrder, getTokenDecimals } = await import("./jupiter");
     const { Connection, LAMPORTS_PER_SOL } = await import("@solana/web3.js");
     
     const SOL_MINT = "So11111111111111111111111111111111111111112";
     
-    // For now, we can't sell because we don't know the exact token amount
-    // This is a data quality issue that needs to be fixed in the buy phase
-    console.warn(`[Position Monitor] ⚠️ Skipping actual sell for ${position.tokenSymbol} - need to implement proper tokenAmount tracking first`);
-    console.warn(`[Position Monitor] TODO: Parse Jupiter swap response to get actual tokens received during buy`);
+    // Get token decimals for proper amount calculation
+    const decimals = await getTokenDecimals(position.tokenMint);
+    const tokenAmountRaw = Math.floor(tokenAmount * Math.pow(10, decimals));
     
-    // Mark position for manual review instead of selling
-    // await storage.deleteAIBotPosition(position.id);
+    console.log(`[Position Monitor] 🔄 Executing Jupiter swap: ${tokenAmount.toFixed(2)} ${position.tokenSymbol} → SOL`);
+    
+    // Get swap quote from Jupiter
+    const swapOrder = await getSwapOrder(
+      position.tokenMint,
+      SOL_MINT,
+      tokenAmountRaw,
+      30 // 30% slippage for illiquid meme coins
+    );
+
+    if (!swapOrder) {
+      console.error(`[Position Monitor] ❌ Failed to get Jupiter quote for ${position.tokenSymbol}`);
+      return;
+    }
+
+    // Execute the swap
+    const signature = await executeSwapOrder(swapOrder, treasuryKeypair);
+    
+    if (!signature) {
+      console.error(`[Position Monitor] ❌ Failed to execute sell for ${position.tokenSymbol}`);
+      return;
+    }
+
+    console.log(`[Position Monitor] ✅ SOLD ${position.tokenSymbol}!`);
+    console.log(`[Position Monitor] 📝 Transaction: https://solscan.io/tx/${signature}`);
+
+    // Calculate profit/loss
+    const currentPrice = parseFloat(position.lastCheckPriceSOL || position.entryPriceSOL);
+    const profitPercent = parseFloat(position.lastCheckProfitPercent || "0");
+    const profitSOL = (currentPrice - entryPrice) * tokenAmount;
+    
+    console.log(`[Position Monitor] 💰 P&L: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}% (${profitSOL > 0 ? '+' : ''}${profitSOL.toFixed(4)} SOL)`);
+
+    // Update budget tracking (free up capital for new trades)
+    const newBudgetUsed = Math.max(0, parseFloat(config.budgetUsed || "0") - amountSOL);
+    await storage.updateAIBotConfig(config.ownerWalletAddress, {
+      budgetUsed: newBudgetUsed.toString(),
+    });
+
+    console.log(`[Position Monitor] 💼 Capital freed: ${amountSOL.toFixed(4)} SOL (available for new trades)`);
+
+    // Delete position from database
+    await storage.deleteAIBotPosition(position.id);
+    console.log(`[Position Monitor] 🗑️ Position closed and removed from tracking`);
     
   } catch (error) {
     console.error(`[Position Monitor] Error executing sell for ${position.tokenSymbol}:`, error);
