@@ -1453,7 +1453,8 @@ function cacheAnalysis(tokenMint: string, analysis: any): void {
 }
 
 /**
- * Fast single-model analysis using DeepSeek (free 5M tokens, superior reasoning)
+ * Fast single-model analysis with AUTOMATIC FAILOVER
+ * Tries: DeepSeek Primary → DeepSeek Backup → OpenAI → Cerebras → Groq
  * Used for quick 75%+ confidence trades
  * Results cached for 30 minutes to reduce API calls
  */
@@ -1473,14 +1474,8 @@ async function analyzeTokenWithDeepSeekOnly(
   if (cached) {
     return cached;
   }
-  
-  try {
-    const deepSeekClient = new OpenAI({
-      baseURL: "https://api.deepseek.com",
-      apiKey: process.env.DEEPSEEK_API_KEY,
-    });
 
-    const prompt = `Analyze this Solana token for trading (quick scan - use your superior reasoning):
+  const prompt = `Analyze this Solana token for trading (quick scan - use your superior reasoning):
 
 Token: ${tokenData.name} (${tokenData.symbol})
 Price: $${tokenData.priceUSD.toFixed(6)} (${tokenData.priceSOL.toFixed(9)} SOL)
@@ -1503,40 +1498,67 @@ Respond ONLY with valid JSON:
   "riskLevel": "low" | "medium" | "high"
 }`;
 
-    const response = await deepSeekClient.chat.completions.create({
-      model: "deepseek-chat",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.3,
-      max_tokens: 500,
-    });
+  // Try providers in order: DeepSeek Primary → DeepSeek Backup → OpenAI → Cerebras → Groq
+  const providers = [
+    { name: "DeepSeek", baseURL: "https://api.deepseek.com", apiKey: process.env.DEEPSEEK_API_KEY, model: "deepseek-chat" },
+    { name: "DeepSeek #2", baseURL: "https://api.deepseek.com", apiKey: process.env.DEEPSEEK_API_KEY_2, model: "deepseek-chat" },
+    { name: "OpenAI", baseURL: "https://api.openai.com/v1", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o-mini" },
+    { name: "OpenAI #2", baseURL: "https://api.openai.com/v1", apiKey: process.env.OPENAI_API_KEY_2, model: "gpt-4o-mini" },
+    { name: "Cerebras", baseURL: "https://api.cerebras.ai/v1", apiKey: process.env.CEREBRAS_API_KEY, model: "llama-3.3-70b" },
+    { name: "Groq", baseURL: "https://api.groq.com/openai/v1", apiKey: process.env.GROQ_API_KEY, model: "llama-3.3-70b-versatile" },
+  ];
 
-    const content = response.choices[0]?.message?.content || "{}";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    const analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : {
-      action: "hold",
-      confidence: 0,
-      reasoning: "Failed to parse DeepSeek response",
-      potentialUpsidePercent: 0,
-      riskLevel: "high",
-    };
+  for (const provider of providers) {
+    if (!provider.apiKey) continue; // Skip if key not available
 
-    // Cache the analysis result
-    cacheAnalysis(tokenData.mint, analysis);
+    try {
+      const client = new OpenAI({
+        baseURL: provider.baseURL,
+        apiKey: provider.apiKey,
+      });
 
-    return analysis;
-  } catch (error) {
-    console.error("[DeepSeek] Quick analysis failed:", error);
-    const errorAnalysis = {
-      action: "hold" as const,
-      confidence: 0,
-      reasoning: "DeepSeek analysis error",
-      potentialUpsidePercent: 0,
-      riskLevel: "high" as const,
-    };
-    
-    // Don't cache error results
-    return errorAnalysis;
+      const response = await client.chat.completions.create({
+        model: provider.model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 500,
+      });
+
+      const content = response.choices[0]?.message?.content || "{}";
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const analysis = jsonMatch ? JSON.parse(jsonMatch[0]) : {
+        action: "hold",
+        confidence: 0,
+        reasoning: "Failed to parse response",
+        potentialUpsidePercent: 0,
+        riskLevel: "high",
+      };
+
+      // Cache the analysis result
+      cacheAnalysis(tokenData.mint, analysis);
+
+      console.log(`[Quick Scan] ✅ ${provider.name} analysis succeeded for ${tokenData.symbol}`);
+      return analysis;
+    } catch (error: any) {
+      const is402 = error?.status === 402;
+      if (is402) {
+        console.warn(`[Quick Scan] ${provider.name} exhausted (402) - trying next provider...`);
+      } else {
+        console.warn(`[Quick Scan] ${provider.name} failed - trying next provider...`);
+      }
+      // Continue to next provider
+    }
   }
+
+  // All providers failed - return safe default
+  console.error("[Quick Scan] ❌ All AI providers failed - returning HOLD");
+  return {
+    action: "hold" as const,
+    confidence: 0,
+    reasoning: "All AI providers unavailable",
+    potentialUpsidePercent: 0,
+    riskLevel: "high" as const,
+  };
 }
 
 /**
