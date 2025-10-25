@@ -111,7 +111,7 @@ function generateStrategyFromSentiment(
 
   switch (sentiment) {
     case "bullish":
-      // STRICT even in bull markets - preserve capital and minimize drawdowns
+      // CONSERVATIVE even in bull markets - preserve capital and minimize drawdowns
       minConfidenceThreshold = 72; // INCREASED: Still very high threshold in bull markets
       maxDailyTrades = 4; // Limited trades
       profitTargetMultiplier = 1.0; // Moderate profit targets
@@ -119,11 +119,11 @@ function generateStrategyFromSentiment(
       preferredMarketCap = "low"; // Quality tokens
       
       budgetPerTrade = 0.025; // REDUCED: Small trades even in bull markets
-      minVolumeUSD = 18000; // INCREASED: Good volume
-      minLiquidityUSD = 12000; // INCREASED: Good liquidity
-      minOrganicScore = 55; // STRICTER: Quality focus
-      minQualityScore = 45; // STRICTER: Quality focus
-      minTransactions24h = 35; // INCREASED: Active required
+      minVolumeUSD = 25000; // CONSERVATIVE: High volume even in bull market ($25k minimum)
+      minLiquidityUSD = 20000; // CONSERVATIVE: High liquidity for safe exits ($20k minimum)
+      minOrganicScore = 70; // CONSERVATIVE: Strict quality filter (70% minimum)
+      minQualityScore = 60; // CONSERVATIVE: Strict quality filter (60% minimum)
+      minTransactions24h = 50; // CONSERVATIVE: Active tokens required (50 minimum)
       minPotentialPercent = 35; // Good upside
       break;
 
@@ -153,17 +153,17 @@ function generateStrategyFromSentiment(
       preferredMarketCap = "low";
       
       budgetPerTrade = 0.02; // REDUCED: Small trades to minimize exposure
-      minVolumeUSD = 25000; // INCREASED: Higher volume for safety
-      minLiquidityUSD = 15000; // INCREASED: Higher liquidity for safe exits
-      minOrganicScore = 65; // STRICTER: Very strict in volatile conditions
-      minQualityScore = 55; // STRICTER: Very strict quality
-      minTransactions24h = 50; // INCREASED: Higher activity required
+      minVolumeUSD = 25000; // CONSERVATIVE: Higher volume for safety ($25k minimum)
+      minLiquidityUSD = 20000; // CONSERVATIVE: Higher liquidity for safe exits ($20k minimum)
+      minOrganicScore = 70; // CONSERVATIVE: Strict in volatile conditions (70% minimum)
+      minQualityScore = 60; // CONSERVATIVE: Strict quality (60% minimum)
+      minTransactions24h = 50; // CONSERVATIVE: Higher activity required (50 minimum)
       minPotentialPercent = 35; // INCREASED: Need good upside to justify volatility risk
       break;
 
     case "neutral":
     default:
-      // STRICT by default - wealth-growing approach with minimal drawdowns
+      // CONSERVATIVE by default - strict wealth-growing approach with minimal drawdowns
       minConfidenceThreshold = 75; // INCREASED: Higher default threshold
       maxDailyTrades = 3;
       profitTargetMultiplier = 0.8;
@@ -171,11 +171,11 @@ function generateStrategyFromSentiment(
       preferredMarketCap = "low";
       
       budgetPerTrade = 0.02; // REDUCED: Smaller default position size
-      minVolumeUSD = 20000; // INCREASED: Higher volume requirement
-      minLiquidityUSD = 15000; // INCREASED: Much higher liquidity requirement
-      minOrganicScore = 60; // INCREASED: Stricter organic score
-      minQualityScore = 50; // INCREASED: Stricter quality score
-      minTransactions24h = 40; // INCREASED: More active tokens
+      minVolumeUSD = 25000; // CONSERVATIVE: Higher volume requirement ($25k minimum)
+      minLiquidityUSD = 20000; // CONSERVATIVE: Much higher liquidity requirement ($20k minimum)
+      minOrganicScore = 70; // CONSERVATIVE: Stricter organic score (70% minimum)
+      minQualityScore = 60; // CONSERVATIVE: Stricter quality score (60% minimum)
+      minTransactions24h = 50; // CONSERVATIVE: More active tokens (50 minimum)
       minPotentialPercent = 30; // INCREASED: Better upside required
       break;
   }
@@ -232,13 +232,13 @@ function getDefaultStrategy(): HivemindStrategy {
     profitTargetMultiplier: 0.8, // Take profits consistently
     riskLevel: "conservative",
     budgetPerTrade: 0.02, // REDUCED: Smaller trades for capital preservation
-    minVolumeUSD: 20000, // INCREASED: Higher volume required
-    minLiquidityUSD: 15000, // INCREASED: Much higher liquidity required
-    minOrganicScore: 60, // STRICTER: Higher organic requirement
-    minQualityScore: 50, // STRICTER: Higher quality requirement
-    minTransactions24h: 40, // INCREASED: More active tokens only
+    minVolumeUSD: 25000, // CONSERVATIVE: Higher volume required ($25k minimum)
+    minLiquidityUSD: 20000, // CONSERVATIVE: Much higher liquidity required ($20k minimum)
+    minOrganicScore: 70, // CONSERVATIVE: Higher organic requirement (70% minimum)
+    minQualityScore: 60, // CONSERVATIVE: Higher quality requirement (60% minimum)
+    minTransactions24h: 50, // CONSERVATIVE: More active tokens only (50 minimum)
     minPotentialPercent: 30, // INCREASED: Better upside required
-    reasoning: "Default strict wealth-growing strategy - Capital preservation with minimal drawdowns through strict quality filters",
+    reasoning: "Default conservative wealth-growing strategy - Capital preservation with minimal drawdowns through strict quality filters (70% organic, 60% quality, $25k volume, $20k liquidity)",
     generatedAt: new Date(),
   };
 }

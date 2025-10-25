@@ -36,7 +36,7 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - Dynamic position sizing (10% base, up to 15% with high AI confidence) for compounding.
 - AI-driven exits with no fixed profit targets.
 - High confidence requirements (minimum 75% AI confidence threshold).
-- Enhanced quality filters: 60%+ organic score, 50%+ quality score, $15k+ volume, $15k+ liquidity.
+- Enhanced quality filters (CONSERVATIVE): 70%+ organic score, 60%+ quality score, $25k+ volume, $20k+ liquidity.
 - Portfolio diversification: 25% maximum concentration limit per position.
 - Stop-loss protection: Automatically sells at -30% loss (-50% for swing trades).
 - Portfolio Drawdown Circuit Breaker: Pauses new trading if portfolio drops >20% from peak, resumes at -15%.
@@ -57,19 +57,19 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - **Strategy Updates (Every 3 hours):** Hivemind regenerates trading strategy to adapt to changing market conditions (reduced from 6 hours for faster adaptation).
 - **Emergency Failover:** Automatically retries with OpenAI if free models fail.
 
-**Dual-Mode Trading Strategy:**
+**Dual-Mode Trading Strategy - CONSERVATIVE APPROACH:**
 
-**SCALP Mode (58-74% AI confidence) - FAST MONEY:**
-- Position size: 5-7% of portfolio (scales with confidence)
+**SCALP Mode (65-79% AI confidence) - SELECTIVE QUICK TRADES:**
+- Position size: 3-6% of portfolio (REDUCED for capital preservation)
 - Max hold time: 30 minutes for rapid turnover
-- Stop-loss: -15% (tight for quick exits)
+- Stop-loss: -10% (TIGHTENED for better capital protection)
 - Profit targets: +4-8% (quick gains, compound faster)
 - Perfect for: High-frequency opportunities, trending tokens, quick momentum plays
 
-**SWING Mode (75%+ AI confidence) - HIGH CONVICTION:**
-- Position size: 8-12% of portfolio (scales with confidence)
+**SWING Mode (80%+ AI confidence) - HIGH CONVICTION ONLY:**
+- Position size: 5-9% of portfolio (REDUCED from 8-12% for lower risk)
 - Max hold time: 24 hours (AI-driven exits)
-- Stop-loss: -30% to -50% (wider for high conviction)
+- Stop-loss: -25% to -40% (TIGHTENED for capital protection)
 - Profit targets: +15% minimum (lets winners run, AI decides optimal exit)
 - Perfect for: Strong fundamentals, high organic volume, institutional interest
 
@@ -84,15 +84,15 @@ This bot operates independently with configurations stored in a dedicated `aiBot
   - SCALP positions: Sell when AI confidence drops below 50%, profit target hit (+4-8%), or 30-minute max hold reached
   - SWING positions: Sell when AI confidence drops below 50%, AI recommends SELL with 60%+ confidence, or profit ≥100%
 
-**Opportunistic Position Rotation:**
+**Opportunistic Position Rotation - CONSERVATIVE SETTINGS:**
 - Automatically sells weaker positions FIRST to free capital, then buys better opportunities when wallet balance is insufficient
 - **Rotation Implementation:**
-  - Uses Jupiter → PumpFun fallback for reliable position closure
-  - Sells entire token position and captures actual SOL received
+  - Uses database tokenAmount (RAW UNITS) instead of blockchain query for reliability
+  - Sells entire token position via Jupiter → PumpFun fallback
   - Refreshes available balance before executing new buy
   - Deletes sold position from database immediately
-- **Rotation Criteria:**
-  - New opportunity must be 15%+ higher AI confidence than weakest position
+- **Rotation Criteria (CONSERVATIVE):**
+  - New opportunity must be 25%+ higher AI confidence than weakest position (RAISED from 15%)
   - OR cutting a loss (-5% or worse) to capture good opportunity (70%+ confidence)
   - Positions must be held for at least 5 minutes before rotation eligible
   - Prioritizes selling: big losses (<-15%), small profits (0-5%), positions with low entry confidence
