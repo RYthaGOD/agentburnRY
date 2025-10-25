@@ -1,7 +1,7 @@
 # BurnBot - Solana Token Buyback & Burn SaaS Platform
 
 ## Overview
-BurnBot is a SaaS platform for Solana SPL token creators, automating token buyback and burn operations. It offers a no-code solution with a dashboard, flexible scheduling, and transaction monitoring to enhance tokenomics through automated and verifiable burn mechanisms. The platform also includes a Volume Bot, a Buy Bot, and an independent AI Trading Bot. The AI Trading Bot scans trending tokens, analyzes them using a 7-model AI consensus system with automatic failover, and executes trades based on AI confidence and profit potential, featuring autonomous capital management and dynamic position sizing.
+BurnBot is a SaaS platform for Solana SPL token creators, automating token buyback and burn operations. It offers a no-code solution with a dashboard, flexible scheduling, and transaction monitoring to enhance tokenomics through automated and verifiable burn mechanisms. The platform also includes a Volume Bot, a Buy Bot, and an independent AI Trading Bot. The AI Trading Bot scans trending tokens, analyzes them using a 7-model AI consensus system with automatic failover, and executes trades based on AI confidence and profit potential, featuring autonomous capital management, dynamic position sizing, and intelligent bundle activity detection to avoid pump-and-dump schemes.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -92,6 +92,16 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - Removes old failed transactions (>7 days retention).
 - Removes old completed transactions (>90 days audit trail retention).
 - Error handling ensures cleanup failures don't disrupt other services.
+
+**Bundle Activity Detection & Token Blacklist:**
+- Automated detection system analyzes tokens for coordinated pump-and-dump schemes before AI analysis.
+- Analyzes 6 suspicious signals: low organic score (<70%), low quality score (<60%), skewed buy/sell ratio (>65% buys), volume manipulation (ratio >10), new token pumps (<24h old with >100% gain), extreme volatility (>200% in 24h).
+- Scoring system: 0-100 (60-84 = suspicious warning, 85+ = critical auto-blacklist).
+- Auto-blacklists critical tokens (≥85 score) with metadata: bundle score, suspicious wallet count, average time between transactions.
+- Tokens with 60-84 score trigger warnings but still proceed to AI analysis.
+- Dashboard UI for viewing/managing blacklisted tokens with filtering and manual add/remove capabilities.
+- Prevents capital loss by filtering obvious scams before expensive AI analysis.
+- Learning system that remembers problematic tokens across sessions.
 
 ### Data Storage
 PostgreSQL via Neon's serverless driver and Drizzle ORM. Uses UUID primary keys, decimal types for balances, and automatic timestamps.
