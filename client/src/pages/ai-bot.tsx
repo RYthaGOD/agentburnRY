@@ -121,6 +121,17 @@ export default function AIBot() {
     refetchInterval: 60000, // Refetch every 60 seconds
   });
 
+  // Fetch scheduler status for real-time activity display
+  const { data: schedulerStatus } = useQuery<{
+    quickScan: { lastRun: number | null; nextRun: number | null; status: string; lastResult?: string };
+    deepScan: { lastRun: number | null; nextRun: number | null; status: string; lastResult?: string };
+    positionMonitor: { lastRun: number | null; nextRun: number | null; status: string; lastResult?: string };
+    portfolioRebalancer: { lastRun: number | null; nextRun: number | null; status: string; lastResult?: string };
+  }>({
+    queryKey: ["/api/ai-bot/scheduler-status"],
+    refetchInterval: 5000, // Refetch every 5 seconds for live updates
+  });
+
   const isEnabled = aiConfig?.enabled || false;
   const budgetUsed = parseFloat(aiConfig?.budgetUsed || "0");
   const totalBudget = parseFloat(aiConfig?.totalBudget || "0");
@@ -444,6 +455,62 @@ export default function AIBot() {
           </Badge>
         </div>
       </div>
+
+      {/* Real-Time Scheduler Status */}
+      {schedulerStatus && (
+        <Card className="border-purple-500/50 bg-gradient-to-r from-background to-purple-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-purple-500" />
+              Live Scheduler Activity
+            </CardTitle>
+            <CardDescription>
+              Real-time bot automation status - updates every 5 seconds
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Quick Scan Status */}
+              <div className="p-4 rounded-lg border bg-muted/30">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-blue-500" />
+                    <span className="text-sm font-medium">Quick Scan (10min)</span>
+                  </div>
+                  <Badge variant={schedulerStatus.quickScan.status === 'running' ? 'default' : schedulerStatus.quickScan.status === 'error' ? 'destructive' : 'outline'} data-testid="badge-quick-scan-status">
+                    {schedulerStatus.quickScan.status}
+                  </Badge>
+                </div>
+                {schedulerStatus.quickScan.lastRun && (
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <div>Last run: {new Date(schedulerStatus.quickScan.lastRun).toLocaleTimeString()}</div>
+                    {schedulerStatus.quickScan.lastResult && <div>{schedulerStatus.quickScan.lastResult}</div>}
+                  </div>
+                )}
+              </div>
+
+              {/* Position Monitor Status */}
+              <div className="p-4 rounded-lg border bg-muted/30">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-green-500" />
+                    <span className="text-sm font-medium">Position Monitor (2.5min)</span>
+                  </div>
+                  <Badge variant={schedulerStatus.positionMonitor.status === 'running' ? 'default' : schedulerStatus.positionMonitor.status === 'error' ? 'destructive' : 'outline'} data-testid="badge-monitor-status">
+                    {schedulerStatus.positionMonitor.status}
+                  </Badge>
+                </div>
+                {schedulerStatus.positionMonitor.lastRun && (
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <div>Last run: {new Date(schedulerStatus.positionMonitor.lastRun).toLocaleTimeString()}</div>
+                    {schedulerStatus.positionMonitor.lastResult && <div>{schedulerStatus.positionMonitor.lastResult}</div>}
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Portfolio Overview - Autonomous Capital Management */}
       <Card className="border-blue-500/50 bg-gradient-to-r from-background to-blue-500/5">

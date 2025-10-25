@@ -56,6 +56,47 @@ interface AIBotState {
 const aiBotStates = new Map<string, AIBotState>();
 
 /**
+ * Global scheduler status for dashboard display
+ */
+interface SchedulerStatus {
+  quickScan: {
+    lastRun: number | null;
+    nextRun: number | null;
+    status: 'idle' | 'running' | 'error';
+    lastResult?: string;
+  };
+  deepScan: {
+    lastRun: number | null;
+    nextRun: number | null;
+    status: 'idle' | 'running' | 'error';
+    lastResult?: string;
+  };
+  positionMonitor: {
+    lastRun: number | null;
+    nextRun: number | null;
+    status: 'idle' | 'running' | 'error';
+    lastResult?: string;
+  };
+  portfolioRebalancer: {
+    lastRun: number | null;
+    nextRun: number | null;
+    status: 'idle' | 'running' | 'error';
+    lastResult?: string;
+  };
+}
+
+const schedulerStatus: SchedulerStatus = {
+  quickScan: { lastRun: null, nextRun: null, status: 'idle' },
+  deepScan: { lastRun: null, nextRun: null, status: 'idle' },
+  positionMonitor: { lastRun: null, nextRun: null, status: 'idle' },
+  portfolioRebalancer: { lastRun: null, nextRun: null, status: 'idle' },
+};
+
+export function getSchedulerStatus(): SchedulerStatus {
+  return { ...schedulerStatus };
+}
+
+/**
  * Cache for DexScreener token data to reduce API calls
  * Cached for 15 minutes to allow frequent scans without hammering API
  */
@@ -1245,6 +1286,10 @@ async function runStandaloneAIBots() {
  * Runs every 10 minutes with cached data for speed
  */
 async function runQuickTechnicalScan() {
+  schedulerStatus.quickScan.status = 'running';
+  schedulerStatus.quickScan.lastRun = Date.now();
+  schedulerStatus.quickScan.nextRun = Date.now() + (10 * 60 * 1000); // 10 minutes
+  
   try {
     console.log("[Quick Scan] Starting enhanced scan (technical + fast AI)...");
     
@@ -1370,8 +1415,12 @@ async function runQuickTechnicalScan() {
     }
     
     console.log("[Quick Scan] Complete");
+    schedulerStatus.quickScan.status = 'idle';
+    schedulerStatus.quickScan.lastResult = `Scanned ${enabledConfigs.length} wallets`;
   } catch (error) {
     console.error("[Quick Scan] Error:", error);
+    schedulerStatus.quickScan.status = 'error';
+    schedulerStatus.quickScan.lastResult = `Error: ${error instanceof Error ? error.message : 'Unknown'}`;
   }
 }
 
@@ -3216,6 +3265,10 @@ async function monitorPositionsWithDeepSeek() {
     return;
   }
 
+  schedulerStatus.positionMonitor.status = 'running';
+  schedulerStatus.positionMonitor.lastRun = Date.now();
+  schedulerStatus.positionMonitor.nextRun = Date.now() + (2.5 * 60 * 1000); // 2.5 minutes
+  
   try {
     console.log("[Position Monitor] Checking open positions with DeepSeek...");
     
@@ -3307,8 +3360,12 @@ async function monitorPositionsWithDeepSeek() {
       }
     }
 
+    schedulerStatus.positionMonitor.status = 'idle';
+    schedulerStatus.positionMonitor.lastResult = `Monitored positions for ${activeConfigs.length} wallets`;
   } catch (error) {
     console.error("[Position Monitor] Error:", error);
+    schedulerStatus.positionMonitor.status = 'error';
+    schedulerStatus.positionMonitor.lastResult = `Error: ${error instanceof Error ? error.message : 'Unknown'}`;
   }
 }
 

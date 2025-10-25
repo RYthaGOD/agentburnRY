@@ -959,6 +959,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get scheduler status for dashboard (shows real-time scheduler activity)
+  app.get("/api/ai-bot/scheduler-status", async (req, res) => {
+    try {
+      const { getSchedulerStatus } = await import("./ai-bot-scheduler");
+      const status = getSchedulerStatus();
+      res.json(status);
+    } catch (error: any) {
+      console.error("Error fetching scheduler status:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get wallet holdings analysis (SOL + all SPL tokens)
   app.get("/api/ai-bot/holdings/:ownerWalletAddress", async (req, res) => {
     try {
