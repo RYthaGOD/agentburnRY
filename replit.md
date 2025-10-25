@@ -49,23 +49,40 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - Low-Cap New Launches (15 tokens) - DexScreener-based replacement for PumpFun API
 - Total: ~80 tokens per scan (2.6x more opportunities than before)
 
-**Optimized AI Workflow (DeepSeek-First Strategy with OpenAI for Critical Decisions):**
-- **Position Monitoring (Every 2.5 minutes):** Uses DeepSeek V3 for analyzing open positions and triggering sells.
-- **Quick Technical Scans (Every 10 minutes):** Scans top trending tokens using DeepSeek V3, executing trades with ≥75% AI confidence.
-- **Deep Scans (Every 30 minutes):** Full 7-model hivemind consensus, including OpenAI, for high-confidence opportunities (85%+ expected swing trades).
+**Optimized AI Workflow (DeepSeek-First Strategy with OpenAI for Critical Decisions) - OPTIMIZED FOR SPEED:**
+- **Position Monitoring (Every 1.5 minutes):** Uses DeepSeek V3 for ultra-fast analysis of open positions and rapid exit detection. ⚡
+- **Quick Technical Scans (Every 2 minutes):** Scans top trending tokens using DeepSeek V3, executing scalp trades with 58-74% AI confidence for quick profits. 🎯
+- **Deep Scans (Every 15 minutes):** Full 7-model hivemind consensus, including OpenAI, for high-confidence swing opportunities (75%+ AI confidence).
 - **Automatic Portfolio Rebalancing (Every 30 minutes):** Forces OpenAI for full 7-model hivemind analysis of ALL positions for optimal sell recommendations.
+- **Strategy Updates (Every 3 hours):** Hivemind regenerates trading strategy to adapt to changing market conditions (reduced from 6 hours for faster adaptation).
 - **Emergency Failover:** Automatically retries with OpenAI if free models fail.
 
-**Swing Trading Strategy:**
-- Auto-detected for positions opened with ≥85% AI confidence.
-- Wider stop-loss (-50%), higher profit targets (100%+), and stricter AI-driven exit criteria.
+**Dual-Mode Trading Strategy:**
+
+**SCALP Mode (58-74% AI confidence) - FAST MONEY:**
+- Position size: 5-7% of portfolio (scales with confidence)
+- Max hold time: 30 minutes for rapid turnover
+- Stop-loss: -15% (tight for quick exits)
+- Profit targets: +4-8% (quick gains, compound faster)
+- Perfect for: High-frequency opportunities, trending tokens, quick momentum plays
+
+**SWING Mode (75%+ AI confidence) - HIGH CONVICTION:**
+- Position size: 8-12% of portfolio (scales with confidence)
+- Max hold time: 24 hours (AI-driven exits)
+- Stop-loss: -30% to -50% (wider for high conviction)
+- Profit targets: +15% minimum (lets winners run, AI decides optimal exit)
+- Perfect for: Strong fundamentals, high organic volume, institutional interest
 
 **Sell Decision Framework:**
-- AI continuously monitors positions (every 2.5 min).
-- Deep scan analysis (every 30 min) by full 7-model AI consensus.
-- Automatic Portfolio Rebalancing scheduler for independent sell recommendations.
-- Automatic Stop-Loss Override: -30% for regular, -50% for swing trades.
-- Regular positions sell when AI confidence drops below 50% or AI recommends SELL. Swing trades sell with 60%+ AI SELL confidence or ≥100% profit.
+- AI continuously monitors positions (every 1.5 min for rapid exits) ⚡.
+- Deep scan analysis (every 15 min) by full 7-model AI consensus for ongoing evaluation.
+- Automatic Portfolio Rebalancing (every 30 min) for independent sell recommendations.
+- **Automatic Stop-Loss Override:**
+  - SCALP trades: -15% (tight control for quick exits)
+  - SWING trades: -30% to -50% (based on entry confidence)
+- **Exit Criteria:**
+  - SCALP positions: Sell when AI confidence drops below 50%, profit target hit (+4-8%), or 30-minute max hold reached
+  - SWING positions: Sell when AI confidence drops below 50%, AI recommends SELL with 60%+ confidence, or profit ≥100%
 
 **Portfolio-Wide Risk Management:**
 - Tracks all-time portfolio peak value.
@@ -96,6 +113,13 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - **Reduced error logging spam** - Graceful fallback with warnings for unpriceable tokens instead of repetitive error logs
 - **Improved position tracking** - Portfolio now correctly shows actual position count and values (8 positions)
 - **PumpFun API failover complete** - All three broken endpoints replaced with DexScreener alternatives, providing 2.6x more token discovery opportunities (30 → 80 tokens per scan)
+- **SPEED OPTIMIZATIONS FOR FAST TRADING:**
+  - Quick scans: 3min → 2min (50% faster opportunity detection)
+  - Position monitoring: 2.5min → 1.5min (66% faster exit detection)
+  - Strategy updates: 6hr → 3hr (2x more adaptive to market changes)
+  - SCALP confidence: 62% → 58% (more quick-profit opportunities)
+  - SCALP hold time: 45min → 30min (faster capital rotation)
+  - SCALP stop-loss: -18% → -15% (tighter risk control for speed)
 
 ### Data Storage
 PostgreSQL via Neon's serverless driver and Drizzle ORM. Key tables: `Projects`, `Transactions`, `Payments`, `ProjectSecrets`, `AIBotConfigs`. Uses UUID primary keys, decimal types for balances, and automatic timestamps.

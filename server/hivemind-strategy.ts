@@ -350,7 +350,7 @@ export async function shouldGenerateNewStrategy(
 
   const hoursOld = (Date.now() - currentStrategy.generatedAt.getTime()) / (1000 * 60 * 60);
 
-  if (hoursOld > 6) {
+  if (hoursOld > 3) {
     console.log(`[Hivemind Strategy] Current strategy is ${hoursOld.toFixed(1)} hours old, regenerating...`);
     return true; // Strategy is stale
   }

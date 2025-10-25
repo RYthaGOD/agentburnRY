@@ -994,8 +994,8 @@ async function runStandaloneAIBots() {
 }
 
 /**
- * Quick scan mode: Technical filters + fast Cerebras AI for 75%+ quality trades
- * Runs every 5 minutes with cached data for speed (2x more opportunities)
+ * Quick scan mode: Technical filters + fast DeepSeek AI for quick money-making trades
+ * Runs every 2 minutes with cached data for speed (3x more opportunities) - OPTIMIZED FOR SPEED
  */
 async function runQuickTechnicalScan() {
   schedulerStatus.quickScan.status = 'running';
@@ -1611,11 +1611,11 @@ function determineTradeMode(confidence: number): TradeModeConfig {
     // Mode A: SCALP - Quick micro-profits with tight risk control
     return {
       mode: "SCALP",
-      minConfidence: 62,
-      positionSizePercent: confidence >= 0.70 ? 6 : confidence >= 0.65 ? 5 : 4,
-      maxHoldMinutes: 45, // 45 minute review threshold
-      stopLossPercent: -18, // Tight stop for scalps
-      profitTargetPercent: confidence >= 0.70 ? 6 : 4, // Quick profit targets
+      minConfidence: 58,
+      positionSizePercent: confidence >= 0.70 ? 7 : confidence >= 0.65 ? 6 : 5,
+      maxHoldMinutes: 30, // 30 minute review threshold for faster trading
+      stopLossPercent: -15, // Tighter stop for faster exits
+      profitTargetPercent: confidence >= 0.70 ? 8 : confidence >= 0.65 ? 6 : 4, // Quick profit targets
     };
   }
 }
@@ -1623,11 +1623,11 @@ function determineTradeMode(confidence: number): TradeModeConfig {
 /**
  * DUAL-MODE POSITION SIZING (SCALP vs SWING)
  * 
- * SCALP Mode (62-74% confidence):
- * - Position: 4-6% of portfolio
- * - Quick profits: +4-6% targets
- * - Tight stop: -18%
- * - Max hold: 45 minutes
+ * SCALP Mode (58-74% confidence) - OPTIMIZED FOR SPEED:
+ * - Position: 5-7% of portfolio
+ * - Quick profits: +4-8% targets
+ * - Tight stop: -15% for fast exits
+ * - Max hold: 30 minutes
  * 
  * SWING Mode (75%+ confidence):
  * - Position: 8-12% of portfolio (scales with confidence)
@@ -1736,8 +1736,8 @@ export function startAITradingBotScheduler() {
   console.log("[AI Bot Scheduler] Starting...");
   console.log(`[AI Bot Scheduler] Active AI providers (${activeProviders.length}): ${activeProviders.join(", ")}`);
 
-  // Quick scans every 3 minutes (dual-mode: scalp + swing opportunities)
-  cron.schedule("*/3 * * * *", () => {
+  // Quick scans every 2 minutes (dual-mode: scalp + swing opportunities) - OPTIMIZED FOR SPEED
+  cron.schedule("*/2 * * * *", () => {
     runQuickTechnicalScan().catch((error) => {
       console.error("[Quick Scan] Unexpected error:", error);
     });
@@ -1764,9 +1764,11 @@ export function startAITradingBotScheduler() {
     console.error("[Quick Scan] Initial scan error:", error);
   });
 
-  console.log("[AI Bot Scheduler] Active - ENHANCED DUAL-MODE TRADING");
-  console.log("  - Quick scans: Every 3 minutes (scalp + swing opportunities) 🎯 FASTER");
-  console.log("  - Deep scans: Every 15 minutes (7-model consensus for high-confidence trades)");
+  console.log("[AI Bot Scheduler] Active - OPTIMIZED FOR FAST TRADING ⚡");
+  console.log("  - Quick scans: Every 2 minutes (58-74% scalp opportunities for quick profits) 🎯 ULTRA FAST");
+  console.log("  - Position monitoring: Every 1.5 minutes (rapid exit detection) ⚡");
+  console.log("  - Deep scans: Every 15 minutes (75%+ swing trades with 7-model consensus)");
+  console.log("  - Strategy updates: Every 3 hours (adaptive hivemind rebalancing)");
   console.log("  - Memory cleanup: Every hour (removes inactive bots and expired cache)");
 }
 
@@ -3106,7 +3108,7 @@ export async function getActivePositions(ownerWalletAddress: string): Promise<Ar
 
 /**
  * Monitor open positions using DeepSeek (free 5M tokens, excellent reasoning)
- * Runs every 2.5 minutes to check position status and make sell recommendations
+ * Runs every 1.5 minutes to check position status and make sell recommendations - OPTIMIZED FOR SPEED
  */
 async function monitorPositionsWithDeepSeek() {
   if (!process.env.DEEPSEEK_API_KEY) {
@@ -3116,11 +3118,11 @@ async function monitorPositionsWithDeepSeek() {
 
   schedulerStatus.positionMonitor.status = 'running';
   schedulerStatus.positionMonitor.lastRun = Date.now();
-  schedulerStatus.positionMonitor.nextRun = Date.now() + (2.5 * 60 * 1000); // 2.5 minutes
+  schedulerStatus.positionMonitor.nextRun = Date.now() + (1.5 * 60 * 1000); // 1.5 minutes
   
   try {
     console.log("[Position Monitor] Checking open positions with DeepSeek...");
-    logActivity('position_monitor', 'info', '🔍 Position Monitor scanning active positions (2.5min interval)');
+    logActivity('position_monitor', 'info', '🔍 Position Monitor scanning active positions (1.5min interval - FAST)');
     
     // Get all active AI bot configs
     const configs = await storage.getAllAIBotConfigs();
@@ -3580,7 +3582,7 @@ async function executeSellForPosition(
 }
 
 /**
- * Start position monitoring scheduler (every 2.5 minutes using free DeepSeek)
+ * Start position monitoring scheduler (every 1.5 minutes using free DeepSeek) - OPTIMIZED FOR SPEED
  * Active management of all positions for optimal performance
  */
 export function startPositionMonitoringScheduler() {
@@ -3592,19 +3594,19 @@ export function startPositionMonitoringScheduler() {
   console.log("[Position Monitor] Starting...");
   console.log("[Position Monitor] Using free DeepSeek API (5M tokens, superior reasoning) for position monitoring");
 
-  // Run every 2.5 minutes for active position management
-  // Using 2-minute intervals with offset to achieve 2.5-minute frequency
+  // Run every 1.5 minutes for active position management
+  // Using 3-minute intervals with 90-second offset to achieve 1.5-minute frequency
   let isOffset = false;
-  cron.schedule("*/2 * * * *", () => {
+  cron.schedule("*/3 * * * *", () => {
     if (isOffset) {
-      // Run at 2.5-minute mark (30 seconds delay)
+      // Run at 1.5-minute mark (90 seconds delay)
       setTimeout(() => {
         monitorPositionsWithDeepSeek().catch((error) => {
           console.error("[Position Monitor] Unexpected error:", error);
         });
-      }, 30000);
+      }, 90000);
     } else {
-      // Run immediately at 2-minute mark
+      // Run immediately at 3-minute mark
       monitorPositionsWithDeepSeek().catch((error) => {
         console.error("[Position Monitor] Unexpected error:", error);
       });
@@ -3612,7 +3614,7 @@ export function startPositionMonitoringScheduler() {
     isOffset = !isOffset; // Alternate between immediate and delayed execution
   });
 
-  console.log("[Position Monitor] Active (checks every 2.5 minutes for active management)");
+  console.log("[Position Monitor] Active (checks every 1.5 minutes for active management)");
 }
 
 /**
