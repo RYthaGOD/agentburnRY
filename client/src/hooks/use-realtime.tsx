@@ -40,8 +40,15 @@ interface AccuracyCheck {
   withinThreshold: boolean;
 }
 
+interface ActivityLog {
+  timestamp: number;
+  type: 'info' | 'success' | 'warning' | 'error' | 'ai_thought';
+  category: 'quick_scan' | 'position_monitor' | 'deep_scan' | 'rebalancer';
+  message: string;
+}
+
 interface WebSocketMessage {
-  type: "price_update" | "bot_event" | "transaction_event" | "accuracy_check";
+  type: "price_update" | "bot_event" | "transaction_event" | "accuracy_check" | "ai_activity_log";
   data: any;
   timestamp: number;
 }
@@ -53,6 +60,7 @@ interface RealtimeContextValue {
   subscribeToBotEvents: (callback: (event: BotEvent) => void) => () => void;
   subscribeToTransactions: (callback: (event: TransactionEvent) => void) => () => void;
   subscribeToAccuracyChecks: (callback: (event: AccuracyCheck) => void) => () => void;
+  subscribeToActivityLogs: (callback: (log: ActivityLog) => void) => () => void;
 }
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null);
@@ -71,6 +79,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const botEventCallbacksRef = useRef<Set<(event: BotEvent) => void>>(new Set());
   const transactionCallbacksRef = useRef<Set<(event: TransactionEvent) => void>>(new Set());
   const accuracyCheckCallbacksRef = useRef<Set<(event: AccuracyCheck) => void>>(new Set());
+  const activityLogCallbacksRef = useRef<Set<(log: ActivityLog) => void>>(new Set());
 
   // WebSocket connection setup function
   const connectWebSocket = useCallback(() => {
@@ -169,6 +178,16 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
             });
             break;
           }
+
+          case "ai_activity_log": {
+            const activityLog = message.data as ActivityLog;
+            
+            // Notify subscribers
+            activityLogCallbacksRef.current.forEach((callback) => {
+              callback(activityLog);
+            });
+            break;
+          }
         }
       } catch (error) {
         console.error("[WebSocket] Error parsing message:", error);
@@ -249,6 +268,13 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  const subscribeToActivityLogs = useCallback((callback: (log: ActivityLog) => void) => {
+    activityLogCallbacksRef.current.add(callback);
+    return () => {
+      activityLogCallbacksRef.current.delete(callback);
+    };
+  }, []);
+
   const value: RealtimeContextValue = {
     isConnected,
     latestPrices,
@@ -256,6 +282,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     subscribeToBotEvents,
     subscribeToTransactions,
     subscribeToAccuracyChecks,
+    subscribeToActivityLogs,
   };
 
   return (

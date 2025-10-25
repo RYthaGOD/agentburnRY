@@ -58,6 +58,13 @@ const aiBotStates = new Map<string, AIBotState>();
 /**
  * Global scheduler status for dashboard display
  */
+interface ActivityLog {
+  timestamp: number;
+  type: 'info' | 'success' | 'warning' | 'error' | 'ai_thought';
+  category: 'quick_scan' | 'position_monitor' | 'deep_scan' | 'rebalancer';
+  message: string;
+}
+
 interface SchedulerStatus {
   quickScan: {
     lastRun: number | null;
@@ -83,6 +90,7 @@ interface SchedulerStatus {
     status: 'idle' | 'running' | 'error';
     lastResult?: string;
   };
+  activityLogs: ActivityLog[];
 }
 
 const schedulerStatus: SchedulerStatus = {
@@ -90,7 +98,33 @@ const schedulerStatus: SchedulerStatus = {
   deepScan: { lastRun: null, nextRun: null, status: 'idle' },
   positionMonitor: { lastRun: null, nextRun: null, status: 'idle' },
   portfolioRebalancer: { lastRun: null, nextRun: null, status: 'idle' },
+  activityLogs: [],
 };
+
+/**
+ * Add activity log and broadcast via WebSocket
+ */
+function logActivity(category: ActivityLog['category'], type: ActivityLog['type'], message: string) {
+  const log: ActivityLog = {
+    timestamp: Date.now(),
+    type,
+    category,
+    message,
+  };
+  
+  // Keep only last 100 logs
+  schedulerStatus.activityLogs.unshift(log);
+  if (schedulerStatus.activityLogs.length > 100) {
+    schedulerStatus.activityLogs = schedulerStatus.activityLogs.slice(0, 100);
+  }
+  
+  // Broadcast to connected clients
+  realtimeService.broadcast({
+    type: 'ai_activity_log',
+    data: log,
+    timestamp: Date.now(),
+  });
+}
 
 export function getSchedulerStatus(): SchedulerStatus {
   return { ...schedulerStatus };
@@ -1292,6 +1326,7 @@ async function runQuickTechnicalScan() {
   
   try {
     console.log("[Quick Scan] Starting enhanced scan (technical + fast AI)...");
+    logActivity('quick_scan', 'info', '🔍 Starting Quick Scan (5min interval)');
     
     const configs = await storage.getAllAIBotConfigs();
     const enabledConfigs = configs.filter((c: any) => c.enabled);
@@ -1415,6 +1450,7 @@ async function runQuickTechnicalScan() {
     }
     
     console.log("[Quick Scan] Complete");
+    logActivity('quick_scan', 'success', `✅ Quick Scan complete - analyzed ${enabledConfigs.length} wallets`);
     schedulerStatus.quickScan.status = 'idle';
     schedulerStatus.quickScan.lastResult = `Scanned ${enabledConfigs.length} wallets`;
   } catch (error) {
@@ -1538,6 +1574,7 @@ Respond ONLY with valid JSON:
       cacheAnalysis(tokenData.mint, analysis);
 
       console.log(`[Quick Scan] ✅ ${provider.name} analysis succeeded for ${tokenData.symbol}`);
+      logActivity('quick_scan', 'ai_thought', `🧠 ${provider.name}: ${tokenData.symbol} → ${analysis.action.toUpperCase()} (${(analysis.confidence * 100).toFixed(0)}%) - ${analysis.reasoning.substring(0, 100)}...`);
       return analysis;
     } catch (error: any) {
       const is402 = error?.status === 402;
@@ -3293,6 +3330,7 @@ async function monitorPositionsWithDeepSeek() {
   
   try {
     console.log("[Position Monitor] Checking open positions with DeepSeek...");
+    logActivity('position_monitor', 'info', '🔍 Position Monitor scanning active positions (2.5min interval)');
     
     // Get all active AI bot configs
     const configs = await storage.getAllAIBotConfigs();
@@ -3470,9 +3508,14 @@ Respond ONLY with valid JSON:
       // Execute sell if AI recommends it with high confidence
       if (analysis.action === "SELL" && analysis.confidence >= 60) {
         console.log(`[Position Monitor] ✅ DeepSeek AI recommends SELL with ${analysis.confidence}% confidence → executing...`);
+        logActivity('position_monitor', 'ai_thought', `🧠 AI: ${position.tokenSymbol} → SELL (${analysis.confidence}%) - ${analysis.reasoning.substring(0, 100)}...`);
+        logActivity('position_monitor', 'success', `🔥 Executing sell for ${position.tokenSymbol} based on AI analysis`);
         await executeSellForPosition(config, position, treasuryKeyBase58, `DeepSeek AI: ${analysis.reasoning} (${analysis.confidence}% confidence)`);
       } else if (analysis.action === "SELL" && analysis.confidence < 60) {
         console.log(`[Position Monitor] ⏸️ DeepSeek suggests SELL but confidence too low (${analysis.confidence}% < 60%) → HOLDING`);
+        logActivity('position_monitor', 'warning', `⏸️ ${position.tokenSymbol}: AI suggests SELL but low confidence (${analysis.confidence}% < 60%)`);
+      } else {
+        logActivity('position_monitor', 'ai_thought', `🧠 AI: ${position.tokenSymbol} → HOLD (${analysis.confidence}%) - ${analysis.reasoning.substring(0, 100)}...`);
       }
       return; // Success - exit
     } catch (deepSeekError: any) {

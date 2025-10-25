@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -19,6 +19,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Switch } from "@/components/ui/switch";
 import type { AIBotConfig } from "@shared/schema";
 import bs58 from "bs58";
+import { useRealtime } from "@/hooks/use-realtime";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +54,24 @@ export default function AIBot() {
     message: string;
     type: "info" | "success" | "warning" | "error";
   }>>([]);
+
+  // Real-time activity logs from WebSocket
+  const [activityLogs, setActivityLogs] = useState<Array<{
+    timestamp: number;
+    type: 'info' | 'success' | 'warning' | 'error' | 'ai_thought';
+    category: 'quick_scan' | 'position_monitor' | 'deep_scan' | 'rebalancer';
+    message: string;
+  }>>([]);
+
+  // Listen for real-time activity logs via WebSocket
+  const { subscribeToActivityLogs } = useRealtime();
+
+  useEffect(() => {
+    const unsubscribe = subscribeToActivityLogs((log) => {
+      setActivityLogs(prev => [log, ...prev].slice(0, 100)); // Keep last 100 logs
+    });
+    return unsubscribe;
+  }, [subscribeToActivityLogs]);
   
   // Private key converter state
   const [arrayKeyInput, setArrayKeyInput] = useState("");
@@ -127,10 +146,30 @@ export default function AIBot() {
     deepScan: { lastRun: number | null; nextRun: number | null; status: string; lastResult?: string };
     positionMonitor: { lastRun: number | null; nextRun: number | null; status: string; lastResult?: string };
     portfolioRebalancer: { lastRun: number | null; nextRun: number | null; status: string; lastResult?: string };
+    activityLogs: Array<{
+      timestamp: number;
+      type: 'info' | 'success' | 'warning' | 'error' | 'ai_thought';
+      category: 'quick_scan' | 'position_monitor' | 'deep_scan' | 'rebalancer';
+      message: string;
+    }>;
   }>({
     queryKey: ["/api/ai-bot/scheduler-status"],
     refetchInterval: 5000, // Refetch every 5 seconds for live updates
   });
+
+  // Load initial activity logs from scheduler status
+  useEffect(() => {
+    if (schedulerStatus?.activityLogs && schedulerStatus.activityLogs.length > 0) {
+      setActivityLogs(prev => {
+        // Merge with WebSocket logs, avoiding duplicates
+        const merged = [...schedulerStatus.activityLogs, ...prev];
+        const unique = merged.filter((log, index, self) =>
+          index === self.findIndex(l => l.timestamp === log.timestamp && l.message === log.message)
+        );
+        return unique.slice(0, 100);
+      });
+    }
+  }, [schedulerStatus]);
 
   const isEnabled = aiConfig?.enabled || false;
   const budgetUsed = parseFloat(aiConfig?.budgetUsed || "0");
@@ -508,6 +547,69 @@ export default function AIBot() {
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Real-Time AI Activity Feed */}
+      {activityLogs.length > 0 && (
+        <Card className="border-cyan-500/50 bg-gradient-to-r from-background to-cyan-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-cyan-500" />
+              Live AI Thoughts & Activity
+            </CardTitle>
+            <CardDescription>
+              Real-time stream of AI analysis, trade decisions, and bot activity
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[400px] w-full rounded-lg border bg-muted/30 p-4">
+              <div className="space-y-2">
+                {activityLogs.map((log, index) => {
+                  const categoryColor = {
+                    quick_scan: 'text-blue-500',
+                    position_monitor: 'text-green-500',
+                    deep_scan: 'text-purple-500',
+                    rebalancer: 'text-cyan-500'
+                  }[log.category];
+
+                  const typeVariant = {
+                    info: 'outline',
+                    success: 'default',
+                    warning: 'secondary',
+                    error: 'destructive',
+                    ai_thought: 'outline'
+                  }[log.type] as any;
+
+                  return (
+                    <div
+                      key={`${log.timestamp}-${index}`}
+                      className="p-3 rounded-lg border bg-background/50 hover-elevate transition-all"
+                      data-testid={`log-${log.category}-${index}`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <Badge variant={typeVariant} className={`text-xs ${log.type === 'ai_thought' ? categoryColor : ''}`}>
+                          {log.category.replace('_', ' ')}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className={`text-sm ${log.type === 'ai_thought' ? 'font-medium' : ''}`}>
+                        {log.message}
+                      </p>
+                    </div>
+                  );
+                })}
+                {activityLogs.length === 0 && (
+                  <div className="text-center text-muted-foreground py-8">
+                    <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Waiting for AI activity...</p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
           </CardContent>
         </Card>
       )}
