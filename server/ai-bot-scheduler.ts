@@ -539,11 +539,13 @@ async function fetchTrendingPumpFunTokens(config?: {
         };
       })
       .filter((pair: any) => {
-        // Use config values or defaults
-        const minOrganicScore = config?.minOrganicScore ?? 40;
-        const minQualityScore = config?.minQualityScore ?? 30;
+        // DUAL-MODE FILTERS: Defaults optimized for SCALP mode (more inclusive)
+        // SCALP: 35% organic, 25% quality, $5k liquidity
+        // SWING: Uses hivemind strategy for tighter filters
+        const minOrganicScore = config?.minOrganicScore ?? 35;
+        const minQualityScore = config?.minQualityScore ?? 25;
         const minLiquidity = config?.minLiquidityUSD ?? 5000;
-        const minTxns = config?.minTransactions24h ?? 20;
+        const minTxns = config?.minTransactions24h ?? 15;
         
         const txns24h = (pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0);
         const liquidityUSD = pair.liquidity?.usd || 0;
@@ -1101,14 +1103,26 @@ async function runQuickTechnicalScan() {
               budgetPerTrade
             );
 
-            // Use hivemind confidence threshold for quick trades
-            if (quickAnalysis.action === "buy" && quickAnalysis.confidence >= minConfidenceThreshold) {
-              console.log(`[Quick Scan] 🚀 HIGH QUALITY: ${token.symbol} - ${(quickAnalysis.confidence * 100).toFixed(1)}% confidence (>= ${(minConfidenceThreshold * 100).toFixed(0)}% hivemind threshold)`);
+            // DUAL-MODE SYSTEM: SCALP (62%+) or SWING (75%+) thresholds
+            const SCALP_THRESHOLD = 0.62; // Mode A: Quick micro-profits
+            const SWING_THRESHOLD = 0.75; // Mode B: High-conviction holds
+            const minThreshold = SCALP_THRESHOLD; // Always check for SCALP opportunities in quick scan
+            
+            // Determine trade mode based on confidence
+            const tradeMode = determineTradeMode(quickAnalysis.confidence);
+            const modeLabel = tradeMode.mode === "SCALP" ? "🎯 SCALP" : "🚀 SWING";
+            
+            // Execute trade if confidence meets minimum threshold (62% for SCALP, 75% for SWING)
+            if (quickAnalysis.action === "buy" && quickAnalysis.confidence >= minThreshold) {
+              console.log(`[Quick Scan] ${modeLabel}: ${token.symbol} - ${(quickAnalysis.confidence * 100).toFixed(1)}% confidence (${tradeMode.positionSizePercent}% position, ${tradeMode.profitTargetPercent}% target, ${tradeMode.stopLossPercent}% stop)`);
               
-              // Execute trade immediately - don't wait for deep scan!
+              // Execute trade immediately with mode-specific parameters!
               await executeQuickTrade(config, token, quickAnalysis, botState, existingPositions);
+            } else if (quickAnalysis.confidence >= minThreshold && quickAnalysis.action !== "sell") {
+              // High confidence but not BUY action - log for analysis
+              console.log(`[Quick Scan] ⚠️ ${token.symbol}: ${quickAnalysis.action.toUpperCase()} ${(quickAnalysis.confidence * 100).toFixed(1)}% (meets ${(minThreshold * 100).toFixed(0)}% threshold but action is ${quickAnalysis.action}, not buy)`);
             } else {
-              console.log(`[Quick Scan] ⏭️ ${token.symbol}: ${quickAnalysis.action.toUpperCase()} ${(quickAnalysis.confidence * 100).toFixed(1)}% (below ${(minConfidenceThreshold * 100).toFixed(0)}% hivemind threshold, will re-analyze in deep scan)`);
+              console.log(`[Quick Scan] ⏭️ ${token.symbol}: ${quickAnalysis.action.toUpperCase()} ${(quickAnalysis.confidence * 100).toFixed(1)}% (below ${(minThreshold * 100).toFixed(0)}% SCALP threshold)`);
             }
           }
         }
@@ -1536,44 +1550,85 @@ async function executeQuickTrade(
 }
 
 /**
- * AUTONOMOUS COMPOUNDING POSITION SIZING (ENHANCED - 50% MORE AGGRESSIVE)
- * Uses percentage of portfolio + AI confidence for exponential growth
+ * DUAL-MODE TRADING SYSTEM
+ * Mode A "SCALP": Quick profits with lower risk (62-74% AI confidence)
+ * Mode B "SWING": High-conviction longer holds (75%+ AI confidence)
+ */
+type TradeMode = "SCALP" | "SWING";
+
+interface TradeModeConfig {
+  mode: TradeMode;
+  minConfidence: number;
+  positionSizePercent: number; // % of portfolio
+  maxHoldMinutes: number;
+  stopLossPercent: number;
+  profitTargetPercent: number;
+}
+
+/**
+ * Determine trade mode based on AI confidence level
+ */
+function determineTradeMode(confidence: number): TradeModeConfig {
+  if (confidence >= 0.75) {
+    // Mode B: SWING - High conviction longer-term trades
+    return {
+      mode: "SWING",
+      minConfidence: 75,
+      positionSizePercent: confidence >= 0.90 ? 12 : confidence >= 0.85 ? 10 : 8,
+      maxHoldMinutes: 1440, // 24 hours
+      stopLossPercent: confidence >= 0.85 ? -50 : -30, // Wider stop for high confidence
+      profitTargetPercent: 15, // Let AI decide exit, but 15% minimum
+    };
+  } else {
+    // Mode A: SCALP - Quick micro-profits with tight risk control
+    return {
+      mode: "SCALP",
+      minConfidence: 62,
+      positionSizePercent: confidence >= 0.70 ? 6 : confidence >= 0.65 ? 5 : 4,
+      maxHoldMinutes: 45, // 45 minute review threshold
+      stopLossPercent: -18, // Tight stop for scalps
+      profitTargetPercent: confidence >= 0.70 ? 6 : 4, // Quick profit targets
+    };
+  }
+}
+
+/**
+ * DUAL-MODE POSITION SIZING (SCALP vs SWING)
  * 
- * Base: 0.02 SOL minimum (conservative floor for small portfolios)
- * Percentage-based: 15% per trade (up from 10%) - grows as portfolio grows
- * AI Confidence: Increases size for high confidence (up to 1.5x for 90%+ confidence)
- * Dynamic cap: 20% of total portfolio (up from 15%) - faster compounding!
+ * SCALP Mode (62-74% confidence):
+ * - Position: 4-6% of portfolio
+ * - Quick profits: +4-6% targets
+ * - Tight stop: -18%
+ * - Max hold: 45 minutes
+ * 
+ * SWING Mode (75%+ confidence):
+ * - Position: 8-12% of portfolio (scales with confidence)
+ * - Larger profits: +15%+ targets
+ * - Wider stop: -30% to -50%
+ * - Longer holds: AI-driven exits
  */
 function calculateDynamicTradeAmount(
   baseAmount: number,
   confidence: number,
   availableBalance: number,
   portfolioValue: number = 0,
-  portfolioPercentPerTrade: number = 15
+  portfolioPercentPerTrade: number = 15 // Legacy parameter, overridden by mode
 ): number {
+  // Determine trade mode based on AI confidence
+  const modeConfig = determineTradeMode(confidence);
+  const effectivePercentPerTrade = modeConfig.positionSizePercent;
+  
   // Calculate percentage-based trade size (enables compounding as portfolio grows)
-  const portfolioBasedAmount = (portfolioValue * portfolioPercentPerTrade) / 100;
+  const portfolioBasedAmount = (portfolioValue * effectivePercentPerTrade) / 100;
   
   // Use the LARGER of: base amount OR portfolio-based amount (allows growth)
   let tradeSize = Math.max(baseAmount, portfolioBasedAmount);
   
-  // AI Confidence multiplier (only increases for exceptional opportunities)
-  // Conservative: Only increases for 85%+ confidence (swing trade territory)
-  let confidenceMultiplier = 1.0;
-  if (confidence >= 0.90) {
-    confidenceMultiplier = 1.5; // Exceptional: 50% more
-  } else if (confidence >= 0.85) {
-    confidenceMultiplier = 1.25; // Very high: 25% more
-  }
-  // Below 85%: use base amount (no multiplier)
-  
-  tradeSize = tradeSize * confidenceMultiplier;
-  
-  // DYNAMIC CAP: Max 20% of portfolio per position (up from 15% - faster growth!)
-  // Small portfolio: ~0.02-0.05 SOL max
-  // Medium portfolio (1 SOL): ~0.20 SOL max  
-  // Large portfolio (10 SOL): ~2.0 SOL max (exponential compounding!)
-  const dynamicMaxPosition = Math.max(0.03, portfolioValue * 0.20);
+  // Mode-specific caps
+  const dynamicMaxPosition = Math.max(
+    0.02, // Minimum 0.02 SOL
+    (portfolioValue * (modeConfig.positionSizePercent + 2)) / 100 // Small buffer above target
+  );
   tradeSize = Math.min(tradeSize, dynamicMaxPosition);
   
   // Ensure minimum trade size (0.01 SOL minimum for Solana network)
@@ -1653,15 +1708,15 @@ export function startAITradingBotScheduler() {
   console.log("[AI Bot Scheduler] Starting...");
   console.log(`[AI Bot Scheduler] Active AI providers (${activeProviders.length}): ${activeProviders.join(", ")}`);
 
-  // Quick scans every 5 minutes (technical filters only, uses cache)
-  cron.schedule("*/5 * * * *", () => {
+  // Quick scans every 3 minutes (dual-mode: scalp + swing opportunities)
+  cron.schedule("*/3 * * * *", () => {
     runQuickTechnicalScan().catch((error) => {
       console.error("[Quick Scan] Unexpected error:", error);
     });
   });
 
-  // Deep scans every 30 minutes (full AI analysis with all 6 models)
-  cron.schedule("*/30 * * * *", () => {
+  // Deep scans every 15 minutes (full AI analysis with all 7 models)
+  cron.schedule("*/15 * * * *", () => {
     runAITradingBots().catch((error) => {
       console.error("[Deep Scan] Unexpected error:", error);
     });
@@ -1674,10 +1729,16 @@ export function startAITradingBotScheduler() {
 
   // Run initial cleanup on startup
   cleanupMemory();
+  
+  // Run initial quick scan immediately on startup (don't wait for cron)
+  console.log("[AI Bot Scheduler] Running initial quick scan...");
+  runQuickTechnicalScan().catch((error) => {
+    console.error("[Quick Scan] Initial scan error:", error);
+  });
 
-  console.log("[AI Bot Scheduler] Active");
-  console.log("  - Quick scans: Every 5 minutes (technical + DeepSeek AI for 75%+ trades) 🚀 2X FASTER");
-  console.log("  - Deep scans: Every 30 minutes (7-model consensus for all opportunities)");
+  console.log("[AI Bot Scheduler] Active - ENHANCED DUAL-MODE TRADING");
+  console.log("  - Quick scans: Every 3 minutes (scalp + swing opportunities) 🎯 FASTER");
+  console.log("  - Deep scans: Every 15 minutes (7-model consensus for high-confidence trades)");
   console.log("  - Memory cleanup: Every hour (removes inactive bots and expired cache)");
 }
 
