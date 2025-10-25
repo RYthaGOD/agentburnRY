@@ -1330,6 +1330,93 @@ export default function AIBot() {
         </Card>
       )}
 
+      {/* Opportunistic Position Rotation */}
+      <Card className="border-orange-500/30 bg-gradient-to-r from-background to-orange-500/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5 text-orange-500" />
+            Opportunistic Position Rotation
+            <Badge variant="outline" className="bg-orange-500/20 text-orange-500 border-orange-500/50">
+              NEW
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            Maximizes capital efficiency by automatically rotating to better opportunities
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Alert className="bg-orange-500/5 border-orange-500/20">
+            <Zap className="h-4 w-4 text-orange-500" />
+            <AlertTitle>Smart Capital Allocation</AlertTitle>
+            <AlertDescription className="text-xs">
+              When wallet capital is insufficient for a new high-confidence opportunity, the AI automatically sells weaker positions to free up capital. 
+              This ensures you're always positioned in the highest-confidence trades.
+            </AlertDescription>
+          </Alert>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg bg-muted/30 space-y-3">
+              <h3 className="text-sm font-semibold text-orange-500">Rotation Criteria</h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-3 w-3 text-orange-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">15% Higher AI Confidence</div>
+                    <div className="text-muted-foreground">New opportunity must significantly outperform weakest position</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-3 w-3 text-orange-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Loss-Cutting Override</div>
+                    <div className="text-muted-foreground">Allows selling -5% positions for 70%+ confidence opportunities</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CheckCircle className="h-3 w-3 text-orange-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">5-Minute Minimum Hold</div>
+                    <div className="text-muted-foreground">Positions must age before rotation eligible</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-green-500/10 border border-green-500/20 space-y-3">
+              <h3 className="text-sm font-semibold text-green-500">Winner Protection</h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex items-start gap-2">
+                  <Shield className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Never Sells Big Winners</div>
+                    <div className="text-muted-foreground">Positions with &gt;10% profit are protected</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Shield className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Prioritizes Weak Positions</div>
+                    <div className="text-muted-foreground">Targets big losses (&lt;-15%), small profits (0-5%), low confidence entries</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Shield className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-medium">Capital Verification</div>
+                    <div className="text-muted-foreground">Ensures selling position provides enough capital for new trade</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs">
+            <strong className="text-blue-500">Benefit:</strong> Maximizes capital efficiency by automatically cutting underperformers and capturing better opportunities. 
+            Keeps portfolio always positioned in highest-confidence trades for exponential growth.
+          </div>
+        </CardContent>
+      </Card>
+
       {/* DeepSeek Cost Optimization */}
       <Alert className="bg-gradient-to-r from-green-500/5 to-blue-500/5 border-green-500/30">
         <Sparkles className="h-4 w-4 text-green-500" />

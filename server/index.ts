@@ -124,4 +124,25 @@ app.use("/api", globalRateLimit);
       process.exit(0);
     });
   });
+
+  // Global error handlers for controlled shutdown on critical failures
+  process.on("unhandledRejection", (reason, promise) => {
+    console.error("❌ Unhandled Promise Rejection:", reason);
+    console.error("Promise:", promise);
+    // Allow process to restart cleanly on unhandled rejections
+    console.error("Initiating controlled shutdown...");
+    scheduler.stop();
+    realtimeService.shutdown();
+    process.exit(1);
+  });
+
+  process.on("uncaughtException", (error) => {
+    console.error("❌ Uncaught Exception:", error);
+    console.error("Stack:", error.stack);
+    // Allow process to restart cleanly on uncaught exceptions
+    console.error("Initiating controlled shutdown...");
+    scheduler.stop();
+    realtimeService.shutdown();
+    process.exit(1);
+  });
 })();

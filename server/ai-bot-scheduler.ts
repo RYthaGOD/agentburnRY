@@ -1527,7 +1527,7 @@ async function executeQuickTrade(
         console.log(`[Quick Scan] 🔄 ROTATING position to capture better opportunity...`);
         
         // Sell the weaker position
-        const { executeSellTrade } = await import("./trading");
+        const { executeSellTrade } = await import("./trading-bot");
         const sellResult = await executeSellTrade(
           treasuryKeyBase58,
           rotationCandidate.position.tokenMint,
@@ -2393,7 +2393,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
             addLog(`🔄 ROTATING position to capture better opportunity...`, "info");
             
             // Sell the weaker position
-            const { executeSellTrade } = await import("./trading");
+            const { executeSellTrade } = await import("./trading-bot");
             const sellResult = await executeSellTrade(
               treasuryKeyBase58,
               rotationCandidate.position.tokenMint,
