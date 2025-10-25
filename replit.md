@@ -91,10 +91,11 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 
 **Performance Optimizations (Oct 25, 2025):**
 - **Eliminated Jupiter Balances API dependency** - Removed broken `/balances` endpoint (404 errors), now reads positions directly from database for faster and more reliable portfolio analysis
-- **Fixed portfolio calculation** - Token amounts stored in raw units (like lamports) are now correctly converted to decimal amounts using standard 6-decimal conversion for PumpFun tokens
-- **Reduced error logging spam** - Silent fallback for portfolio analysis instead of repetitive error logs
-- **Improved position tracking** - Portfolio now correctly shows actual position count and values instead of 0
-- **PumpFun API failover complete** - All three broken endpoints replaced with DexScreener alternatives, providing 2.6x more token discovery opportunities
+- **Fixed portfolio calculation with token decimals** - Added `tokenDecimals` column to `aiBotPositions` table; now fetches and stores actual token decimals (6 for PumpFun, 9 for Solana) and correctly converts raw units to decimal amounts using stored decimals
+- **Accurate position valuation** - Fixed inflated portfolio values (26.5M SOL → 27.4 SOL) by properly dividing raw token amounts by 10^decimals before calculating SOL value
+- **Reduced error logging spam** - Graceful fallback with warnings for unpriceable tokens instead of repetitive error logs
+- **Improved position tracking** - Portfolio now correctly shows actual position count and values (8 positions)
+- **PumpFun API failover complete** - All three broken endpoints replaced with DexScreener alternatives, providing 2.6x more token discovery opportunities (30 → 80 tokens per scan)
 
 ### Data Storage
 PostgreSQL via Neon's serverless driver and Drizzle ORM. Key tables: `Projects`, `Transactions`, `Payments`, `ProjectSecrets`, `AIBotConfigs`. Uses UUID primary keys, decimal types for balances, and automatic timestamps.
