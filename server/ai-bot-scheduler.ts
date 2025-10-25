@@ -1304,6 +1304,152 @@ Respond ONLY with valid JSON:
 }
 
 /**
+ * OPPORTUNISTIC ROTATION: Find weakest position to sell for better opportunity
+ * Returns the position to sell and SOL it would free up, or null if no rotation needed
+ */
+async function findPositionToRotate(
+  ownerWalletAddress: string,
+  newOpportunity: {
+    symbol: string;
+    confidence: number;
+    potentialUpside: number;
+    requiredSOL: number;
+  },
+  currentPositions: any[],
+  availableSOL: number
+): Promise<{ position: any; expectedSOL: number } | null> {
+  // Don't rotate if we have enough capital
+  if (availableSOL >= newOpportunity.requiredSOL) {
+    return null;
+  }
+  
+  // Don't rotate if no positions to sell
+  if (currentPositions.length === 0) {
+    return null;
+  }
+  
+  console.log(`[Opportunistic Rotation] 🔄 Evaluating ${currentPositions.length} positions for rotation...`);
+  console.log(`[Opportunistic Rotation] New opportunity: ${newOpportunity.symbol} (${(newOpportunity.confidence * 100).toFixed(0)}% confidence, +${newOpportunity.potentialUpside}% upside)`);
+  
+  // Get current prices for all positions
+  const mints = currentPositions.map(p => p.tokenMint);
+  const { getBatchTokenPrices } = await import("./jupiter");
+  const priceMap = await getBatchTokenPrices(mints);
+  
+  // Filter out positions that are too new (must hold at least 5 minutes)
+  const MIN_HOLD_MINUTES = 5;
+  const now = Date.now();
+  const eligiblePositions = currentPositions.filter(position => {
+    const positionAgeMinutes = (now - new Date(position.buyTimestamp).getTime()) / (1000 * 60);
+    return positionAgeMinutes >= MIN_HOLD_MINUTES;
+  });
+  
+  if (eligiblePositions.length === 0) {
+    console.log(`[Opportunistic Rotation] ❌ No eligible positions (all held < ${MIN_HOLD_MINUTES} minutes)`);
+    return null;
+  }
+  
+  // Score each eligible position for rotation (lower score = better to sell)
+  const scoredPositions = eligiblePositions.map(position => {
+    const entryPrice = parseFloat(position.entryPriceSOL);
+    const currentPrice = priceMap.get(position.tokenMint) || 0;
+    const profitPercent = entryPrice > 0 ? ((currentPrice - entryPrice) / entryPrice) * 100 : 0;
+    const entryConfidence = position.aiConfidenceAtBuy || 50; // Stored as integer percentage (e.g., 75)
+    const tokenDecimals = position.tokenDecimals || 6;
+    const rawAmount = parseFloat(position.tokenAmount);
+    const tokenAmount = rawAmount / Math.pow(10, tokenDecimals);
+    const estimatedValue = tokenAmount * currentPrice;
+    const positionAgeMinutes = (now - new Date(position.buyTimestamp).getTime()) / (1000 * 60);
+    
+    // Rotation score (lower = better to sell):
+    // - Positions with small profits (0-5%): Score 10 (take profits)
+    // - Positions with small losses (0 to -10%): Score 20 (cut losses)
+    // - Positions with lower entry confidence: Score +confidence penalty
+    // - Positions with big profits (>10%): Score 100 (let winners run)
+    // - Positions with big losses (<-15%): Score 5 (definitely cut)
+    
+    let score = 50; // Base score
+    
+    if (profitPercent > 10) {
+      score = 100; // Don't sell winners
+    } else if (profitPercent > 5) {
+      score = 60; // Small winners - prefer to hold
+    } else if (profitPercent > 0) {
+      score = 10; // Tiny profits - good to rotate
+    } else if (profitPercent > -10) {
+      score = 20; // Small losses - acceptable to cut
+    } else if (profitPercent > -15) {
+      score = 15; // Medium losses - should cut
+    } else {
+      score = 5; // Big losses - definitely cut
+    }
+    
+    // Confidence penalty: Lower confidence at entry = easier to sell
+    const confidencePenalty = Math.max(0, (70 - entryConfidence) / 2);
+    score += confidencePenalty;
+    
+    return {
+      position,
+      score,
+      profitPercent,
+      entryConfidence,
+      estimatedValue,
+      currentPrice,
+      positionAgeMinutes,
+    };
+  }).filter(sp => sp.estimatedValue > 0); // Only consider positions we can price
+  
+  if (scoredPositions.length === 0) {
+    console.log(`[Opportunistic Rotation] ❌ No positions available for rotation`);
+    return null;
+  }
+  
+  // Sort by score (lowest = best to sell)
+  scoredPositions.sort((a, b) => a.score - b.score);
+  
+  const weakest = scoredPositions[0];
+  
+  // Convert new opportunity confidence to percentage for comparison (stored as integer percentage in DB)
+  const newOpportunityConfidencePercent = newOpportunity.confidence * 100;
+  
+  // Only rotate if new opportunity is significantly better
+  const MIN_CONFIDENCE_IMPROVEMENT = 15; // New opportunity should be 15% more confident
+  const confidenceImprovement = newOpportunityConfidencePercent - weakest.entryConfidence;
+  
+  // Or if we're cutting a loss to capture a good opportunity
+  const isCuttingLoss = weakest.profitPercent < -5;
+  const isGoodNewOpportunity = newOpportunity.confidence >= 0.70;
+  
+  if (confidenceImprovement < MIN_CONFIDENCE_IMPROVEMENT && !(isCuttingLoss && isGoodNewOpportunity)) {
+    console.log(`[Opportunistic Rotation] ⏭️ SKIP rotation: New opportunity not significantly better`);
+    console.log(`   Weakest position: ${weakest.position.tokenSymbol} (${weakest.entryConfidence}% entry, ${weakest.profitPercent.toFixed(2)}% profit)`);
+    console.log(`   New opportunity: ${newOpportunity.symbol} (${newOpportunityConfidencePercent.toFixed(0)}% confidence)`);
+    console.log(`   Confidence improvement: ${confidenceImprovement.toFixed(0)}% (need ${MIN_CONFIDENCE_IMPROVEMENT}%)`);
+    return null;
+  }
+  
+  // Verify we'll have enough capital after selling
+  const projectedCapital = availableSOL + weakest.estimatedValue;
+  if (projectedCapital < newOpportunity.requiredSOL) {
+    console.log(`[Opportunistic Rotation] ⏭️ SKIP rotation: Insufficient capital even after selling`);
+    console.log(`   Current: ${availableSOL.toFixed(4)} SOL`);
+    console.log(`   After selling ${weakest.position.tokenSymbol}: ${projectedCapital.toFixed(4)} SOL`);
+    console.log(`   Required: ${newOpportunity.requiredSOL.toFixed(4)} SOL`);
+    return null;
+  }
+  
+  console.log(`[Opportunistic Rotation] ✅ ROTATION APPROVED:`);
+  console.log(`   Selling: ${weakest.position.tokenSymbol} (${weakest.entryConfidence}% entry confidence, ${weakest.profitPercent.toFixed(2)}% profit, ${weakest.positionAgeMinutes.toFixed(0)} min old)`);
+  console.log(`   For: ${newOpportunity.symbol} (${newOpportunityConfidencePercent.toFixed(0)}% confidence, +${confidenceImprovement.toFixed(0)}% improvement)`);
+  console.log(`   Expected SOL: ${weakest.estimatedValue.toFixed(4)} SOL → ${projectedCapital.toFixed(4)} SOL total available`);
+  
+  return {
+    position: weakest.position,
+    expectedSOL: weakest.estimatedValue,
+  };
+}
+
+/**
  * Execute a quick trade from the quick scan
  */
 async function executeQuickTrade(
@@ -1363,8 +1509,58 @@ async function executeQuickTrade(
     const portfolioPercent = config.portfolioPercentPerTrade || 10;
     let tradeAmount = calculateDynamicTradeAmount(baseAmount, analysis.confidence, availableBalance, portfolio.totalValueSOL, portfolioPercent);
 
-    if (tradeAmount <= 0) {
-      console.log(`[Quick Scan] Insufficient funds for trade after all attempts (available: ${availableBalance.toFixed(4)} SOL)`);
+    // OPPORTUNISTIC ROTATION: If insufficient funds, try selling weaker position for better opportunity
+    if (tradeAmount <= 0 || availableBalance < tradeAmount) {
+      const rotationCandidate = await findPositionToRotate(
+        config.ownerWalletAddress,
+        {
+          symbol: token.symbol,
+          confidence: analysis.confidence,
+          potentialUpside: analysis.potentialUpsidePercent,
+          requiredSOL: tradeAmount > 0 ? tradeAmount : baseAmount,
+        },
+        existingPositions,
+        availableBalance
+      );
+      
+      if (rotationCandidate) {
+        console.log(`[Quick Scan] 🔄 ROTATING position to capture better opportunity...`);
+        
+        // Sell the weaker position
+        const { executeSellTrade } = await import("./trading");
+        const sellResult = await executeSellTrade(
+          treasuryKeyBase58,
+          rotationCandidate.position.tokenMint,
+          rotationCandidate.position.tokenAmount
+        );
+        
+        if (sellResult.success && sellResult.solReceived) {
+          // Add freed capital to available balance
+          availableBalance += sellResult.solReceived;
+          console.log(`[Quick Scan] ✅ Freed ${sellResult.solReceived.toFixed(4)} SOL from rotation`);
+          console.log(`[Quick Scan] 💰 New available balance: ${availableBalance.toFixed(4)} SOL`);
+          
+          // Delete the old position
+          await storage.deleteAIBotPositionByMint(config.ownerWalletAddress, rotationCandidate.position.tokenMint);
+          
+          // Recalculate trade amount with new balance
+          tradeAmount = calculateDynamicTradeAmount(baseAmount, analysis.confidence, availableBalance, portfolio.totalValueSOL, portfolioPercent);
+          
+          logActivity('opportunistic_rotation', 'success', `🔄 Rotated ${rotationCandidate.position.tokenSymbol} (${rotationCandidate.position.aiConfidenceAtBuy}%) → ${token.symbol} (${(analysis.confidence * 100).toFixed(0)}%)`);
+        } else {
+          console.log(`[Quick Scan] ❌ Rotation sell failed:`, sellResult.error);
+          console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol}: Insufficient funds after failed rotation`);
+          return;
+        }
+      } else {
+        console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol}: Insufficient funds and no suitable position for rotation (available: ${availableBalance.toFixed(4)} SOL, need: ${tradeAmount.toFixed(4)} SOL)`);
+        return;
+      }
+    }
+    
+    // Final check after potential rotation
+    if (tradeAmount <= 0 || availableBalance < tradeAmount) {
+      console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol}: Still insufficient funds after rotation attempts`);
       return;
     }
 
@@ -2178,8 +2374,58 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         const portfolioPercent = config.portfolioPercentPerTrade || 10;
         let tradeAmount = calculateDynamicTradeAmount(budgetPerTrade, analysis.confidence, availableBalance, portfolio.totalValueSOL, portfolioPercent);
         
-        if (tradeAmount <= 0) {
-          addLog(`⏭️ SKIP ${token.symbol}: Insufficient funds (available: ${availableBalance.toFixed(4)} SOL)`, "warning");
+        // OPPORTUNISTIC ROTATION: If insufficient funds, try selling weaker position for better opportunity
+        if (tradeAmount <= 0 || availableBalance < tradeAmount) {
+          const currentPositions = await storage.getAIBotPositions(ownerWalletAddress);
+          const rotationCandidate = await findPositionToRotate(
+            ownerWalletAddress,
+            {
+              symbol: token.symbol,
+              confidence: analysis.confidence,
+              potentialUpside: analysis.potentialUpsidePercent,
+              requiredSOL: tradeAmount > 0 ? tradeAmount : budgetPerTrade,
+            },
+            currentPositions,
+            availableBalance
+          );
+          
+          if (rotationCandidate) {
+            addLog(`🔄 ROTATING position to capture better opportunity...`, "info");
+            
+            // Sell the weaker position
+            const { executeSellTrade } = await import("./trading");
+            const sellResult = await executeSellTrade(
+              treasuryKeyBase58,
+              rotationCandidate.position.tokenMint,
+              rotationCandidate.position.tokenAmount
+            );
+            
+            if (sellResult.success && sellResult.solReceived) {
+              // Add freed capital to available balance
+              availableBalance += sellResult.solReceived;
+              addLog(`✅ Freed ${sellResult.solReceived.toFixed(4)} SOL from rotation (${rotationCandidate.position.tokenSymbol} → ${token.symbol})`, "success");
+              
+              // Delete the old position
+              await storage.deleteAIBotPositionByMint(ownerWalletAddress, rotationCandidate.position.tokenMint);
+              
+              // Recalculate trade amount with new balance
+              tradeAmount = calculateDynamicTradeAmount(budgetPerTrade, analysis.confidence, availableBalance, portfolio.totalValueSOL, portfolioPercent);
+              
+              logActivity('opportunistic_rotation', 'success', `🔄 Deep Scan: Rotated ${rotationCandidate.position.tokenSymbol} → ${token.symbol}`);
+            } else {
+              addLog(`❌ Rotation sell failed: ${sellResult.error}`, "error");
+              addLog(`⏭️ SKIP ${token.symbol}: Insufficient funds after failed rotation`, "warning");
+              continue;
+            }
+          } else {
+            addLog(`⏭️ SKIP ${token.symbol}: Insufficient funds and no suitable position for rotation (available: ${availableBalance.toFixed(4)} SOL)`, "warning");
+            continue;
+          }
+        }
+        
+        // Final check after potential rotation
+        if (tradeAmount <= 0 || availableBalance < tradeAmount) {
+          addLog(`⏭️ SKIP ${token.symbol}: Still insufficient funds after rotation attempts`, "warning");
           continue;
         }
 

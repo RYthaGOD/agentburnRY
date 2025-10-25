@@ -84,6 +84,16 @@ This bot operates independently with configurations stored in a dedicated `aiBot
   - SCALP positions: Sell when AI confidence drops below 50%, profit target hit (+4-8%), or 30-minute max hold reached
   - SWING positions: Sell when AI confidence drops below 50%, AI recommends SELL with 60%+ confidence, or profit ≥100%
 
+**Opportunistic Position Rotation:**
+- Automatically sells weaker positions to capture better opportunities when capital is insufficient
+- **Rotation Criteria:**
+  - New opportunity must be 15%+ higher AI confidence than weakest position
+  - OR cutting a loss (-5% or worse) to capture good opportunity (70%+ confidence)
+  - Positions must be held for at least 5 minutes before rotation eligible
+  - Prioritizes selling: big losses (<-15%), small profits (0-5%), positions with low entry confidence
+  - Protects winners: Never sells positions with >10% profit unless specifically targeted by AI
+- **Benefits:** Maximizes capital efficiency, automatically cuts underperformers, always positioned in highest-confidence trades
+
 **Portfolio-Wide Risk Management:**
 - Tracks all-time portfolio peak value.
 - Pauses trading at -20% drawdown from peak, resumes at -15% recovery.
