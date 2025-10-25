@@ -273,8 +273,16 @@ export const tokenBlacklist = pgTable("token_blacklist", {
   tokenMint: text("token_mint").notNull().unique(), // Token address to blacklist
   tokenSymbol: text("token_symbol"), // Optional symbol for reference
   tokenName: text("token_name"), // Optional name for reference
-  reason: text("reason"), // Why this token was blacklisted
-  addedBy: text("added_by").notNull(), // Wallet address of who added it
+  reason: text("reason"), // Why this token was blacklisted (bundle_activity, rug_pull, scam, poor_performance, manual)
+  severity: text("severity").notNull().default("warning"), // "warning" or "critical"
+  addedBy: text("added_by").notNull(), // Wallet address of who added it, or "system" for auto-detected
+  notes: text("notes"), // Additional details about why token was flagged
+  
+  // Bundle activity detection metadata
+  bundleDetectionScore: integer("bundle_detection_score"), // 0-100 score indicating likelihood of bundle activity
+  suspiciousWalletCount: integer("suspicious_wallet_count"), // Number of suspicious coordinated wallets detected
+  avgTimeBetweenTxs: integer("avg_time_between_txs_ms"), // Average milliseconds between coordinated transactions
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
