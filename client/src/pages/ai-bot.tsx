@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Brain, Loader2, Zap, AlertCircle, Play, Power, TrendingUp, Activity, CheckCircle, XCircle, Key, Eye, EyeOff, Shield, ChevronDown, Sparkles } from "lucide-react";
+import { Brain, Loader2, Zap, AlertCircle, Play, Power, TrendingUp, Activity, CheckCircle, XCircle, Key, Eye, EyeOff, Shield, ChevronDown, Sparkles, Flame, Info } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -671,6 +671,168 @@ export default function AIBot() {
             <div className="mt-3 p-3 rounded-lg bg-muted/30 border">
               <div className="text-xs text-muted-foreground mb-1">Token Address</div>
               <div className="font-mono text-xs break-all">{myBotToken.pairs[0].baseToken.address}</div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Buyback & Burn Configuration */}
+      {config && (
+        <Card className="border-orange-500/50 bg-gradient-to-r from-background to-orange-500/5">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-500/10">
+                  <Flame className="h-6 w-6 text-orange-500" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">Automatic Buyback & Burn</div>
+                  <div className="text-sm text-muted-foreground">
+                    Permanently destroy tokens with profitable trade proceeds
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Enable</span>
+                <Switch
+                  checked={config.buybackEnabled || false}
+                  onCheckedChange={async (checked) => {
+                    try {
+                      await updateConfig({ buybackEnabled: checked });
+                      if (checked) {
+                        toast({
+                          title: "Buyback & Burn Enabled",
+                          description: `${config.buybackPercentage || 5}% of profits will automatically buyback and burn tokens`,
+                        });
+                      } else {
+                        toast({
+                          title: "Buyback & Burn Disabled",
+                          description: "Automatic buyback and burn has been turned off",
+                        });
+                      }
+                    } catch (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to update buyback setting",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  data-testid="switch-buyback-enabled"
+                />
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {/* Configuration Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Token Mint Address</label>
+                    <Input
+                      value={config.buybackTokenMint || 'FQptMsS3tnyPbK68rTZm3n3R4NHBX5r9edshyyvxpump'}
+                      onChange={(e) => updateConfig({ buybackTokenMint: e.target.value })}
+                      placeholder="Token mint address to buyback"
+                      className="font-mono text-xs"
+                      disabled={!config.buybackEnabled}
+                      data-testid="input-buyback-token-mint"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      MY BOT token will be bought back and permanently burned
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">
+                      Buyback Percentage: {config.buybackPercentage || 5}%
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        step="0.5"
+                        value={config.buybackPercentage || 5}
+                        onChange={(e) => updateConfig({ buybackPercentage: e.target.value })}
+                        className="flex-1"
+                        disabled={!config.buybackEnabled}
+                        data-testid="slider-buyback-percentage"
+                      />
+                      <Input
+                        type="number"
+                        min="1"
+                        max="20"
+                        step="0.5"
+                        value={config.buybackPercentage || 5}
+                        onChange={(e) => updateConfig({ buybackPercentage: e.target.value })}
+                        className="w-20"
+                        disabled={!config.buybackEnabled}
+                        data-testid="input-buyback-percentage"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Percentage of profits used for buyback (1-20%)
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Section */}
+              <div className="border-t pt-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Status</div>
+                    <div className="text-lg font-bold">
+                      {config.buybackEnabled ? (
+                        <span className="text-green-500">Active</span>
+                      ) : (
+                        <span className="text-muted-foreground">Inactive</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Total Buyback SOL</div>
+                    <div className="text-lg font-bold">
+                      {parseFloat(config.totalBuybackSOL || '0').toFixed(4)} SOL
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Tokens Burned</div>
+                    <div className="text-lg font-bold text-orange-500">
+                      {parseFloat(config.totalTokensBurned || '0').toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Buyback %</div>
+                    <div className="text-lg font-bold">
+                      {config.buybackPercentage || 5}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* How It Works */}
+              <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-orange-500 mt-0.5" />
+                  <div className="space-y-2 text-sm">
+                    <p className="font-medium">How Automatic Buyback & Burn Works:</p>
+                    <ul className="space-y-1 text-muted-foreground">
+                      <li>• When a trade closes profitably, {config.buybackPercentage || 5}% of the profit is automatically used</li>
+                      <li>• The bot buys your specified token using Jupiter or PumpSwap</li>
+                      <li>• Purchased tokens are immediately and permanently burned using SPL Token burn</li>
+                      <li>• This reduces circulating supply and supports token value over time</li>
+                      <li>• All buyback and burn transactions are logged and visible on-chain</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -133,6 +133,13 @@ export const aiBotConfigs = pgTable("ai_bot_configs", {
   // STRICT DRAWDOWN PROTECTION: Track portfolio peak for drawdown monitoring
   portfolioPeakSOL: decimal("portfolio_peak_sol", { precision: 18, scale: 9 }).notNull().default("0"),
   
+  // Automatic Buyback & Burn Configuration
+  buybackEnabled: boolean("buyback_enabled").notNull().default(false), // Enable automatic buyback on profitable trades
+  buybackTokenMint: text("buyback_token_mint"), // Token mint address to buyback (e.g., MY BOT token)
+  buybackPercentage: decimal("buyback_percentage", { precision: 5, scale: 2 }).notNull().default("5"), // % of profit to use for buyback (default 5%)
+  totalBuybackSOL: decimal("total_buyback_sol", { precision: 18, scale: 9 }).notNull().default("0"), // Total SOL spent on buybacks
+  totalTokensBurned: decimal("total_tokens_burned", { precision: 18, scale: 9 }).notNull().default("0"), // Total tokens permanently burned
+  
   // Status tracking
   lastBotRunAt: timestamp("last_bot_run_at"),
   lastBotStatus: text("last_bot_status"), // "success", "failed", "skipped"

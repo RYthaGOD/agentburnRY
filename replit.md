@@ -68,6 +68,15 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - Pauses trading at -20% drawdown from peak, resumes at -15% recovery.
 - Multi-layer protection including stop-loss, AI exits, and drawdown circuit breaker.
 
+**Automatic Buyback & Burn Mechanism:**
+- Configurable automatic buyback of a specified token (e.g., MY BOT token: FQptMsS3tnyPbK68rTZm3n3R4NHBX5r9edshyyvxpump) using a percentage of profits from successful trades.
+- Default: 5% of profit from each profitable trade is used to buyback tokens.
+- Purchased tokens are immediately and permanently destroyed using SPL Token's burn instruction.
+- Reduces circulating supply and supports long-term token value.
+- Full transparency with on-chain transaction records for all buyback and burn operations.
+- Tracks total SOL spent on buybacks and total tokens permanently burned.
+- Configurable via dashboard: enable/disable, set token mint address, adjust buyback percentage (1-20%).
+
 ### Data Storage
 PostgreSQL via Neon's serverless driver and Drizzle ORM. Key tables: `Projects`, `Transactions`, `Payments`, `ProjectSecrets`, `AIBotConfigs`. Uses UUID primary keys, decimal types for balances, and automatic timestamps.
 

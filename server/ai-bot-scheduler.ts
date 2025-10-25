@@ -3369,6 +3369,37 @@ async function executeSellForPosition(
     
     console.log(`[Position Monitor] 💰 P&L: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}% (${profitSOL > 0 ? '+' : ''}${profitSOL.toFixed(4)} SOL)`);
 
+    // 🔥 AUTOMATIC BUYBACK & BURN: Use 5% of profit to buyback and destroy MY BOT token
+    if (profitSOL > 0 && config.buybackEnabled) {
+      console.log(`[Position Monitor] 🔥 Profitable trade detected → triggering buyback & burn...`);
+      try {
+        const { executeBuybackAndBurn } = await import("./buyback-burn");
+        const buybackResult = await executeBuybackAndBurn(
+          config.ownerWalletAddress,
+          profitSOL,
+          treasuryKeypair
+        );
+
+        if (buybackResult.success) {
+          console.log(`[Position Monitor] ✅ BUYBACK & BURN COMPLETE!`);
+          console.log(`[Position Monitor] 💰 Spent: ${buybackResult.buybackSOL?.toFixed(6)} SOL (${config.buybackPercentage}% of profit)`);
+          console.log(`[Position Monitor] 🔥 Burned: ${buybackResult.tokensBurned?.toLocaleString()} ${config.buybackTokenMint?.slice(0, 8)}... tokens`);
+          console.log(`[Position Monitor] 📝 Buy TX: https://solscan.io/tx/${buybackResult.buyTxSignature}`);
+          console.log(`[Position Monitor] 🔥 Burn TX: https://solscan.io/tx/${buybackResult.burnTxSignature}`);
+          
+          logActivity('position_monitor', 'success', `🔥 Buyback & Burn: ${buybackResult.tokensBurned?.toLocaleString()} tokens destroyed (${buybackResult.buybackSOL?.toFixed(6)} SOL)`);
+        } else {
+          console.warn(`[Position Monitor] ⚠️ Buyback & Burn failed: ${buybackResult.error}`);
+          logActivity('position_monitor', 'warning', `⚠️ Buyback & Burn failed: ${buybackResult.error}`);
+        }
+      } catch (buybackError: any) {
+        console.error(`[Position Monitor] ❌ Buyback & Burn error:`, buybackError);
+        logActivity('position_monitor', 'error', `❌ Buyback & Burn error: ${buybackError.message}`);
+      }
+    } else if (profitSOL > 0 && !config.buybackEnabled) {
+      console.log(`[Position Monitor] 💡 Buyback disabled - skipping (profit: ${profitSOL.toFixed(6)} SOL)`);
+    }
+
     // Update budget tracking (free up capital for new trades)
     const newBudgetUsed = Math.max(0, parseFloat(config.budgetUsed || "0") - amountSOL);
     await storage.createOrUpdateAIBotConfig({
