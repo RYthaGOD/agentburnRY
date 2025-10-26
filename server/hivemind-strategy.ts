@@ -90,6 +90,46 @@ async function generateAIStrategy(
 ): Promise<HivemindStrategy> {
   console.log(`[Hivemind Strategy] 🤖 Querying full 7-model AI hivemind for strategy optimization...`);
 
+  // 📊 PATTERN ANALYSIS: Fetch trade journal insights to inform AI learning
+  let patternInsights = "";
+  try {
+    const patterns = await storage.getTradePatterns(ownerWalletAddress);
+    
+    if (patterns.totalTrades > 0) {
+      console.log(`[Hivemind Strategy] 📊 Pattern analysis: ${patterns.winRate.toFixed(1)}% win rate from ${patterns.totalTrades} trades`);
+      
+      // Format common failure reasons
+      const failureReasons = patterns.commonFailureReasons.length > 0
+        ? patterns.commonFailureReasons.slice(0, 3).map(f => `  - ${f.reason}: ${f.count} occurrences`).join('\n')
+        : '  - No failure patterns detected yet';
+      
+      // Format successful characteristics
+      const successChars = patterns.mostSuccessfulCharacteristics;
+      const successDetails = successChars.avgOrganicScore > 0
+        ? `  - Avg Organic Score: ${successChars.avgOrganicScore.toFixed(0)}% (wins) vs baseline
+  - Avg Quality Score: ${successChars.avgQualityScore.toFixed(0)}% (wins)
+  - Avg Liquidity: $${(successChars.avgLiquidityUSD / 1000).toFixed(0)}k
+  - Avg Volume: $${(successChars.avgVolumeUSD / 1000).toFixed(0)}k`
+        : '  - Insufficient data for pattern analysis';
+      
+      patternInsights = `
+
+Trade Journal Pattern Analysis (${patterns.totalTrades} completed trades):
+- Actual Win Rate: ${patterns.winRate.toFixed(1)}%
+- Average Profit/Loss: ${patterns.avgProfitLoss.toFixed(2)}%
+
+Common Failure Reasons:
+${failureReasons}
+
+Characteristics of Winning Trades:
+${successDetails}
+
+CRITICAL INSIGHTS: Use this data to set quality filters that avoid past failures and focus on proven winning characteristics.`;
+    }
+  } catch (error) {
+    console.error(`[Hivemind Strategy] ⚠️ Failed to fetch pattern analysis:`, error);
+  }
+
   // Prepare performance analysis prompt for AI
   const performanceSummary = `
 Recent Trading Performance Analysis:
@@ -101,6 +141,7 @@ Recent Trade Details:
 ${recentPerformance.recentTrades.slice(0, 10).map((t, i) => 
   `${i + 1}. ${t.tokenSymbol}: ${t.profit > 0 ? '+' : ''}${t.profit.toFixed(2)}% (held ${Math.round(t.holdTime / 60000)}min, entry confidence ${t.entryConfidence}%)`
 ).join('\n')}` : ''}
+${patternInsights}
 
 Current Strategy Parameters (Conservative Baseline):
 - Min Confidence Threshold: 75%
@@ -111,10 +152,11 @@ Current Strategy Parameters (Conservative Baseline):
 - Min Organic Score: 70%
 - Min Quality Score: 60%
 
-Based on this performance data, what trading strategy adjustments would optimize for:
+Based on this performance data AND trade journal pattern analysis, what trading strategy adjustments would optimize for:
 1. CAPITAL PRESERVATION (primary goal - minimize drawdowns)
 2. Consistent compounding growth (avoid large losses)
 3. Higher win rate through better quality filters
+4. LEARN FROM FAILURES: Adjust filters to avoid repeating common failure patterns
 
 Respond with a JSON object containing:
 {
