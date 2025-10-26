@@ -335,6 +335,94 @@ export function validateSolanaAddresses(
 }
 
 /**
+ * Wallet signature authentication middleware
+ * Verifies wallet ownership via cryptographic signature
+ * Prevents replay attacks and expired messages
+ */
+export async function requireWalletAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  try {
+    const { ownerWalletAddress, signature, message } = req.body;
+    
+    if (!ownerWalletAddress || !signature || !message) {
+      return res.status(401).json({ 
+        message: "Authentication required: ownerWalletAddress, signature, and message are required" 
+      });
+    }
+
+    // Validate address format
+    if (!isValidSolanaAddress(ownerWalletAddress)) {
+      return res.status(400).json({ 
+        message: "Invalid wallet address format" 
+      });
+    }
+
+    // Verify wallet signature
+    const { verifyWalletSignature } = await import("./solana-sdk");
+    const isValidSignature = await verifyWalletSignature(
+      ownerWalletAddress,
+      message,
+      signature
+    );
+
+    if (!isValidSignature) {
+      return res.status(403).json({ 
+        message: "Invalid signature: Could not verify wallet ownership" 
+      });
+    }
+
+    // Extract timestamp from message (format: "action at {timestamp}")
+    const timestampMatch = message.match(/at (\d+)$/);
+    if (!timestampMatch) {
+      return res.status(400).json({ 
+        message: "Invalid message format: timestamp required" 
+      });
+    }
+
+    const messageTimestamp = parseInt(timestampMatch[1], 10);
+    const now = Date.now();
+    const fiveMinutesInMs = 5 * 60 * 1000;
+    
+    if (now - messageTimestamp > fiveMinutesInMs) {
+      return res.status(400).json({ 
+        message: "Message expired: Please sign a new message" 
+      });
+    }
+
+    // Create a hash of the signature for replay attack prevention
+    const { createHash } = await import("crypto");
+    const signatureHash = createHash("sha256").update(signature).digest("hex");
+
+    // Check if this signature has already been used
+    const isUsed = await storage.isSignatureUsed(signatureHash);
+    if (isUsed) {
+      return res.status(400).json({ 
+        message: "Signature already used: Please sign a new message to prevent replay attacks" 
+      });
+    }
+
+    // Mark signature as used
+    await storage.recordUsedSignature({ signatureHash });
+
+    // Attach verified wallet address to request for use in route handler
+    (req as any).authenticatedWallet = ownerWalletAddress;
+    
+    auditLog("wallet_authenticated", {
+      walletAddress: ownerWalletAddress,
+      ip: getClientIp(req),
+    });
+    
+    next();
+  } catch (error: any) {
+    console.error("Wallet authentication error:", error);
+    res.status(500).json({ message: "Authentication failed" });
+  }
+}
+
+/**
  * Environment variable security check
  * Ensures critical security variables are set
  */
