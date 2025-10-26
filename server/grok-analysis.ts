@@ -64,8 +64,9 @@ async function acquireCerebrasLock(): Promise<void> {
 
 /**
  * Track AI model failure and implement circuit breaker
+ * Immediately disables on 402/401 errors (insufficient credits/auth)
  */
-function trackModelFailure(provider: string): void {
+function trackModelFailure(provider: string, error?: Error | string): void {
   const health = modelHealthTracker.get(provider) || {
     provider,
     failures: 0,
@@ -76,7 +77,21 @@ function trackModelFailure(provider: string): void {
   health.failures++;
   health.lastFailure = Date.now();
 
-  if (health.failures >= CIRCUIT_BREAKER_THRESHOLD) {
+  // Check if this is a permanent failure (insufficient credits/balance)
+  const errorMsg = error instanceof Error ? error.message : String(error || '');
+  const isPermanentFailure = errorMsg.includes('402') || 
+                            errorMsg.includes('Insufficient') || 
+                            errorMsg.includes('insufficient') ||
+                            errorMsg.includes('401') ||
+                            errorMsg.includes('Unauthorized');
+
+  if (isPermanentFailure) {
+    // Immediately circuit-break on credential/balance errors
+    health.disabled = true;
+    health.disabledUntil = Date.now() + CIRCUIT_BREAKER_COOLDOWN * 6; // 30 minutes for permanent errors
+    health.failures = CIRCUIT_BREAKER_THRESHOLD; // Mark as fully failed
+    console.warn(`[Circuit Breaker] 🚫 ${provider} IMMEDIATELY disabled (insufficient credits/balance). Will retry in 30 minutes.`);
+  } else if (health.failures >= CIRCUIT_BREAKER_THRESHOLD) {
     health.disabled = true;
     health.disabledUntil = Date.now() + CIRCUIT_BREAKER_COOLDOWN;
     console.warn(`[Circuit Breaker] ⚠️ ${provider} temporarily disabled after ${health.failures} failures. Will retry in 5 minutes.`);
@@ -443,8 +458,8 @@ export async function analyzeTokenWithHiveMind(
         trackModelSuccess(provider);
         return { provider, analysis, success: true };
       } catch (error) {
-        // Track failure for circuit breaker
-        trackModelFailure(provider);
+        // Track failure for circuit breaker (pass error for smart detection)
+        trackModelFailure(provider, error instanceof Error ? error : new Error(String(error)));
         console.error(`[Hive Mind] ${provider} failed:`, error instanceof Error ? error.message : String(error));
         return {
           provider,
