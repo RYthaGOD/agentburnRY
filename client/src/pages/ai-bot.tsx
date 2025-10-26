@@ -846,6 +846,50 @@ export default function AIBot() {
                 </div>
               </div>
 
+              {/* Platform Fee Info */}
+              <div className="border-t pt-6">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <Info className="h-4 w-4" />
+                  Platform Fee Tracking
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Fee Status</div>
+                    <div className="text-lg font-bold">
+                      {aiConfig.isFeeExempt ? (
+                        <span className="text-green-500 flex items-center gap-1">
+                          <CheckCircle className="h-4 w-4" />
+                          Exempt
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">1% per trade</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-background/50 border" data-testid="card-total-fees-paid">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Total Fees Paid</div>
+                    <div className="text-lg font-bold">
+                      {parseFloat(aiConfig.totalPlatformFeesPaid || '0').toFixed(4)} SOL
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-lg bg-background/50 border">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Wallet</div>
+                    <div className="text-xs font-mono truncate" title={publicKey?.toString()}>
+                      {publicKey?.toString().slice(0, 8)}...{publicKey?.toString().slice(-8)}
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground mt-3">
+                  {aiConfig.isFeeExempt ? (
+                    <>✅ Your wallet is exempt from all platform fees. Trade without fees!</>
+                  ) : (
+                    <>💰 A 1% platform fee is deducted from each trade to support development and maintenance.</>
+                  )}
+                </p>
+              </div>
+
               {/* How It Works */}
               <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
                 <div className="flex items-start gap-3">
