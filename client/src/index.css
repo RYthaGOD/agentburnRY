@@ -4,15 +4,15 @@
 
 /* LIGHT MODE */
 :root {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
+  --button-outline: rgba(218,165,32, .12);
+  --badge-outline: rgba(218,165,32, .06);
 
   /* Automatic computation of border around primary / danger buttons */
   --opaque-button-border-intensity: -8; /* In terms of percentages */
 
   /* Backgrounds applied on top of other backgrounds when hovered/active */
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
+  --elevate-1: rgba(218,165,32, .04);
+  --elevate-2: rgba(218,165,32, .10);
 
   --background: 0 0% 98%;
 
@@ -32,15 +32,15 @@
 
   --sidebar-border: 220 10% 90%;
 
-  --sidebar-primary: 270 75% 55%;
+  --sidebar-primary: 48 100% 50%;
 
-  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-primary-foreground: 0 0% 0%;
 
   --sidebar-accent: 220 12% 92%;
 
   --sidebar-accent-foreground: 222 15% 15%;
 
-  --sidebar-ring: 270 75% 62%;
+  --sidebar-ring: 48 100% 50%;
 
   --popover: 0 0% 100%;
 
@@ -48,33 +48,33 @@
 
   --popover-border: 220 10% 86%;
 
-  --primary: 270 75% 55%;
+  --primary: 48 100% 50%;
 
-  --primary-foreground: 0 0% 100%;
+  --primary-foreground: 0 0% 0%;
 
-  --secondary: 220 12% 92%;
+  --secondary: 48 20% 85%;
 
-  --secondary-foreground: 222 15% 15%;
+  --secondary-foreground: 48 100% 20%;
 
-  --muted: 220 14% 94%;
+  --muted: 45 15% 92%;
 
-  --muted-foreground: 222 12% 35%;
+  --muted-foreground: 48 15% 30%;
 
-  --accent: 210 100% 58%;
+  --accent: 48 100% 50%;
 
-  --accent-foreground: 0 0% 100%;
+  --accent-foreground: 0 0% 0%;
 
   --destructive: 0 72% 55%;
 
   --destructive-foreground: 0 0% 100%;
 
   --input: 220 10% 75%;
-  --ring: 270 75% 62%;
-  --chart-1: 270 75% 55%;
-  --chart-2: 210 100% 58%;
-  --chart-3: 170 80% 45%;
-  --chart-4: 38 92% 50%;
-  --chart-5: 142 76% 45%;
+  --ring: 48 100% 50%;
+  --chart-1: 48 100% 50%;
+  --chart-2: 48 100% 60%;
+  --chart-3: 48 80% 40%;
+  --chart-4: 45 92% 45%;
+  --chart-5: 42 100% 50%;
 
   --font-sans: Inter, sans-serif;
   --font-serif: Georgia, serif;
@@ -322,20 +322,20 @@
     inset: -1px;
   }
 
-  /* Fire-themed gradients and glows */
-  .fire-gradient {
-    background: linear-gradient(135deg, hsl(18 95% 55%), hsl(25 100% 60%));
+  /* Gold-themed gradients and glows */
+  .gold-gradient {
+    background: linear-gradient(135deg, hsl(48 100% 50%), hsl(45 100% 60%));
   }
 
-  .ember-glow {
-    box-shadow: 0 0 20px rgba(255, 120, 40, 0.3);
+  .gold-glow {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
   }
 
-  .ember-glow-hover:hover {
-    box-shadow: 0 0 30px rgba(255, 120, 40, 0.5);
+  .gold-glow-hover:hover {
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
   }
 
-  .molten-border {
-    border-image: linear-gradient(135deg, hsl(18 95% 55%), hsl(0 85% 48%)) 1;
+  .gold-border {
+    border-image: linear-gradient(135deg, hsl(48 100% 50%), hsl(42 100% 50%)) 1;
   }
 }
