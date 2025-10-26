@@ -200,7 +200,8 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
   // PRIORITY SYSTEM: Higher priority = more reliable/cheaper
   // Priority 1: Free, reliable models (use first)
   // Priority 2: Free, less reliable models
-  // Priority 3: Paid models (use only when needed)
+  // Priority 3: Paid models (OpenAI - use when needed)
+  // Priority 4: Most expensive models (xAI Grok - use as last resort only)
 
   // Cerebras (fast, free, Llama 4) - Priority 2 (less reliable, rate limited)
   // NOTE: Rate limiting handled at execution level, not selection level
@@ -331,7 +332,7 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
     });
   }
   
-  // Fallback to xAI Grok (PAID) - Priority 3 (use sparingly)
+  // Fallback to xAI Grok (MOST EXPENSIVE - PAID) - Priority 4 (use as LAST RESORT only)
   if (process.env.XAI_API_KEY && isModelAvailable("xAI Grok")) {
     clients.push({
       client: new OpenAI({
@@ -340,12 +341,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "grok-4-fast-reasoning",
       provider: "xAI Grok",
-      priority: 3,
+      priority: 4, // LOWEST PRIORITY - most expensive, only use when all others fail
     });
   }
 
   // INTELLIGENT SORTING: Combine priority and health score for optimal selection
-  // Priority 1 (free/reliable) > Priority 2 (rate limited) > Priority 3 (paid)
+  // Priority 1 (free/reliable) > Priority 2 (rate limited) > Priority 3 (paid) > Priority 4 (most expensive)
   // Within same priority, prefer healthier models (fewer recent failures)
   clients.sort((a, b) => {
     // First, sort by priority (1 is highest priority)
