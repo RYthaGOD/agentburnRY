@@ -24,6 +24,7 @@ BurnBot is a SaaS platform designed for Solana SPL token creators to automate to
 - **Trading Fee**: 1% platform fee applies to all trades (both free and subscription trades)
 - **Payment**: Solana-native (SOL) payments to treasury wallet `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`
 - **Verification**: On-chain transaction verification before subscription activation
+- **Buyback & Burn**: 33% (1/3) of every subscription payment is automatically used to buy back and burn tokens (FQptMsS3tnyPbK68rTZm3n3R4NHBX5r9edshyyvxpump) to create deflationary tokenomics
 
 ### Conversion Funnel
 Landing → Try Token Analyzer (see AI capabilities) → Learn How It Works (understand hivemind) → View Live Stats (verify real performance) → Connect Wallet → Start Trading (10 free trades) → Purchase 2-Week Access

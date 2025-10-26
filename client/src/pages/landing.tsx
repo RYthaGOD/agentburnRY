@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { WalletButton } from "@/components/wallet-button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Sparkles, TrendingUp, Search, Brain, Shield, Zap, BarChart3, CheckCircle2, AlertCircle, Wallet } from "lucide-react";
+import { Sparkles, TrendingUp, Search, Brain, Shield, Zap, BarChart3, CheckCircle2, AlertCircle, Wallet, Flame } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 
@@ -223,6 +223,13 @@ export default function Landing() {
                       <p className="text-sm text-muted-foreground">Same low platform fee</p>
                     </div>
                   </div>
+                  <div className="flex items-start gap-3">
+                    <Flame className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-orange-500">33% used for buyback & burn</p>
+                      <p className="text-sm text-muted-foreground">Deflationary tokenomics</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-muted/50 rounded-md p-3 mt-4">
@@ -261,6 +268,73 @@ export default function Landing() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Tokenomics - Buyback & Burn */}
+      <section className="py-16 bg-gradient-to-br from-orange-500/10 via-primary/10 to-background border-y border-orange-500/20">
+        <div className="container mx-auto px-6 lg:px-8">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <Badge className="mb-4 bg-orange-500/20 border-orange-500/40 text-orange-500">
+                <Flame className="h-3 w-3 mr-1" />
+                Deflationary Tokenomics
+              </Badge>
+              <h2 className="text-4xl font-bold mb-4">Automatic Buyback & Burn</h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Every subscription purchase directly supports the token ecosystem
+              </p>
+            </div>
+
+            <Card className="border-2 border-orange-500/30 bg-gradient-to-br from-orange-500/5 to-background">
+              <CardContent className="pt-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                  <div className="text-center">
+                    <div className="h-16 w-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
+                      <TrendingUp className="h-8 w-8 text-orange-500" />
+                    </div>
+                    <h3 className="font-bold text-2xl mb-2">33%</h3>
+                    <p className="text-sm text-muted-foreground">Of every subscription</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                      <Sparkles className="h-8 w-8 text-primary" />
+                    </div>
+                    <h3 className="font-bold text-2xl mb-2">Auto</h3>
+                    <p className="text-sm text-muted-foreground">Buyback from market</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="h-16 w-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
+                      <Flame className="h-8 w-8 text-orange-500" />
+                    </div>
+                    <h3 className="font-bold text-2xl mb-2">Burn</h3>
+                    <p className="text-sm text-muted-foreground">Permanently removed</p>
+                  </div>
+                </div>
+
+                <div className="bg-muted/50 rounded-lg p-6 border border-orange-500/20">
+                  <div className="flex items-start gap-4">
+                    <Flame className="h-6 w-6 text-orange-500 flex-shrink-0 mt-1" />
+                    <div>
+                      <h4 className="font-bold mb-2">How It Works</h4>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        When you purchase a 2-week subscription (0.15 SOL), one-third (0.05 SOL) is automatically used to buy back tokens from the market and burn them forever. This creates constant buying pressure and reduces supply, supporting long-term token value.
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mt-4 p-3 bg-background/50 rounded-md">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          <span className="text-xs font-medium">Token:</span>
+                        </div>
+                        <code className="text-xs bg-muted px-2 py-1 rounded break-all">
+                          FQptMsS3tnyPbK68rTZm3n3R4NHBX5r9edshyyvxpump
+                        </code>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
