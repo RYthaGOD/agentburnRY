@@ -1282,20 +1282,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message expired. Please try again." });
       }
 
-      // Check AI bot whitelist (RESTRICTED FEATURE)
-      const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
-      const isWhitelisted = AI_BOT_WHITELISTED_WALLETS.includes(ownerWalletAddress);
-      
-      if (!isWhitelisted) {
-        return res.status(403).json({ 
-          message: "AI Trading Bot access is restricted. Your wallet is not whitelisted for this feature." 
+      // Check access: 10 free trades OR active subscription
+      let config = await storage.getAIBotConfig(ownerWalletAddress);
+      if (!config) {
+        // Create default config for new user
+        config = await storage.createOrUpdateAIBotConfig({
+          ownerWalletAddress,
+          enabled: false,
+          totalBudget: "0",
+          budgetPerTrade: "0.02",
         });
       }
 
-      // Get AI bot config
-      const config = await storage.getAIBotConfig(ownerWalletAddress);
-      if (!config) {
-        return res.status(404).json({ message: "AI bot config not found. Please configure the bot first." });
+      const now = new Date();
+      const freeTradesRemaining = Math.max(0, 10 - config.freeTradesUsed);
+      const hasActiveSubscription = config.subscriptionActive && 
+        config.subscriptionExpiresAt && 
+        new Date(config.subscriptionExpiresAt) > now;
+
+      const hasAccess = freeTradesRemaining > 0 || hasActiveSubscription;
+
+      if (!hasAccess) {
+        return res.status(403).json({ 
+          message: "No trading access. You've used your 10 free trades. Please purchase 2-week access for 0.15 SOL to continue.",
+          requiresPayment: true,
+          freeTradesUsed: config.freeTradesUsed,
+        });
+      }
+
+      // If using a free trade (not on subscription), increment free trades used
+      if (!hasActiveSubscription && freeTradesRemaining > 0) {
+        await storage.incrementFreeTradesUsed(ownerWalletAddress);
+        console.log(`[Free Trade] Used trade ${config.freeTradesUsed + 1}/10 for ${ownerWalletAddress}`);
       }
 
       auditLog("execute_standalone_ai_bot", {
@@ -1357,14 +1375,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message expired. Please try again." });
       }
 
-      // Check AI bot whitelist (RESTRICTED FEATURE)
-      const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
-      const isWhitelisted = AI_BOT_WHITELISTED_WALLETS.includes(ownerWalletAddress);
-      
-      if (!isWhitelisted) {
-        return res.status(403).json({ 
-          message: "AI Trading Bot access is restricted. Your wallet is not whitelisted for this feature." 
-        });
+      // Check access: 10 free trades OR active subscription
+      const existingConfig = await storage.getAIBotConfig(ownerWalletAddress);
+      if (existingConfig) {
+        const now = new Date();
+        const freeTradesRemaining = Math.max(0, 10 - existingConfig.freeTradesUsed);
+        const hasActiveSubscription = existingConfig.subscriptionActive && 
+          existingConfig.subscriptionExpiresAt && 
+          new Date(existingConfig.subscriptionExpiresAt) > now;
+
+        const hasAccess = freeTradesRemaining > 0 || hasActiveSubscription;
+
+        if (!hasAccess) {
+          return res.status(403).json({ 
+            message: "No trading access. You've used your 10 free trades. Please purchase 2-week access for 0.15 SOL to continue.",
+            requiresPayment: true,
+            freeTradesUsed: existingConfig.freeTradesUsed,
+          });
+        }
       }
 
       auditLog("update_ai_bot_config", {
