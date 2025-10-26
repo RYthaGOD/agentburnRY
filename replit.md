@@ -45,9 +45,9 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - **Quick Technical Scans:** Every 2 minutes using all 7 AI models in parallel for scalp trades (62-78% AI confidence). Multiple model consensus provides superior accuracy over dual-model approach.
 - **Deep Scans:** Every 15 minutes using the full 7-model hivemind for high-confidence swing opportunities (75%+ AI confidence).
 - **Automatic Portfolio Rebalancing:** Every 30 minutes using full 7-model hivemind analysis for optimal sell recommendations.
-- **Strategy Updates:** Every 3 hours, hivemind regenerates trading strategy to adapt to market conditions.
+- **AI-Powered Strategy Learning:** Every 3 hours, the full 7-model hivemind analyzes recent trading performance (win rate, avg profit, trade count) and intelligently optimizes strategy parameters instead of using rule-based logic. AI continuously learns and improves based on actual performance. Manual regeneration available via dashboard for immediate recalibration.
 - **Hivemind Benefits:** All 7 models (OpenAI, OpenAI #2, DeepSeek, DeepSeek #2, Cerebras, Google Gemini, Groq) run in parallel for ALL decisions, providing superior accuracy through majority voting. When models agree, confidence is averaged. When models disagree, higher-confidence model prevails.
-- **Redundancy & Failover:** Built-in redundancy with 7 models ensures high availability. System continues operating even if some models fail.
+- **Redundancy & Failover:** Built-in redundancy with 7 models ensures high availability. System continues operating even if some models fail. Graceful fallback to rule-based strategy if AI fails, then to conservative defaults.
 
 **Dual-Mode Trading Strategy (Conservative):**
 - **SCALP Mode (65-79% AI confidence):** 3-6% of portfolio, max 30-minute hold, -10% stop-loss, +4-8% profit targets.
