@@ -730,7 +730,7 @@ export default function AIBot() {
               {subscriptionStatus.requiresPayment ? "Trading Access Required" : subscriptionStatus.subscriptionActive ? "Premium Access Active" : "Free Trades Available"}
             </CardTitle>
             <CardDescription>
-              {subscriptionStatus.requiresPayment && "You've used all 10 free trades. Purchase 2-week access to continue trading."}
+              {subscriptionStatus.requiresPayment && "You've used all 20 free trades. Purchase 2-week access to continue trading."}
               {subscriptionStatus.subscriptionActive && subscriptionStatus.subscriptionExpiresAt && `Unlimited trading until ${new Date(subscriptionStatus.subscriptionExpiresAt).toLocaleDateString()}`}
               {!subscriptionStatus.requiresPayment && !subscriptionStatus.subscriptionActive && `${subscriptionStatus.freeTradesRemaining} free trades remaining • Then 0.15 SOL for 2 weeks unlimited access`}
             </CardDescription>
@@ -739,8 +739,8 @@ export default function AIBot() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 rounded-lg border bg-muted/30">
                 <div className="text-sm text-muted-foreground mb-1">Free Trades</div>
-                <div className="text-2xl font-bold">{subscriptionStatus.freeTradesUsed} / 10 Used</div>
-                <Progress value={(subscriptionStatus.freeTradesUsed / 10) * 100} className="mt-2" />
+                <div className="text-2xl font-bold">{subscriptionStatus.freeTradesUsed} / 20 Used</div>
+                <Progress value={(subscriptionStatus.freeTradesUsed / 20) * 100} className="mt-2" />
               </div>
               <div className="p-4 rounded-lg border bg-muted/30">
                 <div className="text-sm text-muted-foreground mb-1">Subscription</div>

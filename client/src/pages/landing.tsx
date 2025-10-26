@@ -106,7 +106,7 @@ export default function Landing() {
             
             <div className="space-y-1">
               <p className="text-base font-semibold text-green-500">
-                ✓ First 10 trades completely free
+                ✓ First 20 trades completely free
               </p>
               <p className="text-sm text-muted-foreground">
                 Then 0.15 SOL for 2 weeks unlimited access • 1% fee per trade • No credit card required
@@ -133,7 +133,7 @@ export default function Landing() {
                 <Badge className="w-fit bg-green-500/20 border-green-500/40 text-green-500 mb-2">
                   Start Free
                 </Badge>
-                <CardTitle className="text-3xl">10 Free Trades</CardTitle>
+                <CardTitle className="text-3xl">20 Free Trades</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -147,14 +147,14 @@ export default function Landing() {
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium">10 AI-powered trades</p>
+                      <p className="font-medium">20 AI-powered trades</p>
                       <p className="text-sm text-muted-foreground">Full access to all features</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium">10-model hivemind AI</p>
+                      <p className="font-medium">11-model hivemind AI</p>
                       <p className="text-sm text-muted-foreground">Same AI system as paid users</p>
                     </div>
                   </div>
@@ -589,7 +589,7 @@ export default function Landing() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/dashboard">
               <Button size="lg" className="text-lg px-8 h-12">
-                Start Free (10 Trades)
+                Start Free (20 Trades)
               </Button>
             </Link>
             <Link href="/stats">
@@ -599,7 +599,7 @@ export default function Landing() {
             </Link>
           </div>
           <p className="text-sm text-muted-foreground mt-4">
-            After 10 free trades, continue for 0.15 SOL per 2 weeks • 1% fee per trade
+            After 20 free trades, continue for 0.15 SOL per 2 weeks • 1% fee per trade
           </p>
         </div>
       </section>
