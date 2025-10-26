@@ -676,6 +676,51 @@ export default function AIBot() {
         </div>
       </div>
 
+      {/* Security Advisory - Fresh Wallet Recommendation */}
+      <Alert className="border-2 border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-background">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+              <Shield className="h-5 w-5 text-blue-500" />
+            </div>
+          </div>
+          <div className="flex-1">
+            <AlertTitle className="text-lg font-bold mb-2 flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-blue-500" />
+              Security Best Practice: Use a Fresh Wallet
+            </AlertTitle>
+            <AlertDescription className="space-y-3">
+              <p className="text-sm">
+                We <strong>strongly recommend</strong> creating a new Solana wallet specifically for AI trading. Transfer only the amount you want to trade (e.g., 0.5-2 SOL) to keep your main wallet safe.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="flex items-start gap-2 text-xs">
+                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Isolated Risk</p>
+                    <p className="text-muted-foreground">Protect your main holdings</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 text-xs">
+                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Clear Tracking</p>
+                    <p className="text-muted-foreground">Easy performance monitoring</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2 text-xs">
+                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Non-Custodial</p>
+                    <p className="text-muted-foreground">You control your funds</p>
+                  </div>
+                </div>
+              </div>
+            </AlertDescription>
+          </div>
+        </div>
+      </Alert>
+
       {/* Subscription Status */}
       {!isLoadingSubscription && subscriptionStatus && (
         <Card className={`border-2 ${subscriptionStatus.requiresPayment ? 'border-destructive/50 bg-destructive/5' : subscriptionStatus.subscriptionActive ? 'border-primary/50 bg-primary/5' : 'border-primary/30'}`}>

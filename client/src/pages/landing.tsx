@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { WalletButton } from "@/components/wallet-button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Sparkles, TrendingUp, Search, Brain, Shield, Zap, BarChart3, CheckCircle2 } from "lucide-react";
+import { Sparkles, TrendingUp, Search, Brain, Shield, Zap, BarChart3, CheckCircle2, AlertCircle, Wallet } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 
@@ -262,6 +262,61 @@ export default function Landing() {
               </Card>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Security Advisory */}
+      <section className="py-12 bg-gradient-to-br from-blue-500/10 to-background">
+        <div className="container mx-auto px-6 lg:px-8">
+          <Card className="max-w-4xl mx-auto border-2 border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-background">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0">
+                  <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                    <Shield className="h-6 w-6 text-blue-500" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-blue-500" />
+                    Security Best Practice: Use a Fresh Wallet
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    We strongly recommend creating a new Solana wallet specifically for AI trading. This keeps your main wallet safe and helps you track trading performance separately.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Isolated Risk</p>
+                        <p className="text-xs text-muted-foreground">Protect your main holdings</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Clear Tracking</p>
+                        <p className="text-xs text-muted-foreground">Easy performance monitoring</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm">Non-Custodial</p>
+                        <p className="text-xs text-muted-foreground">You always control your funds</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-md">
+                    <p className="text-sm text-muted-foreground flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                      <span>Transfer only the amount you want to trade (e.g., 0.5-2 SOL) to your new trading wallet. You can always add more later.</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
