@@ -27,8 +27,9 @@ A dedicated scheduler service automates buyback execution using `node-cron`, han
 This bot operates independently with configurations stored in a dedicated `aiBotConfigs` table. It employs a "hive mind" system where 7 AI models vote on trades with automatic failover, restricted to whitelisted wallets.
 
 **Autonomous Capital Management:**
-- Uses available wallet balance (minus 0.03 SOL fee reserve) for trades.
+- Maintains 10% liquidity reserve for capital growth (90% max deployment) with dynamic fee buffer scaling by portfolio size.
 - Strict percentage-based position sizing (3-6% for SCALP, 5-9% for SWING) with a 0.01 SOL minimum for small portfolios and strict caps for larger portfolios.
+- Dynamic allocation based on market conditions via hivemind strategy that regenerates every 3 hours, adjusting position sizes, confidence thresholds, and risk parameters based on market sentiment (bullish/bearish/neutral/volatile) and recent performance.
 - AI-driven exits with no fixed profit targets, requiring a minimum 75% AI confidence.
 - Enhanced quality filters: 70%+ organic score, 60%+ quality score, $25k+ volume, $20k+ liquidity.
 - Portfolio diversification with a 25% maximum concentration limit per position.
@@ -61,7 +62,7 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - Automatically sells weaker positions first to free capital, then buys better opportunities when wallet balance is insufficient.
 - Rotation Criteria: New opportunity must have 10%+ higher AI confidence (lowered from 25% for more flexibility) or cut a loss to capture a good opportunity (70%+ confidence). Prioritizes selling big losses or small profits.
 - Emergency Rotation: When wallet depleted (<0.01 SOL), forces rotation of weakest position regardless of confidence improvement to maintain trading capability.
-- MAX Portfolio Allocation: Maintains 15% liquidity reserve by capping deployment at 85% of total capital to prevent over-allocation.
+- MAX Portfolio Allocation: Maintains 10% liquidity reserve by capping deployment at 90% of total capital to enable continuous trading for capital growth.
 - Dynamic Fee Buffer: Scales with portfolio size (3% for small, 5% for medium, 7.5% for large portfolios) instead of fixed 0.03 SOL.
 
 **Portfolio-Wide Risk Management:**
