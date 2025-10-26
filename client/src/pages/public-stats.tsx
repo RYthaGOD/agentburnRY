@@ -45,11 +45,9 @@ export default function PublicStats() {
       {/* Header */}
       <div className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/">
-            <a className="flex items-center gap-2 hover-elevate">
-              <Sparkles className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">GigaBrain</span>
-            </a>
+          <Link href="/" className="flex items-center gap-2 hover-elevate">
+            <Sparkles className="h-6 w-6 text-primary" />
+            <span className="text-xl font-bold">GigaBrain</span>
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/analyze">

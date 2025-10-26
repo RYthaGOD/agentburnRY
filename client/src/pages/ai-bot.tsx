@@ -887,31 +887,31 @@ export default function AIBot() {
               <div className="p-4 rounded-lg bg-background/50 border hover-elevate">
                 <div className="text-xs font-medium text-muted-foreground mb-1">Price (USD)</div>
                 <div className="text-2xl font-bold">
-                  ${parseFloat(myBotToken.pairs[0].priceUsd).toFixed(8)}
+                  ${(parseFloat(myBotToken.pairs[0].priceUsd) || 0).toFixed(8)}
                 </div>
-                <div className={`text-xs mt-1 ${myBotToken.pairs[0].priceChange.h24 >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {myBotToken.pairs[0].priceChange.h24 >= 0 ? '+' : ''}
-                  {myBotToken.pairs[0].priceChange.h24.toFixed(2)}% (24h)
+                <div className={`text-xs mt-1 ${(myBotToken.pairs[0].priceChange?.h24 || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {(myBotToken.pairs[0].priceChange?.h24 || 0) >= 0 ? '+' : ''}
+                  {(myBotToken.pairs[0].priceChange?.h24 || 0).toFixed(2)}% (24h)
                 </div>
               </div>
 
               <div className="p-4 rounded-lg bg-background/50 border hover-elevate">
                 <div className="text-xs font-medium text-muted-foreground mb-1">Market Cap</div>
                 <div className="text-2xl font-bold">
-                  ${myBotToken.pairs[0].marketCap.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  ${(myBotToken.pairs[0].marketCap || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  FDV: ${myBotToken.pairs[0].fdv.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  FDV: ${(myBotToken.pairs[0].fdv || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
               </div>
 
               <div className="p-4 rounded-lg bg-background/50 border hover-elevate">
                 <div className="text-xs font-medium text-muted-foreground mb-1">24h Volume</div>
                 <div className="text-2xl font-bold">
-                  ${myBotToken.pairs[0].volume.h24.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  ${(myBotToken.pairs[0].volume?.h24 || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {myBotToken.pairs[0].txns.h24.buys + myBotToken.pairs[0].txns.h24.sells} txns
+                  {(myBotToken.pairs[0].txns?.h24?.buys || 0) + (myBotToken.pairs[0].txns?.h24?.sells || 0)} txns
                 </div>
               </div>
 
@@ -920,14 +920,14 @@ export default function AIBot() {
                 <div className="flex items-center gap-2 mt-1">
                   <div className="flex-1">
                     <div className="text-xs text-green-500 mb-1">
-                      Buys: {myBotToken.pairs[0].txns.h24.buys}
+                      Buys: {myBotToken.pairs[0].txns?.h24?.buys || 0}
                     </div>
                     <div className="text-xs text-red-500">
-                      Sells: {myBotToken.pairs[0].txns.h24.sells}
+                      Sells: {myBotToken.pairs[0].txns?.h24?.sells || 0}
                     </div>
                   </div>
                   <div className="text-sm">
-                    {myBotToken.pairs[0].txns.h24.buys > myBotToken.pairs[0].txns.h24.sells ? '🟢' : '🔴'}
+                    {(myBotToken.pairs[0].txns?.h24?.buys || 0) > (myBotToken.pairs[0].txns?.h24?.sells || 0) ? '🟢' : '🔴'}
                   </div>
                 </div>
               </div>
