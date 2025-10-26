@@ -1402,7 +1402,7 @@ async function runStandaloneAIBots() {
         freeTradesUsed: c.freeTradesUsed || 0,
         subscriptionActive: c.subscriptionActive || false,
         subscriptionExpiresAt: c.subscriptionExpiresAt || null,
-      })
+      }, c.ownerWalletAddress)
     );
     
     if (accessibleConfigs.length === 0) {
@@ -1478,7 +1478,7 @@ async function runQuickTechnicalScan() {
         freeTradesUsed: c.freeTradesUsed || 0,
         subscriptionActive: c.subscriptionActive || false,
         subscriptionExpiresAt: c.subscriptionExpiresAt || null,
-      })
+      }, c.ownerWalletAddress)
     );
     
     if (accessibleConfigs.length === 0) {
@@ -2973,14 +2973,14 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
       freeTradesUsed: config.freeTradesUsed || 0,
       subscriptionActive: config.subscriptionActive || false,
       subscriptionExpiresAt: config.subscriptionExpiresAt || null,
-    });
+    }, ownerWalletAddress);
     
     if (!hasAccess) {
       const statusMessage = getAccessStatusMessage({
         freeTradesUsed: config.freeTradesUsed || 0,
         subscriptionActive: config.subscriptionActive || false,
         subscriptionExpiresAt: config.subscriptionExpiresAt || null,
-      });
+      }, ownerWalletAddress);
       addLog(`[Standalone AI Bot] Access denied - ${statusMessage.message}`, "error");
       return logs;
     }

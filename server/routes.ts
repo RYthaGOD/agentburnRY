@@ -1046,14 +1046,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         freeTradesUsed: config.freeTradesUsed || 0,
         subscriptionActive: config.subscriptionActive || false,
         subscriptionExpiresAt: config.subscriptionExpiresAt || null,
-      });
+      }, ownerWalletAddress);
       
       if (!hasAccess) {
         const statusMessage = getAccessStatusMessage({
           freeTradesUsed: config.freeTradesUsed || 0,
           subscriptionActive: config.subscriptionActive || false,
           subscriptionExpiresAt: config.subscriptionExpiresAt || null,
-        });
+        }, ownerWalletAddress);
         return res.status(403).json({ 
           message: `AI Trading Bot access denied: ${statusMessage.message}` 
         });
