@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, Zap, Target, Trophy, Clock, BarChart3, Activity, Sparkles } from "lucide-react";
+import { TrendingUp, Zap, Target, Trophy, Clock, BarChart3, Activity, Sparkles, Wallet, PieChart, DollarSign } from "lucide-react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +16,10 @@ interface PublicStats {
   last24hTrades: number;
   scalpTrades: number;
   swingTrades: number;
+  totalCapitalSOL: string;
+  capitalInPositionsSOL: string;
+  availableCapitalSOL: string;
+  activePositionsCount: number;
 }
 
 export default function PublicStats() {
@@ -204,6 +208,119 @@ export default function PublicStats() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Portfolio Performance Section */}
+        <Card className="border-purple-500/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PieChart className="h-5 w-5 text-purple-500" />
+              Portfolio Performance
+            </CardTitle>
+            <CardDescription>
+              Real-time capital allocation across all active traders
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Wallet className="h-4 w-4 text-purple-500" />
+                  Total Capital
+                </div>
+                <div className="text-2xl font-bold text-purple-500" data-testid="text-total-capital">
+                  {stats?.totalCapitalSOL || "0.00"} SOL
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Combined portfolio value
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Target className="h-4 w-4 text-orange-500" />
+                  In Positions
+                </div>
+                <div className="text-2xl font-bold text-orange-500" data-testid="text-capital-positions">
+                  {stats?.capitalInPositionsSOL || "0.00"} SOL
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Actively deployed capital
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <DollarSign className="h-4 w-4 text-green-500" />
+                  Available Capital
+                </div>
+                <div className="text-2xl font-bold text-green-500" data-testid="text-available-capital">
+                  {stats?.availableCapitalSOL || "0.00"} SOL
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Ready to deploy
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Activity className="h-4 w-4 text-blue-500" />
+                  Active Positions
+                </div>
+                <div className="text-2xl font-bold text-blue-500" data-testid="text-active-positions">
+                  {stats?.activePositionsCount || 0}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Across all traders
+                </p>
+              </div>
+            </div>
+
+            {/* Capital Allocation Bar */}
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Capital Allocation</span>
+                <span className="font-medium">
+                  {(() => {
+                    const totalCapital = parseFloat(stats?.totalCapitalSOL || "0");
+                    const inPositions = parseFloat(stats?.capitalInPositionsSOL || "0");
+                    if (totalCapital <= 0) return "0% deployed";
+                    const percentage = (inPositions / totalCapital) * 100;
+                    const clamped = Math.min(100, percentage);
+                    return `${clamped.toFixed(1)}% deployed${percentage > 100 ? " (over-allocated)" : ""}`;
+                  })()}
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-orange-500 to-purple-500 transition-all duration-500"
+                  style={{ 
+                    width: (() => {
+                      const totalCapital = parseFloat(stats?.totalCapitalSOL || "0");
+                      const inPositions = parseFloat(stats?.capitalInPositionsSOL || "0");
+                      if (totalCapital <= 0) return "0%";
+                      const percentage = (inPositions / totalCapital) * 100;
+                      // Clamp between 0-100% to prevent overflow
+                      return `${Math.min(100, Math.max(0, percentage))}%`;
+                    })()
+                  }}
+                />
+              </div>
+              {(() => {
+                const totalCapital = parseFloat(stats?.totalCapitalSOL || "0");
+                const inPositions = parseFloat(stats?.capitalInPositionsSOL || "0");
+                if (inPositions > totalCapital && totalCapital > 0) {
+                  return (
+                    <p className="text-xs text-orange-500 flex items-center gap-1">
+                      <Zap className="h-3 w-3" />
+                      Positions have gained value beyond initial capital - excellent performance!
+                    </p>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Trust Signals */}
         <Card className="border-primary/20">

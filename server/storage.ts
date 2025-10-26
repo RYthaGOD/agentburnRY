@@ -641,10 +641,35 @@ export class DatabaseStorage implements IStorage {
     last24hTrades: number;
     scalpTrades: number;
     swingTrades: number;
+    totalCapitalSOL: string;
+    capitalInPositionsSOL: string;
+    availableCapitalSOL: string;
+    activePositionsCount: number;
   }> {
     // Get all completed trades from trade journal
     const allTrades = await db.select().from(tradeJournal);
     const completedTrades = allTrades.filter(t => t.exitAt !== null);
+    
+    // Get active AI bot configs for portfolio metrics
+    const activeConfigs = await db.select().from(aiBotConfigs);
+    const enabledConfigs = activeConfigs.filter(c => c.enabled);
+    
+    // Calculate portfolio metrics (using budgetUsed for capital in positions)
+    const totalCapitalSOL = enabledConfigs.reduce((sum, c) => {
+      return sum + parseFloat(c.totalBudget || "0");
+    }, 0);
+    
+    const capitalInPositionsSOL = enabledConfigs.reduce((sum, c) => {
+      return sum + parseFloat(c.budgetUsed || "0");
+    }, 0);
+    
+    // Cap available capital at 0 minimum (can't be negative)
+    // Note: capitalInPositions > totalCapital can occur when positions gain value
+    const availableCapitalSOL = Math.max(0, totalCapitalSOL - capitalInPositionsSOL);
+    
+    // Count active positions across all users
+    const allPositions = await db.select().from(aiBotPositions);
+    const activePositionsCount = allPositions.length;
     
     if (completedTrades.length === 0) {
       return {
@@ -652,12 +677,16 @@ export class DatabaseStorage implements IStorage {
         winRate: "0.0",
         avgROI: "0.0",
         totalProfit: "0.00",
-        activeUsers: 0,
+        activeUsers: enabledConfigs.length,
         avgHoldTime: 0,
         bestTrade: "0.0",
         last24hTrades: 0,
         scalpTrades: 0,
         swingTrades: 0,
+        totalCapitalSOL: totalCapitalSOL.toFixed(2),
+        capitalInPositionsSOL: capitalInPositionsSOL.toFixed(2),
+        availableCapitalSOL: availableCapitalSOL.toFixed(2),
+        activePositionsCount,
       };
     }
 
@@ -679,10 +708,6 @@ export class DatabaseStorage implements IStorage {
       return sum + parseFloat(t.profitLossSOL || "0");
     }, 0);
     const totalProfit = totalProfitSOL.toFixed(2);
-
-    // Count active users (users with AI bot configs)
-    const activeConfigs = await db.select().from(aiBotConfigs);
-    const activeUsers = activeConfigs.filter(c => c.enabled).length;
 
     // Calculate average hold time
     const totalHoldTime = completedTrades.reduce((sum, t) => {
@@ -712,12 +737,16 @@ export class DatabaseStorage implements IStorage {
       winRate,
       avgROI,
       totalProfit,
-      activeUsers,
+      activeUsers: enabledConfigs.length,
       avgHoldTime,
       bestTrade,
       last24hTrades,
       scalpTrades,
       swingTrades,
+      totalCapitalSOL: totalCapitalSOL.toFixed(2),
+      capitalInPositionsSOL: capitalInPositionsSOL.toFixed(2),
+      availableCapitalSOL: availableCapitalSOL.toFixed(2),
+      activePositionsCount,
     };
   }
 }
