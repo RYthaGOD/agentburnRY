@@ -515,10 +515,13 @@ export default function AIBot() {
 
   if (!connected) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <Brain className="h-16 w-16 text-muted-foreground" />
-        <h2 className="text-2xl font-bold">Connect Your Wallet</h2>
-        <p className="text-muted-foreground">Connect your Solana wallet to access autonomous AI trading</p>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+        <Brain className="h-20 w-20 text-primary" />
+        <div className="text-center">
+          <h2 className="text-4xl font-black text-primary mb-2">GigaBrain</h2>
+          <p className="text-sm font-bold text-primary/80 tracking-wide mb-4">BLACK AND GOLD NEVER FOLD</p>
+          <p className="text-muted-foreground">Connect your Solana wallet to access autonomous AI trading</p>
+        </div>
       </div>
     );
   }
@@ -527,33 +530,45 @@ export default function AIBot() {
 
   return (
     <div className="container mx-auto p-4 space-y-6" data-testid="page-ai-bot">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Brain className="h-8 w-8" />
-            Autonomous AI Trading Bot
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Fully autonomous hivemind system powered by DeepSeek V3 (free tier) - 60%+ cost reduction
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <Badge variant={isEnabled ? "default" : "secondary"} className="px-4 py-2">
-            {isEnabled ? (
-              <><CheckCircle className="h-4 w-4 mr-2" /> Active</>
-            ) : (
-              <><XCircle className="h-4 w-4 mr-2" /> Disabled</>
-            )}
-          </Badge>
+      <div className="relative overflow-hidden rounded-lg border border-primary/30 bg-gradient-to-r from-background via-primary/10 to-background p-6 mb-6">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/5 to-transparent animate-pulse"></div>
+        <div className="relative z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <Brain className="h-10 w-10 text-primary" />
+                <div>
+                  <h1 className="text-4xl font-black tracking-tight text-primary">
+                    GigaBrain
+                  </h1>
+                  <p className="text-sm font-bold text-primary/80 tracking-wide">
+                    BLACK AND GOLD NEVER FOLD
+                  </p>
+                </div>
+              </div>
+              <p className="text-muted-foreground text-sm mt-2">
+                10-Model AI Hivemind • Autonomous Trading • Self-Managing Capital
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <Badge variant={isEnabled ? "default" : "secondary"} className="px-4 py-2 text-base">
+                {isEnabled ? (
+                  <><CheckCircle className="h-4 w-4 mr-2" /> ACTIVE</>
+                ) : (
+                  <><XCircle className="h-4 w-4 mr-2" /> OFFLINE</>
+                )}
+              </Badge>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Real-Time Scheduler Status */}
       {schedulerStatus && (
-        <Card className="border-purple-500/50 bg-gradient-to-r from-background to-purple-500/5">
+        <Card className="border-primary/30 bg-gradient-to-r from-background to-primary/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-purple-500" />
+              <Activity className="h-5 w-5 text-primary" />
               Live Scheduler Activity
             </CardTitle>
             <CardDescription>
@@ -566,7 +581,7 @@ export default function AIBot() {
               <div className="p-4 rounded-lg border bg-muted/30">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-blue-500" />
+                    <Zap className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium">Quick Scan (10min)</span>
                   </div>
                   <Badge variant={schedulerStatus.quickScan.status === 'running' ? 'default' : schedulerStatus.quickScan.status === 'error' ? 'destructive' : 'outline'} data-testid="badge-quick-scan-status">
@@ -585,7 +600,7 @@ export default function AIBot() {
               <div className="p-4 rounded-lg border bg-muted/30">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-green-500" />
+                    <Activity className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium">Position Monitor (2.5min)</span>
                   </div>
                   <Badge variant={schedulerStatus.positionMonitor.status === 'running' ? 'default' : schedulerStatus.positionMonitor.status === 'error' ? 'destructive' : 'outline'} data-testid="badge-monitor-status">
@@ -707,12 +722,12 @@ export default function AIBot() {
 
       {/* Buyback & Burn Configuration */}
       {aiConfig && (
-        <Card className="border-orange-500/50 bg-gradient-to-r from-background to-orange-500/5">
+        <Card className="border-primary/30 bg-gradient-to-r from-background to-primary/5">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-500/10">
-                  <Flame className="h-6 w-6 text-orange-500" />
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Flame className="h-6 w-6 text-primary" />
                 </div>
                 <div>
                   <div className="text-2xl font-bold">Automatic Buyback & Burn</div>
@@ -832,7 +847,7 @@ export default function AIBot() {
 
                   <div className="p-4 rounded-lg bg-background/50 border">
                     <div className="text-xs font-medium text-muted-foreground mb-1">Tokens Burned</div>
-                    <div className="text-lg font-bold text-orange-500">
+                    <div className="text-lg font-bold text-primary">
                       {parseFloat(aiConfig.totalTokensBurned || '0').toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </div>
                   </div>
@@ -891,9 +906,9 @@ export default function AIBot() {
               </div>
 
               {/* How It Works */}
-              <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
+              <div className="p-4 rounded-lg bg-primary/10 border border-primary/20">
                 <div className="flex items-start gap-3">
-                  <Info className="h-5 w-5 text-orange-500 mt-0.5" />
+                  <Info className="h-5 w-5 text-primary mt-0.5" />
                   <div className="space-y-2 text-sm">
                     <p className="font-medium">How Automatic Buyback & Burn Works:</p>
                     <ul className="space-y-1 text-muted-foreground">
@@ -913,12 +928,12 @@ export default function AIBot() {
 
       {/* Advanced Risk Settings */}
       {aiConfig && (
-        <Card className="border-yellow-500/50 bg-gradient-to-r from-background to-yellow-500/5">
+        <Card className="border-primary/30 bg-gradient-to-r from-background to-primary/5">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-yellow-500/10">
-                  <Shield className="h-6 w-6 text-yellow-500" />
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Shield className="h-6 w-6 text-primary" />
                 </div>
                 <div>
                   <div className="text-2xl font-bold">Advanced Risk Settings</div>
@@ -1016,10 +1031,10 @@ export default function AIBot() {
 
       {/* Real-Time AI Activity Feed */}
       {activityLogs.length > 0 && (
-        <Card className="border-cyan-500/50 bg-gradient-to-r from-background to-cyan-500/5">
+        <Card className="border-primary/30 bg-gradient-to-r from-background to-primary/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5 text-cyan-500" />
+              <Brain className="h-5 w-5 text-primary" />
               Live AI Thoughts & Activity
             </CardTitle>
             <CardDescription>
