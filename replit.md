@@ -75,7 +75,11 @@ A dedicated scheduler service automates buyback execution using `node-cron`, han
 - **Trade Journal & Pattern Analysis:** Tracks complete trade lifecycle, categorizes losses, identifies winning patterns, and integrates data into strategy regeneration.
 - **10-Model Hivemind System:** DeepSeek, DeepSeek #2, Together AI, OpenRouter, Groq, Cerebras, Google Gemini, ChatAnywhere, OpenAI, OpenAI #2. Models run in parallel with majority voting.
 - **Smart Model Prioritization:** 3-tier priority system (free reliable, free with limits, paid) to optimize cost/performance.
-- **Circuit Breaker Protection:** Disables failing models for 5 minutes after 3 consecutive failures.
+- **Intelligent Circuit Breaker Protection:** 
+  - Immediately disables models with 402/401 errors (insufficient credits/auth) for 30 minutes
+  - Standard circuit breaker disables models after 3 consecutive failures for 5 minutes
+  - Automatic rotation to healthy models ensures continuous operation
+  - Health scoring prioritizes reliable models over recently failed ones
 - **Tiered AI Usage:** Quick scans use 4 models; deep scans use the full hivemind.
 - **Redundancy & Failover:** Built-in redundancy with 10 models and graceful fallback to rule-based strategies.
 
