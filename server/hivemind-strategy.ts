@@ -104,9 +104,9 @@ async function generateAIStrategy(
         : '  - No failure patterns detected yet';
       
       // Format successful characteristics
-      const successChars = patterns.mostSuccessfulCharacteristics;
-      const successDetails = successChars.avgOrganicScore > 0
-        ? `  - Avg Organic Score: ${successChars.avgOrganicScore.toFixed(0)}% (wins) vs baseline
+      const successChars = patterns.bestTokenCharacteristics.length > 0 ? patterns.bestTokenCharacteristics[0] : null;
+      const successDetails = successChars && successChars.avgOrganicScore > 0
+        ? `  - Avg Organic Score: ${successChars.avgOrganicScore.toFixed(0)}% (wins)
   - Avg Quality Score: ${successChars.avgQualityScore.toFixed(0)}% (wins)
   - Avg Liquidity: $${(successChars.avgLiquidityUSD / 1000).toFixed(0)}k
   - Avg Volume: $${(successChars.avgVolumeUSD / 1000).toFixed(0)}k`
@@ -116,7 +116,7 @@ async function generateAIStrategy(
 
 Trade Journal Pattern Analysis (${patterns.totalTrades} completed trades):
 - Actual Win Rate: ${patterns.winRate.toFixed(1)}%
-- Average Profit/Loss: ${patterns.avgProfitLoss.toFixed(2)}%
+- Average Profit/Loss: ${patterns.avgProfit.toFixed(2)}%
 
 Common Failure Reasons:
 ${failureReasons}
