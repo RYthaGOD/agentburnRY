@@ -1294,11 +1294,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const now = new Date();
+      const currentTime = new Date();
       const freeTradesRemaining = Math.max(0, 10 - config.freeTradesUsed);
       const hasActiveSubscription = config.subscriptionActive && 
         config.subscriptionExpiresAt && 
-        new Date(config.subscriptionExpiresAt) > now;
+        new Date(config.subscriptionExpiresAt) > currentTime;
 
       const hasAccess = freeTradesRemaining > 0 || hasActiveSubscription;
 

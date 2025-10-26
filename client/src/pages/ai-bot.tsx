@@ -49,6 +49,7 @@ export default function AIBot() {
   const [showTreasuryKey, setShowTreasuryKey] = useState(false);
   const [isSavingKey, setIsSavingKey] = useState(false);
   const [isDeletingKey, setIsDeletingKey] = useState(false);
+  const [isPurchasingSubscription, setIsPurchasingSubscription] = useState(false);
   const [scanLog, setScanLog] = useState<Array<{
     timestamp: number;
     message: string;
@@ -81,6 +82,19 @@ export default function AIBot() {
   // Fetch AI bot config for this wallet
   const { data: aiConfig, isLoading } = useQuery<AIBotConfig>({
     queryKey: ["/api/ai-bot/config", publicKey?.toString()],
+    enabled: connected && !!publicKey,
+  });
+
+  // Fetch subscription status for this wallet
+  const { data: subscriptionStatus, isLoading: isLoadingSubscription } = useQuery<{
+    freeTradesUsed: number;
+    freeTradesRemaining: number;
+    subscriptionActive: boolean;
+    subscriptionExpiresAt: string | null;
+    hasAccess: boolean;
+    requiresPayment: boolean;
+  }>({
+    queryKey: ["/api/ai-bot/subscription/status", publicKey?.toString()],
     enabled: connected && !!publicKey,
   });
 
@@ -513,6 +527,105 @@ export default function AIBot() {
     }
   };
 
+  const handlePurchaseSubscription = async () => {
+    if (!publicKey || !signMessage) {
+      toast({
+        title: "Error",
+        description: "Please connect wallet first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPurchasingSubscription(true);
+
+    try {
+      // Import Solana web3.js
+      const { Connection, PublicKey: SolanaPublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } = await import("@solana/web3.js");
+      
+      const connection = new Connection(
+        import.meta.env.VITE_SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com",
+        "confirmed"
+      );
+
+      const TREASURY_WALLET = "jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38";
+      const SUBSCRIPTION_PRICE_SOL = 0.15;
+
+      toast({
+        title: "Preparing Payment...",
+        description: "Creating SOL transfer transaction",
+      });
+
+      // Create transfer instruction
+      const transferInstruction = SystemProgram.transfer({
+        fromPubkey: publicKey,
+        toPubkey: new SolanaPublicKey(TREASURY_WALLET),
+        lamports: Math.floor(SUBSCRIPTION_PRICE_SOL * LAMPORTS_PER_SOL),
+      });
+
+      // Get recent blockhash
+      const { blockhash } = await connection.getLatestBlockhash();
+
+      // Create transaction
+      const transaction = new Transaction().add(transferInstruction);
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+
+      toast({
+        title: "Please Approve",
+        description: "Approve the transaction in your wallet",
+      });
+
+      // Request signature from wallet
+      const { sendTransaction } = await import("@solana/wallet-adapter-react");
+      const signature = await window.solana.sendTransaction(transaction, connection);
+
+      toast({
+        title: "Transaction Sent",
+        description: "Waiting for blockchain confirmation...",
+      });
+
+      // Wait for confirmation
+      await connection.confirmTransaction(signature, "confirmed");
+
+      toast({
+        title: "Payment Confirmed",
+        description: "Activating your subscription...",
+      });
+
+      // Sign message for API verification
+      const message = `Verify subscription payment for wallet ${publicKey.toString()} at ${Date.now()}`;
+      const messageBytes = new TextEncoder().encode(message);
+      const messageSignature = await signMessage(messageBytes);
+      const signatureBase58 = bs58.encode(messageSignature);
+
+      // Verify payment on backend
+      await apiRequest("POST", "/api/ai-bot/subscription/verify-payment", {
+        ownerWalletAddress: publicKey.toString(),
+        txSignature: signature,
+        signature: signatureBase58,
+        message,
+      });
+
+      // Refresh subscription status
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/subscription/status", publicKey.toString()] });
+
+      toast({
+        title: "Subscription Activated!",
+        description: "You now have 2 weeks of unlimited AI trading access",
+      });
+    } catch (error: any) {
+      console.error("Subscription purchase error:", error);
+      toast({
+        title: "Purchase Failed",
+        description: error.message || "Failed to purchase subscription",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPurchasingSubscription(false);
+    }
+  };
+
   if (!connected) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
@@ -562,6 +675,90 @@ export default function AIBot() {
           </div>
         </div>
       </div>
+
+      {/* Subscription Status */}
+      {!isLoadingSubscription && subscriptionStatus && (
+        <Card className={`border-2 ${subscriptionStatus.requiresPayment ? 'border-destructive/50 bg-destructive/5' : subscriptionStatus.subscriptionActive ? 'border-primary/50 bg-primary/5' : 'border-primary/30'}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              {subscriptionStatus.requiresPayment ? "Trading Access Required" : subscriptionStatus.subscriptionActive ? "Premium Access Active" : "Free Trades Available"}
+            </CardTitle>
+            <CardDescription>
+              {subscriptionStatus.requiresPayment && "You've used all 10 free trades. Purchase 2-week access to continue trading."}
+              {subscriptionStatus.subscriptionActive && subscriptionStatus.subscriptionExpiresAt && `Unlimited trading until ${new Date(subscriptionStatus.subscriptionExpiresAt).toLocaleDateString()}`}
+              {!subscriptionStatus.requiresPayment && !subscriptionStatus.subscriptionActive && `${subscriptionStatus.freeTradesRemaining} free trades remaining • Then 0.15 SOL for 2 weeks unlimited access`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg border bg-muted/30">
+                <div className="text-sm text-muted-foreground mb-1">Free Trades</div>
+                <div className="text-2xl font-bold">{subscriptionStatus.freeTradesUsed} / 10 Used</div>
+                <Progress value={(subscriptionStatus.freeTradesUsed / 10) * 100} className="mt-2" />
+              </div>
+              <div className="p-4 rounded-lg border bg-muted/30">
+                <div className="text-sm text-muted-foreground mb-1">Subscription</div>
+                <div className="flex items-center gap-2">
+                  {subscriptionStatus.subscriptionActive ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span className="text-lg font-bold text-green-500">Active</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-lg font-bold text-muted-foreground">Inactive</span>
+                    </>
+                  )}
+                </div>
+                {subscriptionStatus.subscriptionExpiresAt && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Expires: {new Date(subscriptionStatus.subscriptionExpiresAt).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+              <div className="p-4 rounded-lg border bg-muted/30">
+                <div className="text-sm text-muted-foreground mb-1">Trading Fee</div>
+                <div className="text-2xl font-bold">1%</div>
+                <div className="text-xs text-muted-foreground mt-1">Per trade (always applied)</div>
+              </div>
+            </div>
+            {subscriptionStatus.requiresPayment && (
+              <div className="mt-4 p-4 rounded-lg border-2 border-primary/50 bg-primary/10">
+                <div className="flex items-start gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-bold text-lg mb-2">Get 2 Weeks Unlimited Access</h4>
+                    <ul className="text-sm space-y-1 text-muted-foreground mb-3">
+                      <li>• Unlimited AI trades for 14 days</li>
+                      <li>• 10-model hivemind analysis</li>
+                      <li>• Autonomous capital management</li>
+                      <li>• Real-time performance tracking</li>
+                    </ul>
+                    <div className="text-2xl font-black text-primary mb-3">0.15 SOL</div>
+                    <Button 
+                      size="lg" 
+                      className="w-full md:w-auto"
+                      data-testid="button-purchase-subscription"
+                      onClick={handlePurchaseSubscription}
+                      disabled={isPurchasingSubscription}
+                    >
+                      {isPurchasingSubscription ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        "Purchase 2-Week Access"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Real-Time Scheduler Status */}
       {schedulerStatus && (
