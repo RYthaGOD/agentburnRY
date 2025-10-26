@@ -32,19 +32,19 @@ export default function Landing() {
           </Link>
           <nav className="hidden md:flex items-center gap-6">
             <Link href="/stats">
-              <a className="text-sm font-medium hover-elevate px-3 py-2 rounded-md" data-testid="link-stats">
+              <span className="text-sm font-medium hover-elevate px-3 py-2 rounded-md cursor-pointer" data-testid="link-stats">
                 Live Stats
-              </a>
+              </span>
             </Link>
             <Link href="/analyze">
-              <a className="text-sm font-medium hover-elevate px-3 py-2 rounded-md" data-testid="link-analyze">
+              <span className="text-sm font-medium hover-elevate px-3 py-2 rounded-md cursor-pointer" data-testid="link-analyze">
                 Token Analyzer
-              </a>
+              </span>
             </Link>
             <Link href="/learn">
-              <a className="text-sm font-medium hover-elevate px-3 py-2 rounded-md" data-testid="link-learn">
+              <span className="text-sm font-medium hover-elevate px-3 py-2 rounded-md cursor-pointer" data-testid="link-learn">
                 How It Works
-              </a>
+              </span>
             </Link>
           </nav>
           <div className="flex items-center gap-4">

@@ -3,6 +3,23 @@
 ## Overview
 BurnBot is a SaaS platform designed for Solana SPL token creators to automate token buyback and burn operations. It offers a no-code solution with a dashboard, flexible scheduling, and transaction monitoring to enhance tokenomics through automated and verifiable burn mechanisms. The platform also includes a Volume Bot, a Buy Bot, and **GigaBrain** - the standalone AI Trading Bot. GigaBrain ("Black and Gold Never Fold") uses a 10-model AI hivemind consensus system with automatic failover to scan and analyze trending tokens, executing trades based on AI confidence and profit potential. It features autonomous capital management, dynamic position sizing, and intelligent bundle activity detection to avoid pump-and-dump schemes.
 
+## User Acquisition & Trust-Building Features
+
+**Designed to convert website traffic into active users through transparency and hands-on demos:**
+
+### Public Pages (No Wallet Required)
+1. **Landing Page** (`/`): Hero section highlighting GigaBrain AI, live stats preview, trust signals, and clear CTAs linking to all features
+2. **Public Stats Dashboard** (`/stats`): Real-time aggregated performance metrics from all GigaBrain users - win rate, ROI, total profit, best trades, SCALP/SWING split, and 24-hour activity
+3. **Token Analyzer** (`/analyze`): Free AI-powered analysis tool for any Solana token - shows organic score, quality score, AI confidence, and BUY/HOLD/AVOID recommendation without requiring wallet connection
+4. **How It Works** (`/learn`): Educational content explaining the 10-model hivemind system, SCALP vs SWING trading modes, safety features, and getting started guide
+
+### Public API Routes (No Authentication)
+- `GET /api/public/stats` - Returns aggregated performance data from all users
+- `GET /api/public/analyze-token/:tokenMint` - Returns AI analysis for any Solana token (currently mock data)
+
+### Conversion Funnel
+Landing → Try Token Analyzer (see AI capabilities) → Learn How It Works (understand hivemind) → View Live Stats (verify real performance) → Connect Wallet → Start Trading
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
@@ -10,6 +27,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend
 Built with React 18+, TypeScript, and Vite, using Wouter for routing, shadcn/ui (New York variant) on Radix UI primitives, and Tailwind CSS for dark mode. TanStack Query manages server state, and React Hook Form with Zod handles form validation. The GigaBrain AI trading interface features a premium "Black and Gold" theme with gold accents (HSL 48° 100% 50%) on deep black backgrounds.
+
+**Real-Time Performance Monitoring:** WebSocket-based live updates broadcasting 17 trading metrics after each trade, including win rate, ROI, net profit, average hold time, best/worst trades, and SCALP/SWING mode statistics.
 
 ### Backend
 An Express.js server in TypeScript using an ESM module system, a RESTful API, centralized error handling, Zod schema validation, a storage abstraction layer, and a repository pattern for database operations.
