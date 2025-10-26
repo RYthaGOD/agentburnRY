@@ -68,11 +68,11 @@ export interface TokenMarketData {
 
 /**
  * Fetch newly created/migrated pump.fun tokens
- * Uses DexScreener to find recent tokens with Raydium pairs (migrated from pump.fun)
+ * Uses DexScreener to find recent tokens with PumpSwap pairs (migrated from pump.fun)
  */
 export async function fetchNewlyMigratedPumpTokens(maxTokens: number = 20): Promise<TokenMarketData[]> {
   try {
-    console.log("[PumpFun Alt] 🚀 Scanning for recently migrated pump.fun tokens...");
+    console.log("[PumpFun Alt] 🚀 Scanning for recently migrated pump.fun → PumpSwap tokens...");
     
     // Search for recently created Solana tokens with volume
     const response = await fetch('https://api.dexscreener.com/token-profiles/latest/v1', {
@@ -104,33 +104,37 @@ export async function fetchNewlyMigratedPumpTokens(maxTokens: number = 20): Prom
         const pairData = await pairResponse.json();
         const pairs = pairData.pairs || [];
         
-        // Look for Raydium pairs (indicates migration from pump.fun)
-        const raydiumPair = pairs.find((p: any) => 
-          p.dexId === 'raydium' || p.labels?.includes('v3') || p.labels?.includes('v4')
+        // Look for PumpSwap pairs (indicates migration from pump.fun bonding curve completion)
+        // PumpSwap is the native AMM DEX for Pump.fun tokens
+        const pumpswapPair = pairs.find((p: any) => 
+          p.dexId === 'pumpswap' || 
+          p.dexId === 'raydium' || // Some migrated tokens still use Raydium
+          p.labels?.includes('v3') || 
+          p.labels?.includes('v4')
         );
         
-        if (!raydiumPair) continue;
+        if (!pumpswapPair) continue;
         
         // Check if token is relatively new (created within last 7 days)
-        const pairAge = raydiumPair.pairCreatedAt ? Date.now() - raydiumPair.pairCreatedAt : Infinity;
+        const pairAge = pumpswapPair.pairCreatedAt ? Date.now() - pumpswapPair.pairCreatedAt : Infinity;
         const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
         
         if (pairAge > MAX_AGE_MS) continue;
         
         // Must have some volume to be tradeable
-        if ((raydiumPair.volume?.h24 || 0) < 1000) continue;
+        if ((pumpswapPair.volume?.h24 || 0) < 1000) continue;
         
         const tokenData: TokenMarketData = {
           mint: profile.tokenAddress,
-          name: raydiumPair.baseToken?.name || 'Unknown',
-          symbol: raydiumPair.baseToken?.symbol || 'UNKNOWN',
-          priceUSD: parseFloat(raydiumPair.priceUsd || '0'),
-          priceSOL: parseFloat(raydiumPair.priceNative || '0'),
-          volumeUSD24h: raydiumPair.volume?.h24 || 0,
-          marketCapUSD: raydiumPair.fdv || raydiumPair.marketCap || 0,
-          liquidityUSD: raydiumPair.liquidity?.usd || 0,
-          priceChange24h: raydiumPair.priceChange?.h24 || 0,
-          priceChange1h: raydiumPair.priceChange?.h1 || 0,
+          name: pumpswapPair.baseToken?.name || 'Unknown',
+          symbol: pumpswapPair.baseToken?.symbol || 'UNKNOWN',
+          priceUSD: parseFloat(pumpswapPair.priceUsd || '0'),
+          priceSOL: parseFloat(pumpswapPair.priceNative || '0'),
+          volumeUSD24h: pumpswapPair.volume?.h24 || 0,
+          marketCapUSD: pumpswapPair.fdv || pumpswapPair.marketCap || 0,
+          liquidityUSD: pumpswapPair.liquidity?.usd || 0,
+          priceChange24h: pumpswapPair.priceChange?.h24 || 0,
+          priceChange1h: pumpswapPair.priceChange?.h1 || 0,
           holderCount: undefined,
         };
         

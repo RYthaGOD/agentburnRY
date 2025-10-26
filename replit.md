@@ -38,7 +38,7 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - Faster exit threshold: AI sell confidence raised from 40% to 50%.
 
 **Token Discovery:**
-- Aggregates tokens from DexScreener Trending, PumpFun-style tokens via DexScreener, newly migrated PumpFun to Raydium tokens, and low-cap new launches, totaling ~80 tokens per scan.
+- Aggregates tokens from DexScreener Trending, PumpFun-style tokens via DexScreener, newly migrated PumpFun to PumpSwap tokens, and low-cap new launches, totaling ~80 tokens per scan.
 
 **Full Hivemind AI Workflow (All 7 Models for Maximum Accuracy):**
 - **Position Monitoring:** Every 1.5 minutes using all 7 AI models in parallel for consensus on sell decisions. SELL if majority (>50%) vote SELL with >=50% avg confidence OR any single model has >=75% confidence.

@@ -393,7 +393,7 @@ async function getCachedOrFetchTokens(config?: {
   console.log(`[AI Bot] 🎯 Token Discovery Summary:`);
   console.log(`  - DexScreener trending: ${dexTokens.length} tokens`);
   console.log(`  - PumpFun trending: ${pumpfunTrendingTokens.length} tokens`);
-  console.log(`  - Newly migrated (PumpFun → Raydium): ${pumpfunMigratedTokens.length} tokens`);
+  console.log(`  - Newly migrated (PumpFun → PumpSwap): ${pumpfunMigratedTokens.length} tokens`);
   console.log(`  - Low-cap new tokens: ${pumpfunLowCapTokens.length} tokens`);
   console.log(`  - Total (deduplicated): ${allTokens.length} tokens`);
   
