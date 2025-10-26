@@ -149,6 +149,24 @@ export const aiBotConfigs = pgTable("ai_bot_configs", {
   totalPlatformFeesPaid: decimal("total_platform_fees_paid", { precision: 18, scale: 9 }).notNull().default("0"), // Cumulative platform fees paid in SOL
   isFeeExempt: boolean("is_fee_exempt").notNull().default(false), // Computed field - true if wallet is in exemption list
   
+  // Real-time Performance Metrics
+  totalTrades: integer("total_trades").notNull().default(0), // Total completed trades
+  winningTrades: integer("winning_trades").notNull().default(0), // Trades with profit > 0
+  losingTrades: integer("losing_trades").notNull().default(0), // Trades with loss
+  totalProfitSOL: decimal("total_profit_sol", { precision: 18, scale: 9 }).notNull().default("0"), // Cumulative realized profit
+  totalLossSOL: decimal("total_loss_sol", { precision: 18, scale: 9 }).notNull().default("0"), // Cumulative realized loss
+  netProfitSOL: decimal("net_profit_sol", { precision: 18, scale: 9 }).notNull().default("0"), // Total profit - total loss
+  winRate: decimal("win_rate", { precision: 5, scale: 2 }).notNull().default("0"), // Percentage of winning trades (0-100)
+  averageProfitPercent: decimal("average_profit_percent", { precision: 10, scale: 2 }).notNull().default("0"), // Average profit per winning trade
+  averageLossPercent: decimal("average_loss_percent", { precision: 10, scale: 2 }).notNull().default("0"), // Average loss per losing trade
+  roiPercent: decimal("roi_percent", { precision: 10, scale: 2 }).notNull().default("0"), // Return on investment (net profit / total invested * 100)
+  bestTradePercent: decimal("best_trade_percent", { precision: 10, scale: 2 }).notNull().default("0"), // Best single trade profit %
+  worstTradePercent: decimal("worst_trade_percent", { precision: 10, scale: 2 }).notNull().default("0"), // Worst single trade loss %
+  averageHoldTimeMinutes: integer("average_hold_time_minutes").notNull().default(0), // Average position hold duration
+  scalpTradeCount: integer("scalp_trade_count").notNull().default(0), // Count of SCALP trades
+  swingTradeCount: integer("swing_trade_count").notNull().default(0), // Count of SWING trades
+  lastPerformanceUpdateAt: timestamp("last_performance_update_at"), // When performance was last recalculated
+  
   // Status tracking
   lastBotRunAt: timestamp("last_bot_run_at"),
   lastBotStatus: text("last_bot_status"), // "success", "failed", "skipped"
