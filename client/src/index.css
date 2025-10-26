@@ -338,4 +338,19 @@
   .gold-border {
     border-image: linear-gradient(135deg, hsl(48 100% 50%), hsl(42 100% 50%)) 1;
   }
+
+  /* Override Solana Wallet Adapter styles with gold theme */
+  .wallet-adapter-button {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  .wallet-adapter-button:not([disabled]):hover {
+    background-color: hsl(var(--primary) / 0.9) !important;
+  }
+
+  .wallet-adapter-button-trigger {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+  }
 }
