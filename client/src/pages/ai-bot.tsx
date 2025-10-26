@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Brain, Loader2, Zap, AlertCircle, Play, Power, TrendingUp, Activity, CheckCircle, XCircle, Key, Eye, EyeOff, Shield, ChevronDown, Sparkles, Flame, Info, RefreshCw, AlertTriangle } from "lucide-react";
+import { Brain, Loader2, Zap, AlertCircle, Play, Power, TrendingUp, Activity, CheckCircle, XCircle, Key, Eye, EyeOff, Shield, ChevronDown, Sparkles, Flame, Info, RefreshCw, AlertTriangle, Download } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -51,6 +51,7 @@ export default function AIBot() {
   const [isDeletingKey, setIsDeletingKey] = useState(false);
   const [isPurchasingSubscription, setIsPurchasingSubscription] = useState(false);
   const [isRebalancing, setIsRebalancing] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [scanLog, setScanLog] = useState<Array<{
     timestamp: number;
     message: string;
@@ -305,6 +306,69 @@ export default function AIBot() {
       });
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  const handleImportWalletHoldings = async () => {
+    if (!publicKey) {
+      toast({
+        title: "Error",
+        description: "Please connect wallet first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!hasTreasuryKey) {
+      toast({
+        title: "Error",
+        description: "Please add a treasury private key first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    
+    try {
+      toast({
+        title: "🔍 Scanning Wallet",
+        description: "Detecting all token holdings on-chain...",
+      });
+
+      const response = await fetch("/api/ai-bot/import-wallet-holdings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ownerWalletAddress: publicKey.toString(),
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Import failed");
+      }
+
+      const result = await response.json();
+
+      toast({
+        title: "✅ Import Complete",
+        description: `Imported ${result.imported} new tokens. Total positions: ${result.totalNow}`,
+      });
+
+      // Refresh positions
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/positions", publicKey.toString()] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai-bot/config", publicKey.toString()] });
+      
+    } catch (error: any) {
+      console.error("Import error:", error);
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import wallet holdings",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -2315,6 +2379,27 @@ export default function AIBot() {
               <>
                 <Zap className="mr-2 h-5 w-5" />
                 Scan & Trade Now
+              </>
+            )}
+          </Button>
+
+          <Button
+            onClick={handleImportWalletHoldings}
+            disabled={isImporting || !hasTreasuryKey}
+            className="w-full mt-2"
+            size="lg"
+            variant="secondary"
+            data-testid="button-import-holdings"
+          >
+            {isImporting ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Importing Tokens...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-5 w-5" />
+                Import All Wallet Holdings
               </>
             )}
           </Button>

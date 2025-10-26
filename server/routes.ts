@@ -2282,6 +2282,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import all wallet token holdings as AI bot positions
+  app.post("/api/ai-bot/import-wallet-holdings", async (req, res) => {
+    try {
+      const { ownerWalletAddress } = req.body;
+      
+      if (!ownerWalletAddress) {
+        return res.status(400).json({ message: "Owner wallet address required" });
+      }
+      
+      console.log(`[Import Holdings] Starting import for wallet ${ownerWalletAddress.slice(0, 8)}...`);
+      
+      // Get AI bot config to access treasury wallet
+      const config = await storage.getAIBotConfig(ownerWalletAddress);
+      if (!config) {
+        return res.status(404).json({ message: "AI bot config not found. Please set up the AI bot first." });
+      }
+      
+      if (!config.treasuryKeyCiphertext || !config.treasuryKeyIv || !config.treasuryKeyAuthTag) {
+        return res.status(404).json({ message: "No treasury key configured. Please add a treasury private key first." });
+      }
+      
+      // Decrypt treasury key to get the actual trading wallet
+      const { decrypt } = await import("./crypto");
+      const treasuryKey = decrypt(
+        config.treasuryKeyCiphertext,
+        config.treasuryKeyIv,
+        config.treasuryKeyAuthTag
+      );
+      
+      const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
+      const keypair = loadKeypairFromPrivateKey(treasuryKey);
+      const treasuryPublicKey = keypair.publicKey.toString();
+      
+      console.log(`[Import Holdings] Treasury wallet: ${treasuryPublicKey.slice(0, 8)}...`);
+      
+      // Get all token accounts from blockchain
+      const { getAllTokenAccounts } = await import("./solana");
+      const tokenAccounts = await getAllTokenAccounts(treasuryPublicKey);
+      
+      console.log(`[Import Holdings] Found ${tokenAccounts.length} token accounts on-chain`);
+      
+      // Get existing positions from database
+      const existingPositions = await storage.getAIBotPositions(ownerWalletAddress);
+      const existingMints = new Set(existingPositions.map(p => p.tokenMint));
+      
+      let imported = 0;
+      let skipped = 0;
+      let errors = 0;
+      const importedTokens: any[] = [];
+      
+      // Process each token account
+      for (const account of tokenAccounts) {
+        try {
+          const parsed = account.account.data.parsed;
+          const tokenMint = parsed.info.mint;
+          const uiAmount = parsed.info.tokenAmount.uiAmount;
+          const amount = parsed.info.tokenAmount.amount;
+          const decimals = parsed.info.tokenAmount.decimals;
+          
+          // Skip if zero balance
+          if (uiAmount <= 0) {
+            continue;
+          }
+          
+          // Skip if already tracked
+          if (existingMints.has(tokenMint)) {
+            skipped++;
+            console.log(`[Import Holdings] ⏭️ Skipping ${tokenMint.slice(0, 8)}... (already tracked)`);
+            continue;
+          }
+          
+          // Fetch token metadata from DexScreener
+          console.log(`[Import Holdings] 📡 Fetching metadata for ${tokenMint.slice(0, 8)}...`);
+          
+          let tokenSymbol = tokenMint.slice(0, 6);
+          let tokenName = tokenSymbol;
+          
+          try {
+            const dexResponse = await fetch(
+              `https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`,
+              { headers: { 'Accept': 'application/json' } }
+            );
+            
+            if (dexResponse.ok) {
+              const dexData = await dexResponse.json();
+              const pairs = dexData.pairs || [];
+              
+              if (pairs.length > 0) {
+                const mainPair = pairs[0];
+                tokenSymbol = mainPair.baseToken?.symbol || tokenSymbol;
+                tokenName = mainPair.baseToken?.name || tokenSymbol;
+              }
+            }
+          } catch (error) {
+            console.log(`[Import Holdings] ⚠️ Could not fetch metadata for ${tokenMint.slice(0, 8)}, using fallback`);
+          }
+          
+          // Get current price from Jupiter
+          const { getTokenPrice } = await import("./jupiter");
+          let currentPriceSOL = 0;
+          try {
+            currentPriceSOL = await getTokenPrice(tokenMint);
+          } catch (error) {
+            console.log(`[Import Holdings] ⚠️ Could not fetch price for ${tokenSymbol}, using 0`);
+          }
+          
+          // Create position in database (use current price as entry price since we don't know actual entry)
+          const position = await storage.createAIBotPosition({
+            ownerWalletAddress,
+            tokenMint,
+            tokenSymbol,
+            tokenName,
+            entryPriceSOL: currentPriceSOL.toString(),
+            amountSOL: (currentPriceSOL * uiAmount).toString(),
+            tokenAmount: String(amount),
+            tokenDecimals: Number(decimals),
+            buyTxSignature: "imported", // Mark as imported, not from a trade
+            buyTimestamp: new Date(),
+            aiConfidenceAtBuy: 0, // Unknown since manually imported
+            aiPotentialAtBuy: 0,
+            rebuyCount: 0,
+            isSwingTrade: 0,
+          });
+          
+          imported++;
+          importedTokens.push({
+            symbol: tokenSymbol,
+            name: tokenName,
+            mint: tokenMint,
+            amount: uiAmount,
+            valueSOL: currentPriceSOL * uiAmount,
+          });
+          
+          console.log(`[Import Holdings] ✅ Imported ${tokenSymbol}: ${uiAmount} tokens @ ${currentPriceSOL} SOL`);
+          
+        } catch (error: any) {
+          console.error(`[Import Holdings] ❌ Error importing token:`, error);
+          errors++;
+        }
+      }
+      
+      console.log(`[Import Holdings] ✅ Complete: ${imported} imported, ${skipped} skipped, ${errors} errors`);
+      
+      res.json({
+        success: true,
+        message: `Successfully imported ${imported} token holdings`,
+        imported,
+        skipped,
+        errors,
+        totalExisting: existingPositions.length,
+        totalNow: existingPositions.length + imported,
+        importedTokens,
+      });
+    } catch (error: any) {
+      console.error("[Import Holdings] Error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // AI Bot Subscription Routes (10 free trades, then 0.15 SOL for 2 weeks)
   app.get("/api/ai-bot/subscription/status/:ownerWalletAddress", async (req, res) => {
     try {
