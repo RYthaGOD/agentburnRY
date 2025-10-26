@@ -71,6 +71,14 @@ export interface IStorage {
   getAllAIBotConfigs(): Promise<AIBotConfig[]>;
   createOrUpdateAIBotConfig(config: Partial<InsertAIBotConfig> & { ownerWalletAddress: string }): Promise<AIBotConfig>;
   deleteAIBotConfig(ownerWalletAddress: string): Promise<boolean>;
+  
+  // AI Bot Subscription operations
+  updateAIBotSubscription(ownerWalletAddress: string, updates: {
+    subscriptionActive: boolean;
+    subscriptionExpiresAt: Date;
+    subscriptionPaymentTxSignature: string;
+  }): Promise<AIBotConfig>;
+  incrementFreeTradesUsed(ownerWalletAddress: string): Promise<AIBotConfig>;
 
   // AI Bot Position operations (active trades)
   getAIBotPositions(ownerWalletAddress: string): Promise<AIBotPosition[]>;
@@ -373,6 +381,37 @@ export class DatabaseStorage implements IStorage {
       .delete(aiBotConfigs)
       .where(eq(aiBotConfigs.ownerWalletAddress, ownerWalletAddress));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async updateAIBotSubscription(ownerWalletAddress: string, updates: {
+    subscriptionActive: boolean;
+    subscriptionExpiresAt: Date;
+    subscriptionPaymentTxSignature: string;
+  }): Promise<AIBotConfig> {
+    const [updated] = await db
+      .update(aiBotConfigs)
+      .set({
+        subscriptionActive: updates.subscriptionActive,
+        subscriptionExpiresAt: updates.subscriptionExpiresAt,
+        subscriptionPaymentTxSignature: updates.subscriptionPaymentTxSignature,
+        updatedAt: new Date(),
+      })
+      .where(eq(aiBotConfigs.ownerWalletAddress, ownerWalletAddress))
+      .returning();
+    return updated;
+  }
+
+  async incrementFreeTradesUsed(ownerWalletAddress: string): Promise<AIBotConfig> {
+    const { sql: rawSql } = await import("drizzle-orm");
+    const [updated] = await db
+      .update(aiBotConfigs)
+      .set({
+        freeTradesUsed: rawSql`${aiBotConfigs.freeTradesUsed} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(aiBotConfigs.ownerWalletAddress, ownerWalletAddress))
+      .returning();
+    return updated;
   }
 
   // AI Bot Position operations

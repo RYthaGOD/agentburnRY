@@ -2226,6 +2226,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI Bot Subscription Routes (10 free trades, then 0.15 SOL for 2 weeks)
+  app.get("/api/ai-bot/subscription/status/:ownerWalletAddress", async (req, res) => {
+    try {
+      const { ownerWalletAddress } = req.params;
+      
+      // Get or create config
+      let config = await storage.getAIBotConfig(ownerWalletAddress);
+      if (!config) {
+        // Create default config for new user
+        config = await storage.createOrUpdateAIBotConfig({
+          ownerWalletAddress,
+          enabled: false,
+          totalBudget: "0",
+          budgetPerTrade: "0.02",
+        });
+      }
+
+      const now = new Date();
+      const freeTradesRemaining = Math.max(0, 10 - config.freeTradesUsed);
+      const hasActiveSubscription = config.subscriptionActive && 
+        config.subscriptionExpiresAt && 
+        new Date(config.subscriptionExpiresAt) > now;
+
+      res.json({
+        freeTradesUsed: config.freeTradesUsed,
+        freeTradesRemaining,
+        subscriptionActive: hasActiveSubscription,
+        subscriptionExpiresAt: config.subscriptionExpiresAt,
+        hasAccess: freeTradesRemaining > 0 || hasActiveSubscription,
+        requiresPayment: freeTradesRemaining === 0 && !hasActiveSubscription,
+      });
+    } catch (error: any) {
+      console.error("Get subscription status error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/ai-bot/subscription/verify-payment", authRateLimit, async (req, res) => {
+    try {
+      const { ownerWalletAddress, txSignature, signature, message } = req.body;
+      
+      if (!ownerWalletAddress || !txSignature || !signature || !message) {
+        return res.status(400).json({ 
+          message: "Missing required fields: ownerWalletAddress, txSignature, signature, and message are required" 
+        });
+      }
+
+      // Verify wallet signature
+      const { verifyWalletSignature } = await import("./solana-sdk");
+      const isValidSignature = await verifyWalletSignature(
+        ownerWalletAddress,
+        message,
+        signature
+      );
+
+      if (!isValidSignature) {
+        return res.status(401).json({ message: "Invalid signature" });
+      }
+
+      // Extract timestamp from message
+      const timestampMatch = message.match(/at (\d+)$/);
+      if (!timestampMatch) {
+        return res.status(400).json({ message: "Invalid message format" });
+      }
+
+      const messageTimestamp = parseInt(timestampMatch[1], 10);
+      const now = Date.now();
+      const fiveMinutesInMs = 5 * 60 * 1000;
+      if (now - messageTimestamp > fiveMinutesInMs) {
+        return res.status(400).json({ message: "Message expired. Please try again." });
+      }
+
+      // Verify the transaction on-chain
+      const { Connection, PublicKey } = await import("@solana/web3.js");
+      const connection = new Connection(process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com");
+      
+      const TREASURY_WALLET = "jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38";
+      const SUBSCRIPTION_PRICE_SOL = 0.15;
+      const SUBSCRIPTION_PRICE_LAMPORTS = SUBSCRIPTION_PRICE_SOL * 1e9;
+
+      let transaction;
+      try {
+        transaction = await connection.getTransaction(txSignature, {
+          maxSupportedTransactionVersion: 0,
+        });
+      } catch (error: any) {
+        return res.status(400).json({ 
+          message: "Failed to verify transaction on blockchain. Please try again." 
+        });
+      }
+
+      if (!transaction) {
+        return res.status(400).json({ 
+          message: "Transaction not found on blockchain. Please wait a moment and try again." 
+        });
+      }
+
+      // Verify transaction succeeded
+      if (transaction.meta?.err) {
+        return res.status(400).json({ 
+          message: "Transaction failed on blockchain" 
+        });
+      }
+
+      // Verify sender is the wallet address
+      const senderPubkey = transaction.transaction.message.getAccountKeys().get(0)?.toString();
+      if (senderPubkey !== ownerWalletAddress) {
+        return res.status(400).json({ 
+          message: "Transaction sender does not match wallet address" 
+        });
+      }
+
+      // Verify recipient and amount
+      const postBalances = transaction.meta?.postBalances || [];
+      const preBalances = transaction.meta?.preBalances || [];
+      const accountKeys = transaction.transaction.message.getAccountKeys();
+      
+      let treasuryIndex = -1;
+      for (let i = 0; i < accountKeys.length; i++) {
+        if (accountKeys.get(i)?.toString() === TREASURY_WALLET) {
+          treasuryIndex = i;
+          break;
+        }
+      }
+
+      if (treasuryIndex === -1) {
+        return res.status(400).json({ 
+          message: "Payment must be sent to the treasury wallet" 
+        });
+      }
+
+      const amountReceived = postBalances[treasuryIndex] - preBalances[treasuryIndex];
+      if (amountReceived < SUBSCRIPTION_PRICE_LAMPORTS) {
+        return res.status(400).json({ 
+          message: `Payment amount insufficient. Required: ${SUBSCRIPTION_PRICE_SOL} SOL, Received: ${amountReceived / 1e9} SOL` 
+        });
+      }
+
+      // Activate subscription for 2 weeks
+      const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000); // 2 weeks from now
+
+      const updatedConfig = await storage.updateAIBotSubscription(ownerWalletAddress, {
+        subscriptionActive: true,
+        subscriptionExpiresAt: expiresAt,
+        subscriptionPaymentTxSignature: txSignature,
+      });
+
+      auditLog("ai_bot_subscription_payment", {
+        walletAddress: ownerWalletAddress,
+        txSignature,
+        amount: amountReceived / 1e9,
+        expiresAt: expiresAt.toISOString(),
+        ip: req.ip || "unknown",
+      });
+
+      console.log(`[Subscription] ✅ Activated 2-week subscription for ${ownerWalletAddress} until ${expiresAt.toISOString()}`);
+
+      res.json({
+        success: true,
+        message: "Subscription activated successfully",
+        expiresAt: expiresAt.toISOString(),
+        freeTradesUsed: updatedConfig.freeTradesUsed,
+      });
+    } catch (error: any) {
+      console.error("Verify payment error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Token Blacklist Management Routes
   app.get("/api/blacklist", async (req, res) => {
     try {
