@@ -493,6 +493,255 @@ async function sellTokenWithJupiter(
 }
 
 /**
+ * Calculate RSI (Relative Strength Index) from price changes
+ * RSI ranges from 0-100:
+ * - Below 30: Oversold (potential buy signal)
+ * - Above 70: Overbought (potential sell signal)
+ */
+function calculateRSI(priceChanges: number[], period: number = 14): number {
+  if (priceChanges.length < period) return 50; // Neutral if insufficient data
+
+  let gains = 0;
+  let losses = 0;
+
+  // Calculate average gains and losses
+  for (let i = 0; i < period; i++) {
+    const change = priceChanges[i];
+    if (change > 0) {
+      gains += change;
+    } else {
+      losses += Math.abs(change);
+    }
+  }
+
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+
+  if (avgLoss === 0) return 100; // No losses = maximum strength
+  
+  const rs = avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+  
+  return Math.max(0, Math.min(100, rsi));
+}
+
+/**
+ * Calculate EMA (Exponential Moving Average)
+ * EMA gives more weight to recent prices
+ */
+function calculateEMA(prices: number[], period: number): number {
+  if (prices.length === 0) return 0;
+  if (prices.length < period) return prices[prices.length - 1]; // Return latest if insufficient data
+
+  const multiplier = 2 / (period + 1);
+  let ema = prices[0]; // Start with first price
+
+  for (let i = 1; i < prices.length; i++) {
+    ema = (prices[i] - ema) * multiplier + ema;
+  }
+
+  return ema;
+}
+
+/**
+ * Calculate Bollinger Bands
+ * Returns { upper, middle, lower, percentB }
+ * - %B > 1: Price above upper band (overbought)
+ * - %B < 0: Price below lower band (oversold)
+ * - %B = 0.5: Price at middle band
+ */
+function calculateBollingerBands(prices: number[], period: number = 20, stdDev: number = 2): {
+  upper: number;
+  middle: number;
+  lower: number;
+  percentB: number;
+  bandwidth: number;
+} {
+  if (prices.length < period) {
+    const currentPrice = prices[prices.length - 1] || 0;
+    return { upper: currentPrice, middle: currentPrice, lower: currentPrice, percentB: 0.5, bandwidth: 0 };
+  }
+
+  // Calculate SMA (middle band)
+  const recentPrices = prices.slice(-period);
+  const sma = recentPrices.reduce((sum, p) => sum + p, 0) / period;
+
+  // Calculate standard deviation
+  const squaredDiffs = recentPrices.map(p => Math.pow(p - sma, 2));
+  const variance = squaredDiffs.reduce((sum, sq) => sum + sq, 0) / period;
+  const standardDeviation = Math.sqrt(variance);
+
+  // Calculate bands
+  const upper = sma + (stdDev * standardDeviation);
+  const lower = sma - (stdDev * standardDeviation);
+  
+  const currentPrice = prices[prices.length - 1];
+  const percentB = (upper - lower) !== 0 ? (currentPrice - lower) / (upper - lower) : 0.5;
+  const bandwidth = (upper - lower) / sma;
+
+  return {
+    upper,
+    middle: sma,
+    lower,
+    percentB,
+    bandwidth
+  };
+}
+
+/**
+ * Fetch historical price data from DexScreener for technical analysis
+ * Returns array of prices (most recent last)
+ */
+async function fetchHistoricalPrices(tokenMint: string): Promise<number[]> {
+  try {
+    const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`);
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    const pairs = data.pairs || [];
+    if (pairs.length === 0) return [];
+
+    const pair = pairs[0];
+    const currentPrice = parseFloat(pair.priceUsd || "0");
+    
+    // Build price history from available data
+    const prices: number[] = [];
+    
+    // We only have % changes, so we'll reconstruct approximate prices
+    const priceChange5m = parseFloat(pair.priceChange?.m5 || "0");
+    const priceChange1h = parseFloat(pair.priceChange?.h1 || "0");
+    const priceChange6h = parseFloat(pair.priceChange?.h6 || "0");
+    const priceChange24h = parseFloat(pair.priceChange?.h24 || "0");
+    
+    // Calculate historical prices (approximation)
+    const price24hAgo = currentPrice / (1 + priceChange24h / 100);
+    const price6hAgo = currentPrice / (1 + priceChange6h / 100);
+    const price1hAgo = currentPrice / (1 + priceChange1h / 100);
+    const price5mAgo = currentPrice / (1 + priceChange5m / 100);
+    
+    // Build 20-point price array for technical indicators
+    // Interpolate between known points
+    for (let i = 0; i < 5; i++) prices.push(price24hAgo + (price6hAgo - price24hAgo) * (i / 5));
+    for (let i = 0; i < 5; i++) prices.push(price6hAgo + (price1hAgo - price6hAgo) * (i / 5));
+    for (let i = 0; i < 5; i++) prices.push(price1hAgo + (price5mAgo - price1hAgo) * (i / 5));
+    for (let i = 0; i < 5; i++) prices.push(price5mAgo + (currentPrice - price5mAgo) * (i / 5));
+    
+    return prices;
+  } catch (error) {
+    console.error(`[Technical Analysis] Failed to fetch historical prices:`, error);
+    return [];
+  }
+}
+
+/**
+ * Calculate comprehensive technical indicators for a token
+ */
+async function calculateTechnicalIndicators(tokenMint: string, currentPriceUsd: number): Promise<{
+  rsi: number;
+  rsiSignal: string;
+  ema9: number;
+  ema21: number;
+  emaSignal: string;
+  bollingerBands: { upper: number; middle: number; lower: number; percentB: number; bandwidth: number };
+  bollingerSignal: string;
+  overallSignal: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+  technicalScore: number; // 0-100
+}> {
+  const prices = await fetchHistoricalPrices(tokenMint);
+  
+  if (prices.length === 0) {
+    return {
+      rsi: 50,
+      rsiSignal: 'NEUTRAL',
+      ema9: currentPriceUsd,
+      ema21: currentPriceUsd,
+      emaSignal: 'NEUTRAL',
+      bollingerBands: { upper: currentPriceUsd, middle: currentPriceUsd, lower: currentPriceUsd, percentB: 0.5, bandwidth: 0 },
+      bollingerSignal: 'NEUTRAL',
+      overallSignal: 'NEUTRAL',
+      technicalScore: 50
+    };
+  }
+
+  // Calculate price changes for RSI
+  const priceChanges: number[] = [];
+  for (let i = 1; i < prices.length; i++) {
+    const change = ((prices[i] - prices[i - 1]) / prices[i - 1]) * 100;
+    priceChanges.push(change);
+  }
+
+  // Calculate indicators
+  const rsi = calculateRSI(priceChanges, 14);
+  const ema9 = calculateEMA(prices, 9);
+  const ema21 = calculateEMA(prices, 21);
+  const bollingerBands = calculateBollingerBands(prices, 20, 2);
+
+  // Generate signals
+  const rsiSignal = rsi < 30 ? 'OVERSOLD (Buy)' : rsi > 70 ? 'OVERBOUGHT (Sell)' : rsi < 40 ? 'Bullish' : rsi > 60 ? 'Bearish' : 'NEUTRAL';
+  const emaSignal = ema9 > ema21 ? 'BULLISH (Golden Cross)' : ema9 < ema21 ? 'BEARISH (Death Cross)' : 'NEUTRAL';
+  
+  let bollingerSignal = 'NEUTRAL';
+  if (bollingerBands.percentB > 1) {
+    bollingerSignal = 'OVERBOUGHT (above upper band)';
+  } else if (bollingerBands.percentB < 0) {
+    bollingerSignal = 'OVERSOLD (below lower band)';
+  } else if (bollingerBands.percentB > 0.8) {
+    bollingerSignal = 'Approaching overbought';
+  } else if (bollingerBands.percentB < 0.2) {
+    bollingerSignal = 'Approaching oversold';
+  }
+
+  // Calculate overall signal
+  let bullishSignals = 0;
+  let bearishSignals = 0;
+
+  if (rsi < 40) bullishSignals++;
+  if (rsi > 60) bearishSignals++;
+  if (ema9 > ema21) bullishSignals++;
+  if (ema9 < ema21) bearishSignals++;
+  if (bollingerBands.percentB < 0.3) bullishSignals++;
+  if (bollingerBands.percentB > 0.7) bearishSignals++;
+
+  const overallSignal = bullishSignals > bearishSignals ? 'BULLISH' : bearishSignals > bullishSignals ? 'BEARISH' : 'NEUTRAL';
+
+  // Calculate technical score (0-100)
+  let technicalScore = 50; // Start neutral
+
+  // RSI contribution (30 points)
+  if (rsi < 30) technicalScore += 15; // Oversold = buy opportunity
+  else if (rsi < 40) technicalScore += 10;
+  else if (rsi > 70) technicalScore -= 15; // Overbought = sell signal
+  else if (rsi > 60) technicalScore -= 10;
+
+  // EMA contribution (30 points)
+  if (ema9 > ema21 * 1.02) technicalScore += 15; // Strong bullish
+  else if (ema9 > ema21) technicalScore += 10;
+  else if (ema9 < ema21 * 0.98) technicalScore -= 15; // Strong bearish
+  else if (ema9 < ema21) technicalScore -= 10;
+
+  // Bollinger Bands contribution (20 points)
+  if (bollingerBands.percentB < 0.2) technicalScore += 10; // Oversold
+  else if (bollingerBands.percentB > 0.8) technicalScore -= 10; // Overbought
+
+  // Bandwidth contribution (squeeze/expansion)
+  if (bollingerBands.bandwidth < 0.05) technicalScore += 10; // Squeeze = potential breakout
+
+  technicalScore = Math.max(0, Math.min(100, technicalScore));
+
+  return {
+    rsi,
+    rsiSignal,
+    ema9,
+    ema21,
+    emaSignal,
+    bollingerBands,
+    bollingerSignal,
+    overallSignal,
+    technicalScore
+  };
+}
+
+/**
  * Calculate organic volume score (0-100)
  * Detects wash trading and filters for genuinely trending tokens
  */
@@ -4301,6 +4550,10 @@ async function analyzePositionWithAI(
   console.log(`[Position Monitor] 📊 Fetching market data for ${position.tokenSymbol} from DexScreener...`);
   const marketData = await fetchPositionMarketData(position.tokenMint);
 
+  // Calculate technical indicators (RSI, EMA, Bollinger Bands)
+  console.log(`[Position Monitor] 📈 Calculating technical indicators for ${position.tokenSymbol}...`);
+  const technicals = await calculateTechnicalIndicators(position.tokenMint, currentPriceSOL);
+
   // Build comprehensive analysis prompt with advanced technical metrics
   let marketMetrics = "";
   if (marketData) {
@@ -4308,6 +4561,7 @@ async function analyzePositionWithAI(
     console.log(`  - Volume: $${marketData.volumeUSD24h.toLocaleString()}, Liquidity: $${marketData.liquidityUSD.toLocaleString()}`);
     console.log(`  - Buy Pressure: ${marketData.buyPressure.toFixed(1)}% (${marketData.buyTxns24h} buys vs ${marketData.sellTxns24h} sells)`);
     console.log(`  - Price Change: 24h ${marketData.priceChange24h > 0 ? '+' : ''}${marketData.priceChange24h.toFixed(2)}%, 1h ${marketData.priceChange1h > 0 ? '+' : ''}${marketData.priceChange1h.toFixed(2)}%`);
+    console.log(`  - RSI: ${technicals.rsi.toFixed(1)} (${technicals.rsiSignal}), EMA: ${technicals.emaSignal}, BB: ${technicals.bollingerSignal}`);
     
     // Technical analysis signals
     const momentumSignal = marketData.priceChange5m > 0 && marketData.priceChange1h > 0 && marketData.priceChange24h > 0 
@@ -4343,6 +4597,16 @@ Price Action:
 - 1-hour: ${marketData.priceChange1h > 0 ? '+' : ''}${marketData.priceChange1h.toFixed(2)}%
 - 24-hour: ${marketData.priceChange24h > 0 ? '+' : ''}${marketData.priceChange24h.toFixed(2)}%
 
+TECHNICAL INDICATORS:
+- RSI (14): ${technicals.rsi.toFixed(1)} - ${technicals.rsiSignal}
+  ${technicals.rsi < 30 ? '🟢 OVERSOLD - Strong BUY signal' : technicals.rsi > 70 ? '🔴 OVERBOUGHT - Strong SELL signal' : ''}
+- EMA (9/21): ${technicals.emaSignal}
+  ${technicals.ema9 > technicals.ema21 ? '🟢 Bullish trend (9 EMA above 21 EMA)' : '🔴 Bearish trend (9 EMA below 21 EMA)'}
+- Bollinger Bands: ${technicals.bollingerSignal}
+  Position: ${(technicals.bollingerBands.percentB * 100).toFixed(0)}% of band width
+  ${technicals.bollingerBands.percentB > 1 ? '🔴 Price ABOVE upper band (extreme overbought)' : technicals.bollingerBands.percentB < 0 ? '🟢 Price BELOW lower band (extreme oversold)' : ''}
+- Overall Technical Signal: ${technicals.overallSignal} (Score: ${technicals.technicalScore}/100)
+
 Volume Analysis:
 - 24h Volume: $${marketData.volumeUSD24h.toLocaleString()}
 - Volume Trend: ${volumeSignal} (${marketData.volumeChange24h > 0 ? '+' : ''}${marketData.volumeChange24h.toFixed(1)}% vs expected)
@@ -4366,7 +4630,13 @@ Valuation:
     console.log(`[Position Monitor] ⚠️ Failed to fetch market data for ${position.tokenSymbol} - AI will analyze with limited data`);
     marketMetrics = `
 MARKET METRICS: Unavailable (low liquidity or delisted token)
-⚠️ WARNING: This is a major red flag - likely rug pulled or very illiquid`;
+⚠️ WARNING: This is a major red flag - likely rug pulled or very illiquid
+
+TECHNICAL INDICATORS:
+- RSI (14): ${technicals.rsi.toFixed(1)} - ${technicals.rsiSignal}
+- EMA (9/21): ${technicals.emaSignal}
+- Bollinger Bands: ${technicals.bollingerSignal}
+- Overall: ${technicals.overallSignal}`;
   }
 
   const prompt = `You are an expert technical analyst. Analyze this cryptocurrency position and decide: HOLD or SELL?
@@ -4382,35 +4652,52 @@ ${marketMetrics}
 
 TECHNICAL ANALYSIS FRAMEWORK - Analyze these signals carefully:
 
-1. MOMENTUM ANALYSIS (Most Important):
-   - Is the short-term momentum (5m, 1h) still positive?
-   - Are all timeframes aligned (bullish across 5m, 1h, 24h)?
-   - 🔴 SELL SIGNAL: Recent timeframes turning negative while we're in profit
+1. RSI ANALYSIS (Overbought/Oversold):
+   - RSI <30: Oversold (buy signal, HOLD position)
+   - RSI >70: Overbought (sell signal)
+   - 🔴 SELL SIGNAL: RSI >70 = extreme overbought, take profits
 
-2. VOLUME TREND (Critical for exits):
+2. EMA TREND ANALYSIS (Trend Direction):
+   - EMA 9 > EMA 21: Bullish trend (HOLD)
+   - EMA 9 < EMA 21: Bearish trend (consider selling)
+   - 🔴 SELL SIGNAL: Death cross (EMA 9 crosses below EMA 21)
+
+3. BOLLINGER BANDS (Price Extremes):
+   - Price > Upper Band: Overbought (sell signal)
+   - Price < Lower Band: Oversold (buy signal, HOLD)
+   - 🔴 SELL SIGNAL: Price above upper band = extreme overbought
+
+4. MOMENTUM ANALYSIS (Price Action):
+   - Is short-term momentum (5m, 1h) still positive?
+   - Are all timeframes aligned (bullish across 5m, 1h, 24h)?
+   - 🔴 SELL SIGNAL: Recent timeframes turning negative while in profit
+
+5. VOLUME TREND (Interest Level):
    - Is volume increasing (healthy) or declining (warning)?
    - 🔴 SELL SIGNAL: Volume declining >30% = interest dying
 
-3. LIQUIDITY HEALTH (Rug Pull Detection):
+6. LIQUIDITY HEALTH (Rug Pull Detection):
    - Is liquidity stable or draining?
    - 🔴 IMMEDIATE SELL: Liquidity draining <-10% = potential rug pull
 
-4. ORDER FLOW (Market Sentiment):
+7. ORDER FLOW (Market Sentiment):
    - Is buy pressure >45% (healthy) or <40% (weak)?
    - 🔴 SELL SIGNAL: Heavy selling pressure <40% = distribution phase
 
-5. PROFIT PROTECTION:
+8. PROFIT PROTECTION:
    - Current P/L: ${profitPercent.toFixed(2)}%
-   - ${profitPercent > 15 ? '✅ In profit - protect gains if momentum weakens' : profitPercent > 0 ? '🟡 Small profit - only sell on clear reversal' : '🔴 In loss - hold unless critical red flags'}
+   - ${profitPercent > 15 ? '✅ In profit - protect gains if technical signals weaken' : profitPercent > 0 ? '🟡 Small profit - only sell on clear technical reversal' : '🔴 In loss - hold unless critical technical red flags'}
 
 DECISION RULES:
-- SELL if 2+ major red flags appear (momentum dying, volume declining, heavy selling, liquidity drain)
+- SELL if RSI >70 AND (EMA bearish OR price above upper Bollinger Band)
+- SELL if 3+ technical red flags appear (RSI overbought, EMA death cross, Bollinger overbought, momentum dying, volume declining, heavy selling, liquidity drain)
 - SELL if any CRITICAL signal (liquidity draining, rug risk)
-- SELL if we're in good profit ${profitPercent > 15 ? `(+${profitPercent.toFixed(0)}%)` : ''} AND momentum shows clear reversal
-- HOLD if momentum still healthy OR only 1 minor warning
+- SELL if we're in good profit ${profitPercent > 15 ? `(+${profitPercent.toFixed(0)}%)` : ''} AND multiple technical indicators show reversal
+- HOLD if RSI <50 AND EMA bullish AND Bollinger Bands not overbought
+- HOLD if momentum still healthy OR technical indicators show strength
 - HOLD if data unavailable/unclear (better safe than sorry)
 
-Your confidence should be 70%+ to SELL, otherwise HOLD.
+Your confidence should be 70%+ to SELL (based on technical indicators + market conditions), otherwise HOLD.
 
 Respond ONLY with valid JSON:
 {

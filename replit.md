@@ -93,7 +93,14 @@ A dedicated scheduler service automates buyback execution using `node-cron`, han
 - **SCALP Mode (62-79% AI confidence):** 3-6% of portfolio, max 30-minute hold, -8% to -12% stop-loss, +4-8% profit targets.
 - **SWING Mode (80%+ AI confidence):** 5-9% of portfolio, max 24-hour hold, -15% to -25% stop-loss, +15% minimum profit target.
 
-**Sell Decision Framework:** AI continuously monitors positions, with automatic stop-loss override and exit criteria based on AI confidence, profit target, or max hold time.
+**Advanced Technical Analysis:** Integrated RSI (Relative Strength Index), EMA (Exponential Moving Averages 9/21), and Bollinger Bands into both buy and sell decision logic:
+- **RSI (14-period):** Identifies overbought (>70 = sell signal) and oversold (<30 = buy signal) conditions
+- **EMA Cross Strategy:** Golden cross (EMA9 > EMA21 = bullish) and death cross (EMA9 < EMA21 = bearish) for trend confirmation
+- **Bollinger Bands (20-period, 2 std dev):** Detects price extremes - price above upper band signals overbought, below lower band signals oversold
+- **Technical Score (0-100):** Combines all indicators into a single score for AI decision-making
+- **Smart Signal Integration:** Technical indicators integrated into AI prompts for more accurate buy/sell decisions
+
+**Sell Decision Framework:** AI continuously monitors positions using advanced technical indicators (RSI, EMA, Bollinger Bands), market metrics (volume, liquidity, buy pressure), with automatic stop-loss override and exit criteria based on AI confidence, profit target, technical signals, or max hold time.
 
 **Opportunistic Position Rotation:** Automatically sells weaker positions to free capital for better opportunities based on AI confidence. Includes emergency rotation for depleted wallets and maintains a 10% liquidity reserve.
 
