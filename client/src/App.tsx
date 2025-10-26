@@ -17,6 +17,9 @@ import TradingBot from "@/pages/trading-bot";
 import AIBot from "@/pages/ai-bot";
 import Blacklist from "@/pages/blacklist";
 import Whitepaper from "@/pages/whitepaper";
+import PublicStats from "@/pages/public-stats";
+import TokenAnalyzer from "@/pages/token-analyzer";
+import HowItWorks from "@/pages/how-it-works";
 import DashboardLayout from "@/pages/dashboard-layout";
 import NotFound from "@/pages/not-found";
 
@@ -24,6 +27,9 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Landing} />
+      <Route path="/stats" component={PublicStats} />
+      <Route path="/analyze" component={TokenAnalyzer} />
+      <Route path="/learn" component={HowItWorks} />
       <Route path="/whitepaper" component={Whitepaper} />
       <Route path="/dashboard">
         <DashboardLayout>

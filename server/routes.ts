@@ -2279,6 +2279,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public Stats API (no authentication required)
+  app.get("/api/public/stats", async (req, res) => {
+    try {
+      const stats = await storage.getPublicStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get public stats error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Token Analyzer API (no authentication required)
+  app.get("/api/public/analyze-token/:tokenMint", async (req, res) => {
+    try {
+      const { tokenMint } = req.params;
+      
+      // Basic validation
+      if (!isValidSolanaAddress(tokenMint)) {
+        return res.status(400).json({ message: "Invalid Solana token address" });
+      }
+
+      // Mock analysis for now - in production, this would call actual AI analysis
+      const mockAnalysis = {
+        tokenMint,
+        symbol: "TOKEN",
+        name: "Sample Token",
+        price: 0.00000123,
+        volume24h: 45000,
+        liquidity: 32000,
+        organicScore: 75,
+        qualityScore: 68,
+        aiConfidence: 65,
+        recommendation: "HOLD" as const,
+        risks: [
+          "Low liquidity may cause high slippage",
+          "Limited holder diversity",
+          "Recent token with short price history"
+        ],
+        opportunities: [
+          "Growing trading volume over 24h",
+          "Organic buy pressure detected",
+          "Positive sentiment in community"
+        ],
+        analysis: "This token shows moderate potential with decent organic activity. The quality score of 68% indicates some positive fundamentals, but the low liquidity of $32K presents risk. AI confidence is 65%, suggesting a HOLD position - not strong enough for immediate buy but worth monitoring. Consider waiting for liquidity to increase above $50K before entering a position."
+      };
+
+      res.json(mockAnalysis);
+    } catch (error: any) {
+      console.error("Token analysis error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -1135,7 +1135,7 @@ export default function AIBot() {
           <div className="mt-6 p-6 rounded-lg border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
             <div className="flex items-center gap-2 mb-4">
               <div className="text-lg font-bold text-foreground">Trading Performance</div>
-              {config?.totalTrades ? (
+              {aiConfig?.totalTrades ? (
                 <div className="text-xs text-muted-foreground">Real-time metrics</div>
               ) : (
                 <div className="text-xs text-muted-foreground">No trades yet</div>
@@ -1146,19 +1146,19 @@ export default function AIBot() {
               {/* Win Rate */}
               <div className="p-4 rounded-lg bg-background/60">
                 <div className="text-sm font-medium text-muted-foreground">Win Rate</div>
-                <div className={`text-2xl font-bold mt-1 ${parseFloat(config?.winRate || "0") >= 50 ? "text-green-500" : "text-red-500"}`}>
-                  {config?.winRate || "0"}%
+                <div className={`text-2xl font-bold mt-1 ${parseFloat(aiConfig?.winRate || "0") >= 50 ? "text-green-500" : "text-red-500"}`}>
+                  {aiConfig?.winRate || "0"}%
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {config?.winningTrades || 0}W / {config?.losingTrades || 0}L
+                  {aiConfig?.winningTrades || 0}W / {aiConfig?.losingTrades || 0}L
                 </div>
               </div>
               
               {/* ROI */}
               <div className="p-4 rounded-lg bg-background/60">
                 <div className="text-sm font-medium text-muted-foreground">ROI</div>
-                <div className={`text-2xl font-bold mt-1 ${parseFloat(config?.roiPercent || "0") >= 0 ? "text-green-500" : "text-red-500"}`}>
-                  {parseFloat(config?.roiPercent || "0") >= 0 ? "+" : ""}{config?.roiPercent || "0"}%
+                <div className={`text-2xl font-bold mt-1 ${parseFloat(aiConfig?.roiPercent || "0") >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  {parseFloat(aiConfig?.roiPercent || "0") >= 0 ? "+" : ""}{aiConfig?.roiPercent || "0"}%
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">Return on investment</div>
               </div>
@@ -1166,19 +1166,19 @@ export default function AIBot() {
               {/* Net Profit */}
               <div className="p-4 rounded-lg bg-background/60">
                 <div className="text-sm font-medium text-muted-foreground">Net Profit</div>
-                <div className={`text-2xl font-bold mt-1 ${parseFloat(config?.netProfitSOL || "0") >= 0 ? "text-green-500" : "text-red-500"}`}>
-                  {parseFloat(config?.netProfitSOL || "0") >= 0 ? "+" : ""}{parseFloat(config?.netProfitSOL || "0").toFixed(4)} SOL
+                <div className={`text-2xl font-bold mt-1 ${parseFloat(aiConfig?.netProfitSOL || "0") >= 0 ? "text-green-500" : "text-red-500"}`}>
+                  {parseFloat(aiConfig?.netProfitSOL || "0") >= 0 ? "+" : ""}{parseFloat(aiConfig?.netProfitSOL || "0").toFixed(4)} SOL
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">{config?.totalTrades || 0} total trades</div>
+                <div className="text-xs text-muted-foreground mt-1">{aiConfig?.totalTrades || 0} total trades</div>
               </div>
               
               {/* Best Trade */}
               <div className="p-4 rounded-lg bg-background/60">
                 <div className="text-sm font-medium text-muted-foreground">Best / Worst</div>
                 <div className="text-2xl font-bold mt-1">
-                  <span className="text-green-500">+{config?.bestTradePercent || "0"}%</span>
+                  <span className="text-green-500">+{aiConfig?.bestTradePercent || "0"}%</span>
                 </div>
-                <div className="text-xs text-red-500 mt-1">{config?.worstTradePercent || "0"}%</div>
+                <div className="text-xs text-red-500 mt-1">{aiConfig?.worstTradePercent || "0"}%</div>
               </div>
             </div>
             
@@ -1187,23 +1187,23 @@ export default function AIBot() {
               <div className="p-3 rounded-lg bg-background/40">
                 <div className="text-xs text-muted-foreground">Avg Hold Time</div>
                 <div className="text-lg font-semibold mt-1">
-                  {Math.floor((config?.averageHoldTimeMinutes || 0) / 60)}h {(config?.averageHoldTimeMinutes || 0) % 60}m
+                  {Math.floor((aiConfig?.averageHoldTimeMinutes || 0) / 60)}h {(aiConfig?.averageHoldTimeMinutes || 0) % 60}m
                 </div>
               </div>
               
               <div className="p-3 rounded-lg bg-background/40">
                 <div className="text-xs text-muted-foreground">Trade Mode Split</div>
                 <div className="text-lg font-semibold mt-1">
-                  {config?.scalpTradeCount || 0} SCALP / {config?.swingTradeCount || 0} SWING
+                  {aiConfig?.scalpTradeCount || 0} SCALP / {aiConfig?.swingTradeCount || 0} SWING
                 </div>
               </div>
               
               <div className="p-3 rounded-lg bg-background/40">
                 <div className="text-xs text-muted-foreground">Avg Profit / Loss</div>
                 <div className="text-lg font-semibold mt-1">
-                  <span className="text-green-500">+{config?.averageProfitPercent || "0"}%</span>
+                  <span className="text-green-500">+{aiConfig?.averageProfitPercent || "0"}%</span>
                   {" / "}
-                  <span className="text-red-500">-{config?.averageLossPercent || "0"}%</span>
+                  <span className="text-red-500">-{aiConfig?.averageLossPercent || "0"}%</span>
                 </div>
               </div>
             </div>

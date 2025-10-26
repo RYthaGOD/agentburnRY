@@ -100,6 +100,20 @@ export interface IStorage {
     commonFailureReasons: { reason: string; count: number }[];
     bestTokenCharacteristics: any[];
   }>;
+
+  // Public stats (no authentication required)
+  getPublicStats(): Promise<{
+    totalTrades: number;
+    winRate: string;
+    avgROI: string;
+    totalProfit: string;
+    activeUsers: number;
+    avgHoldTime: number;
+    bestTrade: string;
+    last24hTrades: number;
+    scalpTrades: number;
+    swingTrades: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -573,6 +587,98 @@ export class DatabaseStorage implements IStorage {
       totalTrades: finished.length,
       commonFailureReasons,
       bestTokenCharacteristics,
+    };
+  }
+
+  // Public Stats (aggregated from all users)
+  async getPublicStats(): Promise<{
+    totalTrades: number;
+    winRate: string;
+    avgROI: string;
+    totalProfit: string;
+    activeUsers: number;
+    avgHoldTime: number;
+    bestTrade: string;
+    last24hTrades: number;
+    scalpTrades: number;
+    swingTrades: number;
+  }> {
+    // Get all completed trades from trade journal
+    const allTrades = await db.select().from(tradeJournal);
+    const completedTrades = allTrades.filter(t => t.exitAt !== null);
+    
+    if (completedTrades.length === 0) {
+      return {
+        totalTrades: 0,
+        winRate: "0.0",
+        avgROI: "0.0",
+        totalProfit: "0.00",
+        activeUsers: 0,
+        avgHoldTime: 0,
+        bestTrade: "0.0",
+        last24hTrades: 0,
+        scalpTrades: 0,
+        swingTrades: 0,
+      };
+    }
+
+    // Calculate total trades
+    const totalTrades = completedTrades.length;
+
+    // Calculate win rate
+    const wins = completedTrades.filter(t => t.wasSuccessful).length;
+    const winRate = ((wins / totalTrades) * 100).toFixed(1);
+
+    // Calculate average ROI
+    const totalROI = completedTrades.reduce((sum, t) => {
+      return sum + parseFloat(t.profitLossPercent || "0");
+    }, 0);
+    const avgROI = (totalROI / totalTrades).toFixed(1);
+
+    // Calculate total profit
+    const totalProfitSOL = completedTrades.reduce((sum, t) => {
+      return sum + parseFloat(t.profitLossSOL || "0");
+    }, 0);
+    const totalProfit = totalProfitSOL.toFixed(2);
+
+    // Count active users (users with AI bot configs)
+    const activeConfigs = await db.select().from(aiBotConfigs);
+    const activeUsers = activeConfigs.filter(c => c.enabled).length;
+
+    // Calculate average hold time
+    const totalHoldTime = completedTrades.reduce((sum, t) => {
+      return sum + (t.holdDurationMinutes || 0);
+    }, 0);
+    const avgHoldTime = Math.round(totalHoldTime / totalTrades);
+
+    // Find best trade
+    const bestTradePercent = completedTrades.reduce((max, t) => {
+      const percent = parseFloat(t.profitLossPercent || "0");
+      return percent > max ? percent : max;
+    }, 0);
+    const bestTrade = bestTradePercent.toFixed(1);
+
+    // Count trades in last 24 hours
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const last24hTrades = completedTrades.filter(t => 
+      t.exitAt && new Date(t.exitAt) > oneDayAgo
+    ).length;
+
+    // Count SCALP vs SWING trades
+    const scalpTrades = completedTrades.filter(t => t.tradeMode === "SCALP").length;
+    const swingTrades = completedTrades.filter(t => t.tradeMode === "SWING").length;
+
+    return {
+      totalTrades,
+      winRate,
+      avgROI,
+      totalProfit,
+      activeUsers,
+      avgHoldTime,
+      bestTrade,
+      last24hTrades,
+      scalpTrades,
+      swingTrades,
     };
   }
 }
