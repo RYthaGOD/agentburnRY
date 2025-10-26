@@ -20,6 +20,49 @@ const CIRCUIT_BREAKER_THRESHOLD = 3; // Disable after 3 consecutive failures
 const CIRCUIT_BREAKER_COOLDOWN = 5 * 60 * 1000; // Re-enable after 5 minutes
 
 /**
+ * Rate Limiting for Cerebras to prevent 429 errors
+ * Uses a promise-based queue to serialize concurrent requests
+ */
+const cerebrasRateLimiter = {
+  lastRequestTime: 0,
+  minDelayMs: 2000, // Minimum 2 seconds between Cerebras requests
+  queue: Promise.resolve(), // Promise chain for serialization
+};
+
+/**
+ * Acquire Cerebras rate limit lock - ensures only one request at a time
+ * Returns a promise that resolves when it's safe to make a Cerebras request
+ */
+async function acquireCerebrasLock(): Promise<void> {
+  // Chain onto the existing queue
+  const currentQueue = cerebrasRateLimiter.queue;
+  
+  // Create a new promise for the next waiter
+  let releaseNext: () => void;
+  cerebrasRateLimiter.queue = new Promise(resolve => {
+    releaseNext = resolve;
+  });
+  
+  // Wait for our turn
+  await currentQueue;
+  
+  // Calculate wait time based on last request
+  const now = Date.now();
+  const timeSinceLastRequest = now - cerebrasRateLimiter.lastRequestTime;
+  const waitTime = Math.max(0, cerebrasRateLimiter.minDelayMs - timeSinceLastRequest);
+  
+  if (waitTime > 0) {
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  // Record this request
+  cerebrasRateLimiter.lastRequestTime = Date.now();
+  
+  // Release the next waiter
+  releaseNext!();
+}
+
+/**
  * Track AI model failure and implement circuit breaker
  */
 function trackModelFailure(provider: string): void {
@@ -73,6 +116,21 @@ function isModelAvailable(provider: string): boolean {
   }
   
   return false;
+}
+
+/**
+ * Get health score for a model (0-100, higher = healthier)
+ * Used to prioritize working models over recently failed ones
+ */
+function getModelHealthScore(provider: string): number {
+  const health = modelHealthTracker.get(provider);
+  if (!health) return 100; // Never used = assume healthy
+  if (health.disabled) return 0; // Circuit broken = unusable
+  
+  // Penalize based on recent failures (even if not circuit broken)
+  // 0 failures = 100, 1 failure = 80, 2 failures = 60
+  const failurePenalty = health.failures * 20;
+  return Math.max(0, 100 - failurePenalty);
 }
 
 /**
@@ -130,6 +188,7 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
   // Priority 3: Paid models (use only when needed)
 
   // Cerebras (fast, free, Llama 4) - Priority 2 (less reliable, rate limited)
+  // NOTE: Rate limiting handled at execution level, not selection level
   if (process.env.CEREBRAS_API_KEY && isModelAvailable("Cerebras")) {
     clients.push({
       client: new OpenAI({
@@ -270,13 +329,36 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
     });
   }
 
-  // OPTIMIZATION: Sort by priority (1=highest) and limit models if requested
-  clients.sort((a, b) => a.priority - b.priority);
+  // INTELLIGENT SORTING: Combine priority and health score for optimal selection
+  // Priority 1 (free/reliable) > Priority 2 (rate limited) > Priority 3 (paid)
+  // Within same priority, prefer healthier models (fewer recent failures)
+  clients.sort((a, b) => {
+    // First, sort by priority (1 is highest priority)
+    if (a.priority !== b.priority) {
+      return a.priority - b.priority;
+    }
+    
+    // If same priority, sort by health score (100 = healthiest)
+    const healthA = getModelHealthScore(a.provider);
+    const healthB = getModelHealthScore(b.provider);
+    return healthB - healthA; // Higher health first
+  });
   
+  // INTELLIGENT MODEL SELECTION: Ensure we get requested number of WORKING models
   if (context.maxModels && context.maxModels > 0) {
-    const limited = clients.slice(0, context.maxModels);
-    console.log(`[AI Optimization] Limiting to ${context.maxModels} highest-priority models: ${limited.map(c => c.provider).join(", ")}`);
-    return limited;
+    const availableModels = clients.filter(c => isModelAvailable(c.provider));
+    const requestedCount = context.maxModels;
+    
+    if (availableModels.length < requestedCount) {
+      console.warn(`[AI Optimization] ⚠️ Requested ${requestedCount} models but only ${availableModels.length} available (some circuit-broken)`);
+      console.log(`[AI Optimization] Using all ${availableModels.length} available models: ${availableModels.map(c => c.provider).join(", ")}`);
+      return availableModels;
+    }
+    
+    const selected = availableModels.slice(0, requestedCount);
+    const healthScores = selected.map(c => `${c.provider}(health:${getModelHealthScore(c.provider)})`);
+    console.log(`[AI Optimization] Selected ${requestedCount} highest-priority healthy models: ${healthScores.join(", ")}`);
+    return selected;
   }
 
   return clients;
@@ -483,6 +565,11 @@ async function analyzeSingleModel(
   userRiskTolerance: "low" | "medium" | "high",
   budgetPerTrade: number
 ): Promise<TradingAnalysis> {
+  // Cerebras rate limiting: Acquire lock to serialize concurrent requests
+  if (provider === "Cerebras") {
+    await acquireCerebrasLock();
+  }
+  
   // Calculate additional metrics for deeper analysis
   // Add safeguards for zero/near-zero values to prevent Infinity/NaN
   const safeMarketCap = Math.max(tokenData.marketCapUSD, 0.01);
