@@ -9,7 +9,7 @@ import OpenAI from "openai";
 import { sellTokenOnPumpFun } from "./pumpfun";
 import { getTreasuryKey } from "./key-manager";
 import { getWalletBalance } from "./solana";
-import { deductTransactionFee } from "./transaction-fee";
+import { deductTransactionFee, deductPlatformFee } from "./transaction-fee";
 import { realtimeService } from "./realtime";
 import { Keypair, Connection, PublicKey } from "@solana/web3.js";
 import { loadKeypairFromPrivateKey, getConnection } from "./solana-sdk";
@@ -1803,10 +1803,10 @@ async function executeQuickTrade(
       config.treasuryKeyAuthTag
     );
 
-    // Get treasury public key for balance check
+    // Get treasury keypair for transactions and balance check
     const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
-    const keypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
-    const treasuryPublicKey = keypair.publicKey.toString();
+    const treasuryKeypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
+    const treasuryPublicKey = treasuryKeypair.publicKey.toString();
 
     // Scan actual wallet balance
     const { getWalletBalance } = await import("./solana");
@@ -2020,11 +2020,27 @@ async function executeQuickTrade(
       console.log(`[Quick Scan]    Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`);
     }
 
+    // Deduct platform fee (1% on all trades, except exempt wallets)
+    const feeResult = await deductPlatformFee(
+      config.ownerWalletAddress,
+      tradeAmount,
+      treasuryKeypair
+    );
+    
+    const finalTradeAmount = feeResult.remainingAmount;
+    
+    if (feeResult.isExempt) {
+      console.log(`[Quick Scan] ✅ Fee exempt wallet - using full amount: ${finalTradeAmount.toFixed(6)} SOL`);
+    } else if (feeResult.feeDeducted > 0) {
+      console.log(`[Quick Scan] 💰 Platform fee deducted: ${feeResult.feeDeducted.toFixed(6)} SOL`);
+      console.log(`[Quick Scan] 💵 Trading with: ${finalTradeAmount.toFixed(6)} SOL (after 1% fee)`);
+    }
+
     // Execute buy with Jupiter → PumpSwap fallback
     const result = await buyTokenWithFallback(
       treasuryKeyBase58,
       token.mint,
-      tradeAmount,
+      finalTradeAmount,
       1000 // 10% slippage
     );
     
@@ -2044,19 +2060,29 @@ async function executeQuickTrade(
       
       console.log(`[Quick Scan] ✅ Received ${tokensReceived} tokens from swap`);
       
-      // Update budget tracking
+      // Update budget tracking and cumulative platform fees
       const budgetUsed = parseFloat(config.budgetUsed || "0");
-      const newBudgetUsed = budgetUsed + tradeAmount;
+      const totalSpent = tradeAmount; // Original amount before fee deduction
+      const newBudgetUsed = budgetUsed + totalSpent;
+      const currentFeesTotal = parseFloat(config.totalPlatformFeesPaid || "0");
+      const newFeesTotal = currentFeesTotal + feeResult.feeDeducted;
+      
       await storage.createOrUpdateAIBotConfig({
         ownerWalletAddress: config.ownerWalletAddress,
         budgetUsed: newBudgetUsed.toString(),
+        totalPlatformFeesPaid: newFeesTotal.toString(),
+        isFeeExempt: feeResult.isExempt,
       });
 
-      // Record transaction with actual tokens received
+      // Record transaction with fee tracking
       await storage.createTransaction({
         projectId: null as any, // null for standalone AI bot transactions
         type: "ai_buy",
-        amount: tradeAmount.toString(),
+        amount: tradeAmount.toString(), // Gross amount (before fee)
+        netAmount: finalTradeAmount.toString(), // Net amount actually swapped
+        platformFee: feeResult.feeDeducted.toString(), // Platform fee deducted
+        feeExempt: feeResult.isExempt, // Exemption status
+        feeTxSignature: feeResult.txSignature || null, // Fee transfer signature
         tokenAmount: tokensReceived.toString(),
         txSignature: result.signature,
         status: "completed",
@@ -3018,11 +3044,27 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           addLog(`   Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`, "info");
         }
 
+        // Deduct platform fee (1% on all trades, except exempt wallets)
+        const feeResult = await deductPlatformFee(
+          ownerWalletAddress,
+          tradeAmount,
+          treasuryKeypair
+        );
+        
+        const finalTradeAmount = feeResult.remainingAmount;
+        
+        if (feeResult.isExempt) {
+          addLog(`✅ Fee exempt wallet - using full amount: ${finalTradeAmount.toFixed(6)} SOL`, "info");
+        } else if (feeResult.feeDeducted > 0) {
+          addLog(`💰 Platform fee deducted: ${feeResult.feeDeducted.toFixed(6)} SOL`, "info");
+          addLog(`💵 Trading with: ${finalTradeAmount.toFixed(6)} SOL (after 1% fee)`, "info");
+        }
+
         // Buy with Jupiter → PumpSwap fallback for better success rate
         const result = await buyTokenWithFallback(
           treasuryKeyBase58,
           token.mint,
-          tradeAmount,
+          finalTradeAmount,
           1000 // 10% slippage (1000 bps)
         );
         
@@ -3042,20 +3084,30 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
           
           addLog(`✅ Received ${tokensReceived} tokens from swap`, "success");
           
-          // Update budget tracking and available balance
-          const newBudgetUsed = budgetUsed + tradeAmount;
-          availableBalance -= tradeAmount;
+          // Update budget tracking, available balance, and cumulative platform fees
+          const totalSpent = tradeAmount; // Original amount before fee deduction
+          const newBudgetUsed = budgetUsed + totalSpent;
+          availableBalance -= totalSpent;
+          const currentFeesTotal = parseFloat(config.totalPlatformFeesPaid || "0");
+          const newFeesTotal = currentFeesTotal + feeResult.feeDeducted;
+          
           await storage.createOrUpdateAIBotConfig({
             ownerWalletAddress,
             budgetUsed: newBudgetUsed.toString(),
+            totalPlatformFeesPaid: newFeesTotal.toString(),
+            isFeeExempt: feeResult.isExempt,
           });
           addLog(`💰 Budget updated: ${newBudgetUsed.toFixed(4)}/${totalBudget.toFixed(4)} SOL used (${availableBalance.toFixed(4)} SOL remaining)`, "info");
 
-          // Record transaction with actual tokens received
+          // Record transaction with fee tracking
           await storage.createTransaction({
             projectId: null as any, // null for standalone AI bot transactions
             type: "ai_buy",
-            amount: tradeAmount.toString(),
+            amount: tradeAmount.toString(), // Gross amount (before fee)
+            netAmount: finalTradeAmount.toString(), // Net amount actually swapped
+            platformFee: feeResult.feeDeducted.toString(), // Platform fee deducted
+            feeExempt: feeResult.isExempt, // Exemption status
+            feeTxSignature: feeResult.txSignature || null, // Fee transfer signature
             tokenAmount: tokensReceived.toString(),
             txSignature: result.signature,
             status: "completed",

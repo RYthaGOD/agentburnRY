@@ -58,7 +58,11 @@ export const transactions = pgTable("transactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id").references(() => projects.id), // Nullable for standalone AI bot transactions
   type: text("type").notNull(), // claim, buyback, burn, volume_buy, volume_sell, limit_buy, ai_buy, ai_sell
-  amount: decimal("amount", { precision: 18, scale: 9 }).notNull(),
+  amount: decimal("amount", { precision: 18, scale: 9 }).notNull(), // Gross SOL amount (before fee for buys)
+  netAmount: decimal("net_amount", { precision: 18, scale: 9 }), // Net SOL actually swapped (after fee deduction)
+  platformFee: decimal("platform_fee", { precision: 18, scale: 9 }), // Platform fee deducted (1% for AI bot trades)
+  feeExempt: boolean("fee_exempt").notNull().default(false), // Whether this transaction was fee-exempt
+  feeTxSignature: text("fee_tx_signature"), // Signature of the fee transfer transaction (if applicable)
   tokenAmount: decimal("token_amount", { precision: 30, scale: 9 }), // Increased to handle tokens with trillion+ supply
   txSignature: text("tx_signature").notNull(),
   status: text("status").notNull(), // pending, completed, failed
@@ -140,6 +144,10 @@ export const aiBotConfigs = pgTable("ai_bot_configs", {
   buybackPercentage: decimal("buyback_percentage", { precision: 5, scale: 2 }).notNull().default("5"), // % of profit to use for buyback (default 5%)
   totalBuybackSOL: decimal("total_buyback_sol", { precision: 18, scale: 9 }).notNull().default("0"), // Total SOL spent on buybacks
   totalTokensBurned: decimal("total_tokens_burned", { precision: 30, scale: 9 }).notNull().default("0"), // Total tokens permanently burned (increased for high-supply tokens)
+  
+  // Platform Fee Tracking (1% fee on all trades, with exemptions)
+  totalPlatformFeesPaid: decimal("total_platform_fees_paid", { precision: 18, scale: 9 }).notNull().default("0"), // Cumulative platform fees paid in SOL
+  isFeeExempt: boolean("is_fee_exempt").notNull().default(false), // Computed field - true if wallet is in exemption list
   
   // Status tracking
   lastBotRunAt: timestamp("last_bot_run_at"),
