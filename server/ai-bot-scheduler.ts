@@ -1324,7 +1324,11 @@ async function runQuickTechnicalScan() {
               riskTolerance,
               budgetPerTrade,
               0.5, // 50% agreement threshold
-              { isPeakHours: false, isHighConfidence: false } // Quick scans use all available models
+              { 
+                isPeakHours: false, 
+                isHighConfidence: false,
+                maxModels: 4 // OPTIMIZATION: Use only 4 highest-priority models for quick scans (saves 60% API calls)
+              }
             );
             const quickAnalysis = hiveMindResult.analysis;
 
@@ -2392,12 +2396,13 @@ export function startAITradingBotScheduler() {
     console.error("[Quick Scan] Initial scan error:", error);
   });
 
-  console.log("[AI Bot Scheduler] Active - OPTIMIZED FOR FAST TRADING ⚡");
-  console.log("  - Quick scans: Every 2 minutes (58-74% scalp opportunities for quick profits) 🎯 ULTRA FAST");
-  console.log("  - Position monitoring: Every 1.5 minutes (rapid exit detection) ⚡");
-  console.log("  - Deep scans: Every 15 minutes (75%+ swing trades with 7-model consensus)");
+  console.log("[AI Bot Scheduler] Active - OPTIMIZED FOR API EFFICIENCY ⚡");
+  console.log("  - Quick scans: Every 2 minutes (4 AI models, SCALP opportunities) 🎯 OPTIMIZED");
+  console.log("  - Position monitoring: Every 3 minutes (DeepSeek only) 💰 SAVES 50% API CALLS");
+  console.log("  - Deep scans: Every 15 minutes (ALL models for SWING trades)");
   console.log("  - Strategy updates: Every 3 hours (adaptive hivemind rebalancing)");
   console.log("  - Memory cleanup: Every hour (removes inactive bots and expired cache)");
+  console.log("  - Circuit Breaker: Auto-disables failing models for 5 minutes");
 }
 
 /**
@@ -3861,7 +3866,7 @@ export async function getActivePositions(ownerWalletAddress: string): Promise<Ar
 
 /**
  * Monitor open positions using DeepSeek (free 5M tokens, excellent reasoning)
- * Runs every 1.5 minutes to check position status and make sell recommendations - OPTIMIZED FOR SPEED
+ * Runs every 3 minutes to check position status and make sell recommendations - OPTIMIZED FOR API EFFICIENCY
  */
 async function monitorPositionsWithDeepSeek() {
   if (!process.env.DEEPSEEK_API_KEY) {
@@ -3871,11 +3876,11 @@ async function monitorPositionsWithDeepSeek() {
 
   schedulerStatus.positionMonitor.status = 'running';
   schedulerStatus.positionMonitor.lastRun = Date.now();
-  schedulerStatus.positionMonitor.nextRun = Date.now() + (1.5 * 60 * 1000); // 1.5 minutes
+  schedulerStatus.positionMonitor.nextRun = Date.now() + (3 * 60 * 1000); // 3 minutes (OPTIMIZED)
   
   try {
     console.log("[Position Monitor] Checking open positions with DeepSeek...");
-    logActivity('position_monitor', 'info', '🔍 Position Monitor scanning active positions (1.5min interval - FAST)');
+    logActivity('position_monitor', 'info', '🔍 Position Monitor scanning active positions (3min interval - OPTIMIZED)');
     
     // Get all active AI bot configs
     const configs = await storage.getAllAIBotConfigs();
@@ -4391,8 +4396,8 @@ async function executeSellForPosition(
 }
 
 /**
- * Start position monitoring scheduler (every 1.5 minutes using free DeepSeek) - OPTIMIZED FOR SPEED
- * Active management of all positions for optimal performance
+ * Start position monitoring scheduler (every 3 minutes using free DeepSeek) - OPTIMIZED FOR API EFFICIENCY
+ * Active management of all positions while conserving API calls (saves 50% vs 1.5min interval)
  */
 export function startPositionMonitoringScheduler() {
   if (!process.env.DEEPSEEK_API_KEY) {
@@ -4403,27 +4408,14 @@ export function startPositionMonitoringScheduler() {
   console.log("[Position Monitor] Starting...");
   console.log("[Position Monitor] Using free DeepSeek API (5M tokens, superior reasoning) for position monitoring");
 
-  // Run every 1.5 minutes for active position management
-  // Using 3-minute intervals with 90-second offset to achieve 1.5-minute frequency
-  let isOffset = false;
+  // Run every 3 minutes for active position management (OPTIMIZED: saves 50% API calls vs 1.5min)
   positionMonitorJob = cron.schedule("*/3 * * * *", () => {
-    if (isOffset) {
-      // Run at 1.5-minute mark (90 seconds delay)
-      setTimeout(() => {
-        monitorPositionsWithDeepSeek().catch((error) => {
-          console.error("[Position Monitor] Unexpected error:", error);
-        });
-      }, 90000);
-    } else {
-      // Run immediately at 3-minute mark
-      monitorPositionsWithDeepSeek().catch((error) => {
-        console.error("[Position Monitor] Unexpected error:", error);
-      });
-    }
-    isOffset = !isOffset; // Alternate between immediate and delayed execution
+    monitorPositionsWithDeepSeek().catch((error) => {
+      console.error("[Position Monitor] Unexpected error:", error);
+    });
   });
 
-  console.log("[Position Monitor] Active (checks every 1.5 minutes for active management)");
+  console.log("[Position Monitor] Active (checks every 3 minutes - OPTIMIZED to reduce API usage)");
 }
 
 /**

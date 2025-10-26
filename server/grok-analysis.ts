@@ -4,6 +4,78 @@
 import OpenAI from "openai";
 
 /**
+ * Circuit Breaker for AI Models - Tracks failures and temporarily disables failing models
+ * OPTIMIZATION: Prevents wasted API calls to consistently failing models
+ */
+interface ModelHealth {
+  provider: string;
+  failures: number;
+  lastFailure: number;
+  disabled: boolean;
+  disabledUntil?: number;
+}
+
+const modelHealthTracker = new Map<string, ModelHealth>();
+const CIRCUIT_BREAKER_THRESHOLD = 3; // Disable after 3 consecutive failures
+const CIRCUIT_BREAKER_COOLDOWN = 5 * 60 * 1000; // Re-enable after 5 minutes
+
+/**
+ * Track AI model failure and implement circuit breaker
+ */
+function trackModelFailure(provider: string): void {
+  const health = modelHealthTracker.get(provider) || {
+    provider,
+    failures: 0,
+    lastFailure: 0,
+    disabled: false,
+  };
+
+  health.failures++;
+  health.lastFailure = Date.now();
+
+  if (health.failures >= CIRCUIT_BREAKER_THRESHOLD) {
+    health.disabled = true;
+    health.disabledUntil = Date.now() + CIRCUIT_BREAKER_COOLDOWN;
+    console.warn(`[Circuit Breaker] ⚠️ ${provider} temporarily disabled after ${health.failures} failures. Will retry in 5 minutes.`);
+  }
+
+  modelHealthTracker.set(provider, health);
+}
+
+/**
+ * Track successful AI model response and reset failure count
+ */
+function trackModelSuccess(provider: string): void {
+  const health = modelHealthTracker.get(provider);
+  if (health) {
+    health.failures = 0;
+    health.disabled = false;
+    health.disabledUntil = undefined;
+    modelHealthTracker.set(provider, health);
+  }
+}
+
+/**
+ * Check if model is available (not disabled by circuit breaker)
+ */
+function isModelAvailable(provider: string): boolean {
+  const health = modelHealthTracker.get(provider);
+  if (!health || !health.disabled) return true;
+  
+  // Check if cooldown period has expired
+  if (health.disabledUntil && Date.now() > health.disabledUntil) {
+    health.disabled = false;
+    health.failures = 0;
+    health.disabledUntil = undefined;
+    modelHealthTracker.set(provider, health);
+    console.log(`[Circuit Breaker] ✅ ${provider} re-enabled after cooldown`);
+    return true;
+  }
+  
+  return false;
+}
+
+/**
  * Intelligent OpenAI usage context for cost optimization
  * DeepSeek (5M free tokens) is now the primary model, OpenAI used only when critical
  */
@@ -13,6 +85,7 @@ export interface OpenAIUsageContext {
   needsTieBreaker?: boolean; // Free models showed disagreement (now DeepSeek handles this)
   forceInclude?: boolean; // Always include OpenAI regardless of context
   forceExclude?: boolean; // Never include OpenAI (e.g., quick monitoring)
+  maxModels?: number; // OPTIMIZATION: Limit number of models to use (for quick scans)
 }
 
 /**
@@ -44,14 +117,20 @@ function isPeakTradingHours(): boolean {
 
 /**
  * Get all available AI clients for hive mind consensus
- * @param context Optional context to determine smart OpenAI usage
+ * OPTIMIZED: Uses circuit breaker to skip failing models and supports tiered model selection
+ * @param context Optional context to determine smart OpenAI usage and model limits
  */
-function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: OpenAI; model: string; provider: string }> {
+function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: OpenAI; model: string; provider: string; priority: number }> {
   const clients = [];
   const includeOpenAI = shouldIncludeOpenAI(context);
 
-  // Cerebras (fast, free, Llama 4)
-  if (process.env.CEREBRAS_API_KEY) {
+  // PRIORITY SYSTEM: Higher priority = more reliable/cheaper
+  // Priority 1: Free, reliable models (use first)
+  // Priority 2: Free, less reliable models
+  // Priority 3: Paid models (use only when needed)
+
+  // Cerebras (fast, free, Llama 4) - Priority 2 (less reliable, rate limited)
+  if (process.env.CEREBRAS_API_KEY && isModelAvailable("Cerebras")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.cerebras.ai/v1",
@@ -59,11 +138,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "llama-3.3-70b",
       provider: "Cerebras",
+      priority: 2,
     });
   }
 
-  // Google Gemini 2.5 Flash (1M tokens/min free, highest volume)
-  if (process.env.GOOGLE_AI_KEY) {
+  // Google Gemini 2.5 Flash (1M tokens/min free, highest volume) - Priority 2 (rate limits)
+  if (process.env.GOOGLE_AI_KEY && isModelAvailable("Google Gemini")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -71,12 +151,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "gemini-2.0-flash-exp",
       provider: "Google Gemini",
+      priority: 2,
     });
   }
 
-  // DeepSeek V3 Primary (5M free tokens, PRIMARY MODEL - superior reasoning, handles tie-breaking)
-  // Now the main workhorse for analysis, position monitoring, and quick scans
-  if (process.env.DEEPSEEK_API_KEY) {
+  // DeepSeek V3 Primary (5M free tokens, PRIMARY MODEL) - Priority 1 (most reliable free)
+  if (process.env.DEEPSEEK_API_KEY && isModelAvailable("DeepSeek")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.deepseek.com",
@@ -84,11 +164,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "deepseek-chat",
       provider: "DeepSeek",
+      priority: 1,
     });
   }
 
-  // DeepSeek V3 Backup (5M free tokens, automatic failover for maximum uptime)
-  if (process.env.DEEPSEEK_API_KEY_2) {
+  // DeepSeek V3 Backup (5M free tokens) - Priority 1 (most reliable free)
+  if (process.env.DEEPSEEK_API_KEY_2 && isModelAvailable("DeepSeek #2")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.deepseek.com",
@@ -96,11 +177,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "deepseek-chat",
       provider: "DeepSeek #2",
+      priority: 1,
     });
   }
 
-  // ChatAnywhere GPT-4o-mini (200 req/day free, high quality)
-  if (process.env.CHATANYWHERE_API_KEY) {
+  // ChatAnywhere GPT-4o-mini (200 req/day free) - Priority 2 (daily limits)
+  if (process.env.CHATANYWHERE_API_KEY && isModelAvailable("ChatAnywhere")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.chatanywhere.tech/v1",
@@ -108,11 +190,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "gpt-4o-mini",
       provider: "ChatAnywhere",
+      priority: 2,
     });
   }
 
-  // Together AI (200+ models, free tier)
-  if (process.env.TOGETHER_API_KEY) {
+  // Together AI (200+ models, generous free tier) - Priority 1 (very reliable)
+  if (process.env.TOGETHER_API_KEY && isModelAvailable("Together AI")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.together.xyz/v1",
@@ -120,11 +203,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
       provider: "Together AI",
+      priority: 1,
     });
   }
 
-  // OpenRouter (300+ models, free tier, fallback for variety)
-  if (process.env.OPENROUTER_API_KEY) {
+  // OpenRouter (300+ models, free tier) - Priority 1 (very reliable)
+  if (process.env.OPENROUTER_API_KEY && isModelAvailable("OpenRouter")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://openrouter.ai/api/v1",
@@ -132,11 +216,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "meta-llama/llama-3.3-70b-instruct",
       provider: "OpenRouter",
+      priority: 1,
     });
   }
 
-  // Groq (completely free with generous limits)
-  if (process.env.GROQ_API_KEY) {
+  // Groq (completely free with generous limits) - Priority 1 (very reliable)
+  if (process.env.GROQ_API_KEY && isModelAvailable("Groq")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.groq.com/openai/v1",
@@ -144,33 +229,36 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "llama-3.3-70b-versatile",
       provider: "Groq",
+      priority: 1,
     });
   }
 
-  // OpenAI Primary (GPT-4o-mini, high quality, paid) - Smart usage only
-  if (includeOpenAI && process.env.OPENAI_API_KEY) {
+  // OpenAI Primary (GPT-4o-mini, high quality, PAID) - Priority 3 (use sparingly)
+  if (includeOpenAI && process.env.OPENAI_API_KEY && isModelAvailable("OpenAI")) {
     clients.push({
       client: new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
       }),
       model: "gpt-4o-mini",
       provider: "OpenAI",
+      priority: 3,
     });
   }
   
-  // OpenAI Backup (GPT-4o-mini, automatic failover when primary fails) - Smart usage only
-  if (includeOpenAI && process.env.OPENAI_API_KEY_2) {
+  // OpenAI Backup (GPT-4o-mini, PAID) - Priority 3 (use sparingly)
+  if (includeOpenAI && process.env.OPENAI_API_KEY_2 && isModelAvailable("OpenAI #2")) {
     clients.push({
       client: new OpenAI({
         apiKey: process.env.OPENAI_API_KEY_2,
       }),
       model: "gpt-4o-mini",
       provider: "OpenAI #2",
+      priority: 3,
     });
   }
   
-  // Fallback to xAI Grok (paid)
-  if (process.env.XAI_API_KEY) {
+  // Fallback to xAI Grok (PAID) - Priority 3 (use sparingly)
+  if (process.env.XAI_API_KEY && isModelAvailable("xAI Grok")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.x.ai/v1",
@@ -178,7 +266,17 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       }),
       model: "grok-4-fast-reasoning",
       provider: "xAI Grok",
+      priority: 3,
     });
+  }
+
+  // OPTIMIZATION: Sort by priority (1=highest) and limit models if requested
+  clients.sort((a, b) => a.priority - b.priority);
+  
+  if (context.maxModels && context.maxModels > 0) {
+    const limited = clients.slice(0, context.maxModels);
+    console.log(`[AI Optimization] Limiting to ${context.maxModels} highest-priority models: ${limited.map(c => c.provider).join(", ")}`);
+    return limited;
   }
 
   return clients;
@@ -247,7 +345,7 @@ export async function analyzeTokenWithHiveMind(
   console.log(`[Hive Mind] 🧠 FULL HIVEMIND: All ${clients.length} AI models running in parallel for maximum accuracy`);
   console.log(`[Hive Mind] 📊 Providers: ${providers}`);
   
-  // Query all models in parallel
+  // Query all models in parallel with circuit breaker tracking
   const votes = await Promise.all(
     clients.map(async ({ client, model, provider }) => {
       try {
@@ -259,8 +357,12 @@ export async function analyzeTokenWithHiveMind(
           userRiskTolerance,
           budgetPerTrade
         );
+        // Track success to reset failure count
+        trackModelSuccess(provider);
         return { provider, analysis, success: true };
       } catch (error) {
+        // Track failure for circuit breaker
+        trackModelFailure(provider);
         console.error(`[Hive Mind] ${provider} failed:`, error instanceof Error ? error.message : String(error));
         return {
           provider,
