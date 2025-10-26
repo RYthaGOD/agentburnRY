@@ -620,6 +620,38 @@ async function analyzeSingleModel(
   const priceVolatility = Math.abs(tokenData.priceChange24h || 0);
   const hasRecentMomentum = (tokenData.priceChange1h || 0) > 0 && (tokenData.priceChange24h || 0) > 0;
   
+  // Enhanced technical indicators
+  const priceChange1h = tokenData.priceChange1h || 0;
+  const priceChange24h = tokenData.priceChange24h || 0;
+  const priceChange5m = tokenData.priceChange5m || 0;
+  
+  // Momentum indicators
+  const isStrongUptrend = priceChange5m > 0 && priceChange1h > 0 && priceChange24h > 0;
+  const isWeakening = priceChange5m < 0 && priceChange1h > 0; // Recent reversal
+  const isAccelerating = Math.abs(priceChange5m) > Math.abs(priceChange1h / 12); // 5min move > hourly average
+  
+  // Volume analysis
+  const volumeTrend = tokenData.volumeChange24h || 0; // Volume increasing/decreasing
+  const isVolumeIncreasing = volumeTrend > 10; // Volume up 10%+
+  const isHighVolumeBreakout = volumeToMarketCapRatio > 0.2 && isVolumeIncreasing;
+  
+  // Buy/Sell pressure (from DexScreener data)
+  const buyPressure = tokenData.buyPressurePercent || 50;
+  const sellPressure = 100 - buyPressure;
+  const buyerDominance = buyPressure > 60 ? 'STRONG BUYER CONTROL' : buyPressure > 55 ? 'MODERATE BUYER EDGE' : buyPressure < 40 ? 'SELLER PRESSURE' : 'BALANCED';
+  
+  // Liquidity depth analysis
+  const liquidityDepth = safeLiquidity / safeMarketCap;
+  const isLiquidityAdequate = liquidityDepth > 0.1; // 10%+ liquidity/mcap
+  const liquidityRisk = liquidityDepth < 0.05 ? 'HIGH RISK (thin liquidity)' : liquidityDepth < 0.1 ? 'MODERATE' : 'LOW RISK (deep liquidity)';
+  
+  // Pattern recognition indicators
+  const is24hBreakout = priceChange24h > 15 && isVolumeIncreasing;
+  const isConsolidation = Math.abs(priceChange1h) < 3 && priceChange24h > -5; // Sideways movement
+  const isPullback = priceChange1h < -5 && priceChange24h > 10; // Healthy pullback in uptrend
+  const isReversal = priceChange5m > 5 && priceChange1h < -10; // Potential bottom reversal
+  const isPumpDumping = priceChange1h > 30 && priceChange5m < -10; // Pump and dump pattern
+  
   const prompt = `You are a CONSERVATIVE cryptocurrency trading analyst specializing in HIGH-QUALITY token selection for Solana. Your goal is to identify tokens with strong fundamentals and sustainable growth potential through COMPREHENSIVE, IN-DEPTH ANALYSIS.
 
 **COMPREHENSIVE TOKEN DATA:**
@@ -638,10 +670,30 @@ ${tokenData.description ? `- Description: ${tokenData.description}` : ''}
 - Liquidity/Market Cap Ratio: ${(liquidityToMarketCapRatio * 100).toFixed(2)}% (${liquidityToMarketCapRatio > 0.1 ? 'STRONG' : liquidityToMarketCapRatio > 0.05 ? 'ADEQUATE' : 'WEAK'})
 
 **Price Action Analysis:**
-- 1h Price Change: ${tokenData.priceChange1h ? (tokenData.priceChange1h > 0 ? '+' : '') + tokenData.priceChange1h.toFixed(2) + '%' : 'N/A'}
-- 24h Price Change: ${tokenData.priceChange24h ? (tokenData.priceChange24h > 0 ? '+' : '') + tokenData.priceChange24h.toFixed(2) + '%' : 'N/A'}
-- Momentum Status: ${hasRecentMomentum ? 'POSITIVE (both 1h and 24h gains)' : 'NEUTRAL or NEGATIVE'}
+- 5m Price Change: ${priceChange5m > 0 ? '+' : ''}${priceChange5m.toFixed(2)}% ${isAccelerating ? '⚡ ACCELERATING' : ''}
+- 1h Price Change: ${priceChange1h > 0 ? '+' : ''}${priceChange1h.toFixed(2)}% ${isWeakening ? '⚠️ WEAKENING' : ''}
+- 24h Price Change: ${priceChange24h > 0 ? '+' : ''}${priceChange24h.toFixed(2)}%
+- Momentum Status: ${isStrongUptrend ? '🚀 STRONG UPTREND (all timeframes positive)' : hasRecentMomentum ? 'POSITIVE momentum' : 'NEUTRAL or NEGATIVE'}
 - Price Volatility (24h): ${priceVolatility.toFixed(2)}% (${priceVolatility > 30 ? 'HIGH risk' : priceVolatility > 15 ? 'MODERATE risk' : 'LOW risk'})
+
+**Volume & Liquidity Analysis:**
+- Volume Trend (24h): ${volumeTrend > 0 ? '+' : ''}${volumeTrend.toFixed(1)}% ${isVolumeIncreasing ? '📈 INCREASING' : ''}
+- Volume/Market Cap: ${(volumeToMarketCapRatio * 100).toFixed(2)}% ${isHighVolumeBreakout ? '🔥 HIGH VOLUME BREAKOUT' : ''}
+- Liquidity Depth: ${(liquidityDepth * 100).toFixed(2)}% (${liquidityRisk})
+- Liquidity/Market Cap: ${(liquidityToMarketCapRatio * 100).toFixed(2)}% (${isLiquidityAdequate ? 'ADEQUATE for safe trading' : '⚠️ THIN - slippage risk'})
+
+**Buy/Sell Pressure (Order Flow):**
+- Buy Pressure: ${buyPressure.toFixed(1)}% vs Sell: ${sellPressure.toFixed(1)}%
+- Order Flow Analysis: ${buyerDominance}
+${buyPressure > 65 ? '✅ Strong buying momentum - buyers in control' : buyPressure < 35 ? '❌ Heavy selling pressure - avoid' : '➖ Neutral order flow'}
+
+**Pattern Recognition Signals:**
+${is24hBreakout ? '🚀 **24H BREAKOUT PATTERN** - Price +15% with rising volume (bullish continuation)' : ''}
+${isConsolidation ? '📊 **CONSOLIDATION PATTERN** - Sideways price action (potential breakout setup)' : ''}
+${isPullback ? '💎 **HEALTHY PULLBACK** - Short-term dip in strong uptrend (buying opportunity)' : ''}
+${isReversal ? '🔄 **POTENTIAL REVERSAL** - Recent 5m strength after 1h weakness (bottom forming?)' : ''}
+${isPumpDumping ? '⚠️ **PUMP & DUMP WARNING** - Rapid rise followed by sharp drop (HIGH RISK)' : ''}
+${!is24hBreakout && !isConsolidation && !isPullback && !isReversal && !isPumpDumping ? '➖ No clear pattern identified' : ''}
 
 **Holder & Distribution:**
 ${tokenData.holderCount ? `- Holder Count: ${tokenData.holderCount.toLocaleString()} (${tokenData.holderCount > 1000 ? 'GOOD distribution' : tokenData.holderCount > 500 ? 'MODERATE distribution' : 'CONCENTRATED holdings - RISK'})` : '- Holder Count: Not available'}
@@ -658,12 +710,15 @@ Perform a COMPREHENSIVE evaluation across ALL of these critical dimensions:
    - Token distribution and concentration risks
    - Liquidity depth and sustainability
 
-2. **TECHNICAL PRICE ACTION ANALYSIS (25% weight)**
-   - Short-term momentum (1h, 24h trends)
-   - Volume patterns and acceleration
-   - Support/resistance levels based on price history
-   - Volatility analysis and risk assessment
-   - Price-to-volume correlation strength
+2. **TECHNICAL PRICE ACTION & PATTERN ANALYSIS (30% weight)**
+   - **Momentum Analysis:** 5m, 1h, 24h price trends and acceleration
+   - **Volume Patterns:** Volume trending, breakouts, and volume-price correlation
+   - **Chart Patterns:** Breakouts, consolidations, pullbacks, reversals, pump-dumps
+   - **Order Flow:** Buy/sell pressure balance and buyer/seller dominance
+   - **Support/Resistance:** Key price levels and breakout/breakdown zones
+   - **Volatility Analysis:** Price stability and risk assessment
+   - **Predictable Patterns:** Identify repeatable setups (e.g., volume breakouts, consolidation breakouts, pullback entries)
+   - **Pattern Probability:** Assess likelihood of pattern completion based on historical behavior
 
 3. **MARKET CONDITIONS & TIMING (20% weight)**
    - Market cap position relative to similar tokens
@@ -679,15 +734,33 @@ Perform a COMPREHENSIVE evaluation across ALL of these critical dimensions:
    - Historical pump-and-dump patterns
    - Exit liquidity availability
 
-**CONSERVATIVE COMPOUNDING STRATEGY:**
-We prioritize HIGH-PROBABILITY trades with SUSTAINABLE returns:
-- Look for tokens with strong fundamentals, not just hype
-- Require clear technical indicators supporting entry
-- Demand adequate liquidity for safe position management  
-- Strict quality filters: prefer proven concepts over speculation
-- Target realistic 25-50% gains over moonshot gambling
-- ONLY recommend BUY at 70%+ confidence for high-quality setups
-- Be highly selective - it's okay to say HOLD if conditions aren't ideal
+**PATTERN-DRIVEN TRADING STRATEGY:**
+Leverage PREDICTABLE PATTERNS for high-probability trades:
+
+**Pattern Priority (Trade These Setups):**
+1. **Volume Breakout + Consolidation Break:** Price consolidating (flat 1h) then breaks out with 20%+ volume increase
+2. **Healthy Pullback in Uptrend:** 24h up 15-30%, 1h down 5-10% (buying the dip), strong buy pressure returns
+3. **Reversal with Volume:** After 1h decline, 5m shows strong reversal (+5%) with increasing volume
+4. **Strong Uptrend Continuation:** All timeframes (5m, 1h, 24h) positive + volume increasing + buyer dominance >60%
+
+**Avoid These Patterns (High Risk):**
+- Pump & Dump: Rapid >30% gain in 1h followed by sharp 5m reversal
+- Fading Volume: Price rising but volume declining (weak continuation)
+- Seller Dominance: Buy pressure <40% despite price stability
+- Thin Liquidity Spikes: Price volatility >30% with liquidity <5% of market cap
+
+**Use ALL Technical Indicators:**
+- Combine 3+ timeframes (5m, 1h, 24h) for trend confirmation
+- Volume MUST confirm price action (rising price needs rising volume)
+- Buy/sell pressure validates momentum direction
+- Liquidity depth determines position sizing safety
+- Pattern recognition identifies predictable entry/exit points
+
+**Conservative Entry Rules:**
+- ONLY recommend BUY at 65%+ confidence when pattern + fundamentals align
+- Require 2+ bullish indicators (momentum + volume + order flow)
+- Pattern must be clear and historically profitable (breakout, pullback, reversal)
+- Always check for counter-signals (pump-dump, fading volume, seller pressure)
 
 **DECISION CRITERIA:**
 For BUY recommendation (requires 70%+ confidence):
@@ -727,7 +800,7 @@ Be thorough, analytical, and CONSERVATIVE. Quality analysis over quick decisions
     messages: [
       {
         role: "system",
-        content: "You are a CONSERVATIVE cryptocurrency trading analyst focused on HIGH-PROBABILITY trades through comprehensive analysis. You specialize in identifying quality tokens with strong fundamentals and sustainable growth potential on Solana. You perform detailed, multi-dimensional analysis covering fundamentals, technicals, market conditions, and risk factors. You're thorough, analytical, and selective - preferring to pass on mediocre opportunities to wait for high-quality setups. Always respond with valid JSON containing detailed reasoning.",
+        content: "You are an EXPERT cryptocurrency trading analyst specializing in PATTERN-DRIVEN, HIGH-PROBABILITY trades on Solana. You excel at identifying PREDICTABLE TRADING PATTERNS (breakouts, pullbacks, reversals, consolidations) and combining them with comprehensive technical indicators (momentum, volume, buy/sell pressure, liquidity depth). You analyze ALL available indicators across multiple timeframes (5m, 1h, 24h) to find high-confidence setups. You're data-driven, systematic, and pattern-focused - looking for repeatable setups with strong technical confirmation. Always respond with valid JSON containing detailed pattern and indicator analysis.",
       },
       {
         role: "user",
@@ -774,6 +847,9 @@ export interface TokenMarketData {
   holderCount?: number;
   priceChange24h?: number;
   priceChange1h?: number;
+  priceChange5m?: number; // 5-minute price change for micro-momentum tracking
+  volumeChange24h?: number; // 24-hour volume change percentage
+  buyPressurePercent?: number; // Buy pressure percentage (buys / total transactions)
   liquidityUSD?: number;
   createdAt?: Date;
   description?: string;
