@@ -40,14 +40,14 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 **Token Discovery:**
 - Aggregates tokens from DexScreener Trending, PumpFun-style tokens via DexScreener, newly migrated PumpFun to Raydium tokens, and low-cap new launches, totaling ~80 tokens per scan.
 
-**Optimized AI Workflow with Dual-Model Consensus:**
-- **Position Monitoring:** Every 1.5 minutes using OpenAI + DeepSeek 2 in parallel for dual-model consensus on sell decisions.
-- **Quick Technical Scans:** Every 2 minutes using OpenAI + DeepSeek 2 in parallel for scalp trades (62-78% AI confidence). Both models analyze simultaneously and results are averaged for higher accuracy.
-- **Deep Scans:** Every 15 minutes using the full 7-model hivemind, including OpenAI, for high-confidence swing opportunities (75%+ AI confidence).
-- **Automatic Portfolio Rebalancing:** Every 30 minutes, forces OpenAI for full 7-model hivemind analysis for optimal sell recommendations.
+**Full Hivemind AI Workflow (All 7 Models for Maximum Accuracy):**
+- **Position Monitoring:** Every 1.5 minutes using all 7 AI models in parallel for consensus on sell decisions. SELL if majority (>50%) vote SELL with >=50% avg confidence OR any single model has >=75% confidence.
+- **Quick Technical Scans:** Every 2 minutes using all 7 AI models in parallel for scalp trades (62-78% AI confidence). Multiple model consensus provides superior accuracy over dual-model approach.
+- **Deep Scans:** Every 15 minutes using the full 7-model hivemind for high-confidence swing opportunities (75%+ AI confidence).
+- **Automatic Portfolio Rebalancing:** Every 30 minutes using full 7-model hivemind analysis for optimal sell recommendations.
 - **Strategy Updates:** Every 3 hours, hivemind regenerates trading strategy to adapt to market conditions.
-- **Dual-Model Benefits:** OpenAI + DeepSeek 2 run in parallel for quick scans and position monitoring, combining strengths of both models for more accurate trading decisions. When models agree, confidence is averaged for stronger signals. When models disagree, the higher-confidence model's recommendation is used.
-- **Emergency Failover:** Falls back to DeepSeek Primary → OpenAI #2 → Cerebras → Groq if primary models fail.
+- **Hivemind Benefits:** All 7 models (OpenAI, OpenAI #2, DeepSeek, DeepSeek #2, Cerebras, Google Gemini, Groq) run in parallel for ALL decisions, providing superior accuracy through majority voting. When models agree, confidence is averaged. When models disagree, higher-confidence model prevails.
+- **Redundancy & Failover:** Built-in redundancy with 7 models ensures high availability. System continues operating even if some models fail.
 
 **Dual-Mode Trading Strategy (Conservative):**
 - **SCALP Mode (65-79% AI confidence):** 3-6% of portfolio, max 30-minute hold, -10% stop-loss, +4-8% profit targets.
