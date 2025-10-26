@@ -181,40 +181,31 @@ IMPORTANT: Be CONSERVATIVE. Prioritize capital preservation over aggressive grow
   const prompt = performanceSummary;
 
   try {
-    // Use hivemind consensus to generate strategy
-    const result = await analyzeTokenWithHiveMind({
-      chainId: "solana",
-      pairAddress: ownerWalletAddress, // Use wallet as identifier
-      baseToken: {
-        address: ownerWalletAddress,
-        name: "Strategy Analysis",
-        symbol: "STRATEGY"
-      },
-      quoteToken: {
-        address: "So11111111111111111111111111111111111111112",
-        name: "Solana",
-        symbol: "SOL"
-      },
-      priceNative: "1",
-      priceUsd: "0",
-      txns: {
-        m5: { buys: 0, sells: 0 },
-        h1: { buys: 0, sells: 0 },
-        h6: { buys: 0, sells: 0 },
-        h24: { buys: recentPerformance.totalTrades, sells: recentPerformance.totalTrades }
-      },
-      volume: { h24: 0, h6: 0, h1: 0, m5: 0 },
-      priceChange: { m5: 0, h1: 0, h6: 0, h24: recentPerformance.avgProfit },
-      liquidity: { usd: 0, base: 0, quote: 0 },
-      fdv: 0,
-      marketCap: 0
-    }, prompt, true); // forceInclude = true for full hivemind
+    // Use hivemind consensus to generate strategy (using TokenMarketData format)
+    const tokenData: any = {
+      mint: ownerWalletAddress,
+      name: "Strategy Analysis",
+      symbol: "STRATEGY",
+      priceUSD: 0,
+      priceSOL: 1,
+      volumeUSD24h: 0,
+      marketCapUSD: 0,
+      liquidityUSD: 0,
+      priceChange24h: recentPerformance.avgProfit,
+    };
+    
+    const result = await analyzeTokenWithHiveMind(
+      tokenData,
+      "low", // Risk tolerance
+      0.02, // Budget per trade
+      0.5 // Min agreement
+    );
 
-    console.log(`[Hivemind Strategy] 🧠 AI Consensus: ${result.decision} (${result.confidence}% confidence)`);
-    console.log(`[Hivemind Strategy] 📊 AI Reasoning: ${result.reasoning.substring(0, 200)}...`);
+    console.log(`[Hivemind Strategy] 🧠 AI Consensus: ${result.consensus}`);
+    console.log(`[Hivemind Strategy] 📊 AI Reasoning: ${result.analysis.reasoning.substring(0, 200)}...`);
 
     // Parse AI response to extract strategy parameters
-    const aiSuggestion = parseAIStrategyResponse(result.reasoning);
+    const aiSuggestion = parseAIStrategyResponse(result.analysis.reasoning);
     
     if (aiSuggestion) {
       console.log(`[Hivemind Strategy] ✅ Using AI-generated strategy: ${aiSuggestion.marketSentiment} market, ${aiSuggestion.riskLevel} risk`);
@@ -225,7 +216,7 @@ IMPORTANT: Be CONSERVATIVE. Prioritize capital preservation over aggressive grow
     } else {
       // AI didn't return valid JSON, use confidence and reasoning
       console.log(`[Hivemind Strategy] ⚠️ AI response not in JSON format, deriving strategy from confidence`);
-      return deriveStrategyFromAIConfidence(result.confidence, result.reasoning, recentPerformance);
+      return deriveStrategyFromAIConfidence(result.analysis.confidence, result.analysis.reasoning, recentPerformance);
     }
   } catch (error) {
     console.error(`[Hivemind Strategy] ❌ AI strategy generation failed:`, error);

@@ -2135,8 +2135,8 @@ async function executeQuickTrade(
             tokenAmount: tokensReceived.toString(),
             aiConfidenceAtBuy: aiConfidence.toString(),
             potentialUpsideAtBuy: analysis.potentialUpsidePercent.toString(),
-            organicScoreAtBuy: analysis.organicScore,
-            qualityScoreAtBuy: analysis.qualityScore,
+            organicScoreAtBuy: (token as any).organicScore,
+            qualityScoreAtBuy: (token as any).qualityScore,
             liquidityUSDAtBuy: token.liquidityUSD?.toString(),
             volumeUSD24hAtBuy: token.volumeUSD24h.toString(),
             exitReason: "pending", // Will be updated on sell
@@ -3137,8 +3137,8 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
                 tokenAmount: tokensReceived.toString(),
                 aiConfidenceAtBuy: aiConfidence.toString(),
                 potentialUpsideAtBuy: analysis.potentialUpsidePercent.toString(),
-                organicScoreAtBuy: analysis.organicScore,
-                qualityScoreAtBuy: analysis.qualityScore,
+                organicScoreAtBuy: (token as any).organicScore,
+                qualityScoreAtBuy: (token as any).qualityScore,
                 liquidityUSDAtBuy: token.liquidityUSD?.toString(),
                 volumeUSD24hAtBuy: token.volumeUSD24h.toString(),
                 exitReason: "pending", // Will be updated on sell
