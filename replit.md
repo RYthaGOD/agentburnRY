@@ -59,7 +59,10 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 
 **Opportunistic Position Rotation:**
 - Automatically sells weaker positions first to free capital, then buys better opportunities when wallet balance is insufficient.
-- Rotation Criteria: New opportunity must have 25%+ higher AI confidence or cut a loss to capture a good opportunity (70%+ confidence). Prioritizes selling big losses or small profits.
+- Rotation Criteria: New opportunity must have 10%+ higher AI confidence (lowered from 25% for more flexibility) or cut a loss to capture a good opportunity (70%+ confidence). Prioritizes selling big losses or small profits.
+- Emergency Rotation: When wallet depleted (<0.01 SOL), forces rotation of weakest position regardless of confidence improvement to maintain trading capability.
+- MAX Portfolio Allocation: Maintains 15% liquidity reserve by capping deployment at 85% of total capital to prevent over-allocation.
+- Dynamic Fee Buffer: Scales with portfolio size (3% for small, 5% for medium, 7.5% for large portfolios) instead of fixed 0.03 SOL.
 
 **Portfolio-Wide Risk Management:**
 - Tracks all-time portfolio peak value, pauses trading at -20% drawdown, resumes at -15% recovery. Includes multi-layer protection.

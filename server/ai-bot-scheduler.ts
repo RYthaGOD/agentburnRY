@@ -1705,8 +1705,21 @@ async function findPositionToRotate(
   // Convert new opportunity confidence to percentage for comparison (stored as integer percentage in DB)
   const newOpportunityConfidencePercent = newOpportunity.confidence * 100;
   
+  // EMERGENCY ROTATION: If wallet is nearly empty (< 0.01 SOL), force rotation regardless of confidence
+  const isEmergencyRotation = availableSOL < 0.01;
+  if (isEmergencyRotation) {
+    console.log(`[Opportunistic Rotation] 🚨 EMERGENCY: Wallet depleted (${availableSOL.toFixed(4)} SOL) → forcing rotation of weakest position`);
+    console.log(`   Selling: ${weakest.position.tokenSymbol} (${weakest.entryConfidence}% entry, ${weakest.profitPercent.toFixed(2)}% profit)`);
+    console.log(`   For: ${newOpportunity.symbol} (${newOpportunityConfidencePercent.toFixed(0)}% confidence)`);
+    
+    return {
+      position: weakest.position,
+      expectedSOL: weakest.estimatedValue,
+    };
+  }
+  
   // Only rotate if new opportunity is significantly better
-  const MIN_CONFIDENCE_IMPROVEMENT = 25; // CONSERVATIVE: New opportunity should be 25% more confident (raised from 15%)
+  const MIN_CONFIDENCE_IMPROVEMENT = 10; // BALANCED: New opportunity should be 10% more confident (lowered from 25% to enable more rotation)
   const confidenceImprovement = newOpportunityConfidencePercent - weakest.entryConfidence;
   
   // Or if we're cutting a loss to capture a good opportunity
@@ -1774,10 +1787,27 @@ async function executeQuickTrade(
     // Scan actual wallet balance
     const { getWalletBalance } = await import("./solana");
     let actualBalance = await getWalletBalance(treasuryPublicKey);
-    const FEE_BUFFER = 0.03; // Always keep 0.03 SOL for fees
+    
+    // Analyze complete wallet portfolio FIRST to determine total capital
+    console.log(`[Quick Scan] 📊 Analyzing wallet portfolio for allocation strategy...`);
+    const portfolio = await analyzePortfolio(treasuryPublicKey, actualBalance);
+    
+    console.log(`[Quick Scan] 💼 Portfolio: ${portfolio.totalValueSOL.toFixed(4)} SOL total, ${portfolio.holdingCount} positions, largest ${portfolio.largestPosition.toFixed(1)}%`);
+    
+    // DYNAMIC FEE BUFFER: Scale with portfolio size for better liquidity management
+    // - Small portfolios (<0.5 SOL): Keep 0.03 SOL
+    // - Medium portfolios (0.5-2 SOL): Keep 5% of portfolio
+    // - Large portfolios (>2 SOL): Keep 7.5% of portfolio
+    let FEE_BUFFER = 0.03; // Default minimum
+    if (portfolio.totalValueSOL > 2.0) {
+      FEE_BUFFER = portfolio.totalValueSOL * 0.075; // 7.5% for large portfolios
+    } else if (portfolio.totalValueSOL > 0.5) {
+      FEE_BUFFER = portfolio.totalValueSOL * 0.05; // 5% for medium portfolios
+    }
+    
     let availableBalance = Math.max(0, actualBalance - FEE_BUFFER);
 
-    console.log(`[Quick Scan] Wallet balance: ${actualBalance.toFixed(4)} SOL (available: ${availableBalance.toFixed(4)} SOL after fee buffer)`);
+    console.log(`[Quick Scan] Wallet balance: ${actualBalance.toFixed(4)} SOL (available: ${availableBalance.toFixed(4)} SOL, fee buffer: ${FEE_BUFFER.toFixed(4)} SOL)`);
 
     // If balance is low, try to claim creator rewards
     if (availableBalance < 0.05) {
@@ -1790,12 +1820,20 @@ async function executeQuickTrade(
         console.log(`[Quick Scan] After rewards claim: ${actualBalance.toFixed(4)} SOL (available: ${availableBalance.toFixed(4)} SOL)`);
       }
     }
-
-    // Analyze complete wallet portfolio for accurate allocation decisions
-    console.log(`[Quick Scan] 📊 Analyzing wallet portfolio for allocation strategy...`);
-    const portfolio = await analyzePortfolio(treasuryPublicKey, actualBalance);
     
-    console.log(`[Quick Scan] 💼 Portfolio: ${portfolio.totalValueSOL.toFixed(4)} SOL total, ${portfolio.holdingCount} positions, largest ${portfolio.largestPosition.toFixed(1)}%`);
+    // MAX PORTFOLIO ALLOCATION: Prevent over-deployment to maintain liquidity
+    const MAX_PORTFOLIO_ALLOCATION = 0.85; // Keep 15% in reserve for opportunities and fees
+    const maxDeployableCapital = portfolio.totalValueSOL * MAX_PORTFOLIO_ALLOCATION;
+    const currentlyDeployed = portfolio.totalValueSOL - actualBalance;
+    const remainingAllocation = Math.max(0, maxDeployableCapital - currentlyDeployed);
+    
+    // Enforce allocation limit
+    if (remainingAllocation < availableBalance) {
+      const oldAvailable = availableBalance;
+      availableBalance = Math.max(0, remainingAllocation);
+      console.log(`[Quick Scan] ⚠️ Portfolio allocation limit: ${(currentlyDeployed / portfolio.totalValueSOL * 100).toFixed(1)}% deployed`);
+      console.log(`[Quick Scan] 🔒 Capping available balance from ${oldAvailable.toFixed(4)} to ${availableBalance.toFixed(4)} SOL to maintain ${((1 - MAX_PORTFOLIO_ALLOCATION) * 100).toFixed(0)}% reserve`);
+    }
 
     // Calculate dynamic trade amount based on AI confidence (using refreshed balance if rewards were claimed)
     const baseAmount = parseFloat(config.budgetPerTrade || "0.02");
@@ -2532,11 +2570,22 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
     const treasuryKeypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
 
     // Scan actual wallet balance
-    const FEE_BUFFER = 0.03; // Always keep 0.03 SOL for fees
     let actualBalance = await getWalletBalance(treasuryKeypair.publicKey.toString());
+    
+    // Analyze portfolio to get total capital
+    const portfolio = await analyzePortfolio(treasuryKeypair.publicKey.toString(), actualBalance);
+    
+    // DYNAMIC FEE BUFFER: Scale with portfolio size for better liquidity management
+    let FEE_BUFFER = 0.03; // Default minimum
+    if (portfolio.totalValueSOL > 2.0) {
+      FEE_BUFFER = portfolio.totalValueSOL * 0.075; // 7.5% for large portfolios
+    } else if (portfolio.totalValueSOL > 0.5) {
+      FEE_BUFFER = portfolio.totalValueSOL * 0.05; // 5% for medium portfolios
+    }
+    
     let availableBalance = Math.max(0, actualBalance - FEE_BUFFER);
 
-    addLog(`💰 Wallet balance: ${actualBalance.toFixed(4)} SOL (available: ${availableBalance.toFixed(4)} SOL after fee buffer)`, "info");
+    addLog(`💰 Wallet balance: ${actualBalance.toFixed(4)} SOL (available: ${availableBalance.toFixed(4)} SOL, fee buffer: ${FEE_BUFFER.toFixed(4)} SOL)`, "info");
 
     // If balance is low, try to claim creator rewards
     if (availableBalance < 0.05) {
@@ -2551,9 +2600,23 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         addLog(`💰 No rewards available to claim or claim failed`, "warning");
       }
     }
+    
+    // MAX PORTFOLIO ALLOCATION: Prevent over-deployment to maintain liquidity
+    const MAX_PORTFOLIO_ALLOCATION = 0.85; // Keep 15% in reserve for opportunities and fees
+    const maxDeployableCapital = portfolio.totalValueSOL * MAX_PORTFOLIO_ALLOCATION;
+    const currentlyDeployed = portfolio.totalValueSOL - actualBalance;
+    const remainingAllocation = Math.max(0, maxDeployableCapital - currentlyDeployed);
+    
+    // Enforce allocation limit
+    if (remainingAllocation < availableBalance) {
+      const oldAvailable = availableBalance;
+      availableBalance = Math.max(0, remainingAllocation);
+      addLog(`⚠️ Portfolio allocation limit: ${(currentlyDeployed / portfolio.totalValueSOL * 100).toFixed(1)}% deployed`, "warning");
+      addLog(`🔒 Capping available balance from ${oldAvailable.toFixed(4)} to ${availableBalance.toFixed(4)} SOL to maintain ${((1 - MAX_PORTFOLIO_ALLOCATION) * 100).toFixed(0)}% reserve`, "info");
+    }
 
     if (availableBalance <= 0) {
-      addLog(`💰 Insufficient funds: ${actualBalance.toFixed(4)} SOL (need at least ${FEE_BUFFER} SOL for fees)`, "error");
+      addLog(`💰 Insufficient funds: ${actualBalance.toFixed(4)} SOL (need at least ${FEE_BUFFER.toFixed(4)} SOL for fees)`, "error");
       return logs;
     }
 
@@ -2597,10 +2660,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
     // Map risk level to tolerance
     const riskTolerance = riskLevel === "aggressive" ? "high" : riskLevel === "conservative" ? "low" : "medium";
 
-    // Analyze complete wallet portfolio for accurate allocation decisions
-    addLog(`📊 Analyzing wallet portfolio for allocation strategy...`, "info");
-    const portfolio = await analyzePortfolio(ownerWalletAddress, actualBalance);
-    
+    // Portfolio already analyzed earlier (line 2579) for fee buffer and allocation calculations
     addLog(`💼 Portfolio Analysis:`, "success");
     addLog(`   Total Value: ${portfolio.totalValueSOL.toFixed(4)} SOL`, "info");
     addLog(`   SOL Balance: ${portfolio.solBalance.toFixed(4)} SOL (${((portfolio.solBalance / portfolio.totalValueSOL) * 100).toFixed(1)}%)`, "info");
