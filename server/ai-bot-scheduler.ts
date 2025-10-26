@@ -757,20 +757,37 @@ async function fetchTrendingPumpFunTokens(config?: {
       console.log(`[AI Bot] 🏆 Top token: ${top.baseToken?.symbol} - Quality: ${top.qualityScore.toFixed(1)}%, Organic: ${top.organicScore.toFixed(1)}%`);
     }
     
-    // Map to TokenMarketData format
-    const tokens: TokenMarketData[] = scoredPairs.map((pair: any) => ({
-      mint: pair.baseToken.address,
-      name: pair.baseToken.name || 'Unknown',
-      symbol: pair.baseToken.symbol || 'UNKNOWN',
-      priceUSD: parseFloat(pair.priceUsd || '0'),
-      priceSOL: parseFloat(pair.priceNative || '0'),
-      volumeUSD24h: pair.volume?.h24 || 0,
-      marketCapUSD: pair.fdv || pair.marketCap || 0,
-      liquidityUSD: pair.liquidity?.usd || 0,
-      priceChange24h: pair.priceChange?.h24 || 0,
-      priceChange1h: pair.priceChange?.h1 || 0,
-      holderCount: undefined, // DexScreener doesn't provide holder count
-    }));
+    // Map to TokenMarketData format with enhanced technical indicators
+    const tokens: TokenMarketData[] = scoredPairs.map((pair: any) => {
+      // Calculate buy pressure from transaction data
+      const buys24h = pair.txns?.h24?.buys || 0;
+      const sells24h = pair.txns?.h24?.sells || 0;
+      const totalTxns = buys24h + sells24h;
+      const buyPressurePercent = totalTxns > 0 ? (buys24h / totalTxns) * 100 : 50;
+      
+      // Calculate volume change (compare recent volume to baseline)
+      const volumeH1 = pair.volume?.h1 || 0;
+      const volumeH24 = pair.volume?.h24 || 0;
+      const avgHourlyVolume = volumeH24 / 24;
+      const volumeChange24h = avgHourlyVolume > 0 ? ((volumeH1 - avgHourlyVolume) / avgHourlyVolume) * 100 : 0;
+      
+      return {
+        mint: pair.baseToken.address,
+        name: pair.baseToken.name || 'Unknown',
+        symbol: pair.baseToken.symbol || 'UNKNOWN',
+        priceUSD: parseFloat(pair.priceUsd || '0'),
+        priceSOL: parseFloat(pair.priceNative || '0'),
+        volumeUSD24h: pair.volume?.h24 || 0,
+        marketCapUSD: pair.fdv || pair.marketCap || 0,
+        liquidityUSD: pair.liquidity?.usd || 0,
+        priceChange24h: pair.priceChange?.h24 || 0,
+        priceChange1h: pair.priceChange?.h1 || 0,
+        priceChange5m: pair.priceChange?.m5 || 0, // 5-minute price change
+        volumeChange24h: volumeChange24h, // Volume trend
+        buyPressurePercent: buyPressurePercent, // Buy/sell pressure
+        holderCount: undefined, // DexScreener doesn't provide holder count
+      };
+    });
 
     console.log(`[AI Bot] ✅ Fetched ${tokens.length} trending Solana tokens from DexScreener`);
     
