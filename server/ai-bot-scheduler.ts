@@ -2193,24 +2193,24 @@ function determineTradeMode(confidence: number): TradeModeConfig {
       stopLossPercent: confidence >= 0.85 ? -25 : -15, // TIGHTER: -15% to -25% for better capital preservation
       profitTargetPercent: 15, // Let AI decide exit, but 15% minimum
     };
-  } else if (confidence >= 0.65) {
-    // Mode A: SCALP - Quick micro-profits with tight risk control (RAISED from 58% to 65%)
+  } else if (confidence >= 0.62) {
+    // Mode A: SCALP - Quick micro-profits with balanced risk control (OPTIMIZED: 62% for more opportunities)
     return {
       mode: "SCALP",
-      minConfidence: 65, // CONSERVATIVE: Higher threshold for SCALP trades
+      minConfidence: 62, // OPTIMIZED: Balanced threshold captures quality SCALP trades
       positionSizePercent: confidence >= 0.75 ? 6 : confidence >= 0.70 ? 4 : 3, // REDUCED: 3-6% (was 5-7%)
       maxHoldMinutes: 30, // 30 minute review threshold for faster trading
-      stopLossPercent: confidence >= 0.75 ? -8 : confidence >= 0.70 ? -6 : -5, // TIGHTEST: -5% to -8% for maximum capital protection
+      stopLossPercent: confidence >= 0.75 ? -12 : confidence >= 0.70 ? -10 : -8, // OPTIMIZED: -8% to -12% for profitability (was -5% to -8% - too tight for volatile PumpFun tokens)
       profitTargetPercent: confidence >= 0.75 ? 8 : confidence >= 0.70 ? 6 : 4, // Quick profit targets
     };
   } else {
     // Below minimum threshold - return conservative defaults (should be filtered out)
     return {
       mode: "SCALP",
-      minConfidence: 65,
+      minConfidence: 62,
       positionSizePercent: 3,
       maxHoldMinutes: 30,
-      stopLossPercent: -5, // Tightest possible
+      stopLossPercent: -8, // Balanced protection (was -5%)
       profitTargetPercent: 4,
     };
   }

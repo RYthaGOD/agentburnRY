@@ -33,16 +33,16 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - AI-driven exits with no fixed profit targets, requiring a minimum 75% AI confidence.
 - **STRICT quality filters (Win Rate Optimized):** 80%+ organic score, 70%+ quality score, $25k+ volume, $20k+ liquidity, 24h+ token age, 100+ estimated holders.
 - Portfolio diversification with a 25% maximum concentration limit per position.
-- **TIGHTER stop-loss protection (Capital Preservation):** -5% to -8% for SCALP, -15% to -25% for SWING trades.
+- **OPTIMIZED stop-loss protection (Profitability Balanced):** -8% to -12% for SCALP, -15% to -25% for SWING trades.
 - Portfolio Drawdown Circuit Breaker pauses trading if portfolio drops >20% from peak, resuming at -15%.
-- Faster exit threshold: AI sell confidence raised from 40% to 50%.
+- Optimized exit threshold: AI sell confidence at 45% (balanced for capturing bigger moves while protecting capital).
 
 **Token Discovery:**
 - Aggregates tokens from DexScreener Trending, PumpFun-style tokens via DexScreener, newly migrated PumpFun to PumpSwap tokens, and low-cap new launches, totaling ~80 tokens per scan.
 
 **Full Hivemind AI Workflow (All 7 Models for Maximum Accuracy):**
 - **Position Monitoring:** Every 1.5 minutes using all 7 AI models in parallel for consensus on sell decisions. SELL if majority (>50%) vote SELL with >=50% avg confidence OR any single model has >=75% confidence.
-- **Quick Technical Scans:** Every 2 minutes using all 7 AI models in parallel for scalp trades (62-78% AI confidence). Multiple model consensus provides superior accuracy over dual-model approach.
+- **Quick Technical Scans:** Every 2 minutes using all 7 AI models in parallel for scalp trades (62-79% AI confidence). Multiple model consensus provides superior accuracy over dual-model approach.
 - **Deep Scans:** Every 15 minutes using the full 7-model hivemind for high-confidence swing opportunities (75%+ AI confidence).
 - **Automatic Portfolio Rebalancing:** Every 30 minutes using full 7-model hivemind analysis for optimal sell recommendations.
 - **AI-Powered Strategy Learning:** Every 3 hours, the full 7-model hivemind analyzes recent trading performance (win rate, avg profit, trade count) and intelligently optimizes strategy parameters instead of using rule-based logic. AI continuously learns and improves based on actual performance. Manual regeneration available via dashboard for immediate recalibration.
@@ -56,14 +56,14 @@ This bot operates independently with configurations stored in a dedicated `aiBot
 - **Hivemind Benefits:** All 7 models (OpenAI, OpenAI #2, DeepSeek, DeepSeek #2, Cerebras, Google Gemini, Groq) run in parallel for ALL decisions, providing superior accuracy through majority voting. When models agree, confidence is averaged. When models disagree, higher-confidence model prevails.
 - **Redundancy & Failover:** Built-in redundancy with 7 models ensures high availability. System continues operating even if some models fail. Graceful fallback to rule-based strategy if AI fails, then to conservative defaults.
 
-**Dual-Mode Trading Strategy (Win Rate Optimized):**
-- **SCALP Mode (65-79% AI confidence):** 3-6% of portfolio, max 30-minute hold, **-5% to -8% stop-loss** (TIGHTER), +4-8% profit targets.
-- **SWING Mode (80%+ AI confidence):** 5-9% of portfolio, max 24-hour hold, **-15% to -25% stop-loss** (TIGHTER), +15% minimum profit target.
+**Dual-Mode Trading Strategy (Profitability Optimized):**
+- **SCALP Mode (62-79% AI confidence):** 3-6% of portfolio, max 30-minute hold, **-8% to -12% stop-loss** (OPTIMIZED for volatile PumpFun tokens), +4-8% profit targets.
+- **SWING Mode (80%+ AI confidence):** 5-9% of portfolio, max 24-hour hold, **-15% to -25% stop-loss**, +15% minimum profit target.
 
 **Sell Decision Framework:**
 - AI continuously monitors positions. Deep scan analysis and automatic portfolio rebalancing provide ongoing evaluation and sell recommendations.
-- **Automatic Stop-Loss Override (OPTIMIZED):** -5% to -8% for SCALP, -15% to -25% for SWING.
-- Exit Criteria: AI confidence drops below 50%, profit target hit, or max hold time reached.
+- **Automatic Stop-Loss Override (OPTIMIZED):** -8% to -12% for SCALP, -15% to -25% for SWING.
+- Exit Criteria: AI confidence drops below 45%, profit target hit, or max hold time reached.
 
 **Opportunistic Position Rotation:**
 - Automatically sells weaker positions first to free capital, then buys better opportunities when wallet balance is insufficient.
