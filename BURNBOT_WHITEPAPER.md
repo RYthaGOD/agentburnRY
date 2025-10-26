@@ -10,7 +10,12 @@
 
 BurnBot is a production-grade SaaS platform designed to automate token buyback and burn operations for Solana SPL tokens. The platform provides token creators with a secure, transparent, and fully automated solution to reduce token supply through scheduled market purchases and permanent destruction via the Solana incinerator.
 
-This white paper details the technical architecture, security infrastructure, and operational mechanisms that ensure user data safety while delivering reliable automated token burns.
+The platform features a **flexible access control system** with three tiers:
+- **Unlimited Access Whitelist**: Designated wallets receive permanent free access with 0% platform fees
+- **Free Trial**: 20 free trades for all new users to evaluate the platform
+- **Paid Subscription**: 0.15 SOL for 2 weeks of unlimited access with 1% platform fee
+
+This white paper details the technical architecture, security infrastructure, access control mechanisms, and operational systems that ensure user data safety while delivering reliable automated token burns.
 
 ---
 
@@ -23,6 +28,13 @@ This white paper details the technical architecture, security infrastructure, an
 5. [Blockchain Integration](#5-blockchain-integration)
 6. [Automated Execution](#6-automated-execution)
 7. [Payment & Subscription System](#7-payment--subscription-system)
+   - 7.1 [Access Control Models](#71-access-control-models)
+     - 7.1.1 [Unlimited Access Whitelist](#711-unlimited-access-whitelist-priority-1)
+     - 7.1.2 [Free Trial System](#712-free-trial-system-priority-2)
+     - 7.1.3 [Subscription System](#713-subscription-system-priority-3)
+   - 7.2 [100% Solana-Native Payments](#72-100-solana-native-payments)
+   - 7.3 [Transaction Fee System](#73-transaction-fee-system)
+   - 7.4 [On-Chain Payment Verification](#74-on-chain-payment-verification)
 8. [Transparency & Auditability](#8-transparency--auditability)
 9. [Risk Management](#9-risk-management)
 10. [Conclusion](#10-conclusion)
@@ -514,7 +526,110 @@ If execution fails:
 
 ## 7. Payment & Subscription System
 
-### 7.1 100% Solana-Native Payments
+### 7.1 Access Control Models
+
+BurnBot implements a tiered access control system with three distinct models:
+
+#### 7.1.1 Unlimited Access Whitelist (Priority 1)
+
+**Whitelisted Wallet Privileges:**
+
+The platform supports an **unlimited access whitelist** for designated wallets that receive:
+
+- ✅ **Unlimited Free Trades**: No subscription required, no trade limits
+- ✅ **Zero Platform Fees**: 0% transaction fees (normally 1%)
+- ✅ **Permanent Access**: Never expires, no renewal needed
+- ✅ **Full Feature Access**: All AI models, trading modes, and capabilities
+
+**Implementation:**
+
+Whitelist checks occur at the highest priority level before any other access validation:
+
+```typescript
+// Priority 1: Check unlimited access whitelist
+if (walletAddress in UNLIMITED_ACCESS_WALLETS) {
+  return { access: true, fees: 0% }
+}
+```
+
+**Current Whitelisted Wallets:**
+- `924yATAEdnrYmncJMX2je7dpiEfVRqCSPmQ2NK3QfoXA`
+
+**Security Features:**
+- Whitelist stored in server-side code (not database)
+- Cannot be modified via API or frontend
+- Requires code deployment to update
+- Immune to database tampering or breaches
+
+**Use Cases:**
+- Platform partners and strategic collaborators
+- Beta testers and early adopters
+- Team members and advisors
+- Marketing and promotional campaigns
+
+#### 7.1.2 Free Trial System (Priority 2)
+
+**Free Trades for New Users:**
+
+Every new user receives:
+- **20 Free AI Trades**: No payment required to start
+- **Full Feature Access**: All trading capabilities during trial
+- **1% Platform Fee**: Applies to all trades (free and paid)
+
+**Purpose:**
+- Reduce barrier to entry
+- Allow users to evaluate platform capabilities
+- Build trust through hands-on experience
+
+#### 7.1.3 Subscription System (Priority 3)
+
+**Paid Subscriptions:**
+
+| Tier | Price | Duration | Features |
+|------|-------|----------|----------|
+| AI Trading Bot | 0.15 SOL | 2 weeks | Unlimited AI trades, full access |
+
+**Payment Flow:**
+```
+1. User selects subscription
+2. Platform displays treasury wallet:
+   jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38
+3. User sends exact SOL amount
+4. On-chain verification
+5. Subscription activated
+```
+
+**Access Priority Hierarchy:**
+
+```
+┌─────────────────────────────────────┐
+│  Check 1: Unlimited Access Whitelist│
+│  ✅ If whitelisted → Grant access    │
+│     (0% fees, unlimited)            │
+└──────────────┬──────────────────────┘
+               │ No match
+               ▼
+┌─────────────────────────────────────┐
+│  Check 2: Free Trades Remaining     │
+│  ✅ If < 20 trades used → Grant     │
+│     (1% fees, limited to 20)        │
+└──────────────┬──────────────────────┘
+               │ Exhausted
+               ▼
+┌─────────────────────────────────────┐
+│  Check 3: Active Subscription       │
+│  ✅ If paid & not expired → Grant   │
+│     (1% fees, unlimited)            │
+└──────────────┬──────────────────────┘
+               │ None
+               ▼
+┌─────────────────────────────────────┐
+│        Access Denied                │
+│  ❌ Require payment or whitelist    │
+└─────────────────────────────────────┘
+```
+
+### 7.2 100% Solana-Native Payments
 
 **No Third-Party Processors:**
 - All payments in SOL (Solana's native currency)
@@ -544,7 +659,66 @@ If execution fails:
    d. Activate automated scheduling
 ```
 
-### 7.2 On-Chain Payment Verification
+### 7.3 Transaction Fee System
+
+**Platform Fees:**
+
+The platform implements a tiered fee structure based on access level:
+
+| Access Level | Platform Fee | Details |
+|--------------|--------------|---------|
+| **Whitelisted Wallets** | **0%** | No platform fees on any transactions |
+| **Free Trial Users** | **1%** | Applied to all 20 free trades |
+| **Paid Subscribers** | **1%** | Applied to all trades during subscription |
+
+**Fee Application:**
+
+```typescript
+// Fee calculation with whitelist exemption
+if (isWalletWhitelisted(walletAddress)) {
+  platformFee = 0%  // Whitelisted: No fees
+  netAmount = grossAmount
+} else {
+  platformFee = 1%  // Standard fee for all others
+  netAmount = grossAmount * 0.99
+  feeAmount = grossAmount * 0.01
+}
+```
+
+**Fee Exempt Wallets:**
+- `924yATAEdnrYmncJMX2je7dpiEfVRqCSPmQ2NK3QfoXA`
+
+**Fee Destination:**
+- Treasury wallet: `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`
+
+**Fee Transparency:**
+- All fees deducted before trade execution
+- Transaction records show gross amount, net amount, and fee
+- Fee exemption status recorded for each transaction
+- Complete fee history visible in dashboard
+
+**Benefits for Whitelisted Users:**
+
+Example trade comparison:
+```
+Normal User (1% fee):
+- Intended trade: 1.0 SOL
+- Platform fee: 0.01 SOL
+- Actual trade: 0.99 SOL
+- User saves: $0
+
+Whitelisted User (0% fee):
+- Intended trade: 1.0 SOL
+- Platform fee: 0.00 SOL
+- Actual trade: 1.0 SOL
+- User saves: 0.01 SOL per trade
+
+High-volume trader (1000 trades):
+- Whitelisted savings: 10 SOL
+- Significant cost reduction for active traders
+```
+
+### 7.4 On-Chain Payment Verification
 
 **Trust Minimized Verification:**
 
@@ -643,16 +817,36 @@ Every transaction is publicly verifiable:
 - All operations visible on-chain
 - Open-source compatible architecture
 - Auditable execution logs
+- **Transparent access control**: Whitelist publicly documented
+- **Fee exemption visibility**: All fee waivers tracked and disclosed
+
+**Access Control Transparency:**
+
+The platform maintains complete transparency regarding access privileges:
+
+```
+Publicly Documented Whitelist:
+- 924yATAEdnrYmncJMX2je7dpiEfVRqCSPmQ2NK3QfoXA (0% fees, unlimited access)
+
+Verification Methods:
+1. Check API: GET /api/ai-bot/subscription/status/{wallet}
+   Response includes: hasAccess, freeTradesRemaining, isWhitelisted
+2. View transaction records: Fee exemption status included
+3. Open documentation: UNLIMITED-ACCESS-WALLET.md
+```
 
 **Platform Revenue:**
-- Subscription fees (0.2-0.4 SOL per 30 days)
-- Transaction fees: 0.5% after 60th transaction per project
-  - First 60 transactions free for each project
+- Subscription fees (0.15 SOL per 2 weeks for AI Trading Bot)
+- Transaction fees: 1% on all trades
+  - **Whitelisted wallets**: 0% fees (fully exempt)
+  - **Free trial users**: 1% fees on all 20 free trades
+  - **Paid subscribers**: 1% fees on all trades
   - Fee deducted from SOL amount before swap execution
-  - Applied to all transaction types (buybacks, volume bot, buy bot)
+  - Applied to all transaction types (buybacks, volume bot, buy bot, AI trades)
   - Fee destination: Treasury wallet (jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38)
 - No token custody fees
 - All fees transparently disclosed
+- Fee exemptions publicly documented
 
 ---
 
@@ -664,12 +858,14 @@ Every transaction is publicly verifiable:
 |------|-----------|
 | Private key theft | AES-256-GCM encryption, isolated storage, memory clearing |
 | Replay attacks | Signature hash storage, timestamp validation |
-| Unauthorized access | Wallet signature authentication, time-bounded sessions |
+| Unauthorized access | Wallet signature authentication, time-bounded sessions, whitelist verification |
 | Database breach | Encrypted keys useless without master key |
 | Master key exposure | Environment variable, never in code/logs |
 | Transaction failures | Pre-execution simulation, retry logic |
 | Network attacks | HTTPS/TLS, input validation, rate limiting |
 | Denial of service | Rate limiting, request validation, timeout handling |
+| Whitelist manipulation | Server-side code storage, requires deployment to modify, immune to database tampering |
+| Fee bypass attempts | Dual validation (access whitelist + fee exemption list), all transactions logged with exemption status |
 
 ### 9.2 Operational Risks
 
@@ -716,6 +912,8 @@ BurnBot implements defense-in-depth security through:
 - ✅ **Bank-grade encryption** (AES-256-GCM) for all private keys
 - ✅ **Wallet-based authentication** eliminating password risks
 - ✅ **Signature verification** with replay prevention
+- ✅ **Tiered access control** with whitelist, free trial, and subscription models
+- ✅ **Transparent fee structure** with documented exemptions
 - ✅ **Data minimization** collecting only essential information
 - ✅ **Blockchain transparency** with full on-chain auditability
 - ✅ **Non-custodial design** users retain control of assets
