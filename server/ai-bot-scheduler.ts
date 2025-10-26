@@ -43,6 +43,7 @@ let positionMonitorJob: ScheduledTask | null = null;
 let portfolioRebalancerJob: ScheduledTask | null = null;
 let walletSyncJob: ScheduledTask | null = null;
 let databaseCleanupJob: ScheduledTask | null = null;
+let strategyLearningJob: ScheduledTask | null = null;
 
 /**
  * Stop all AI bot schedulers
@@ -90,6 +91,12 @@ export function stopAllAIBotSchedulers() {
     databaseCleanupJob.stop();
     databaseCleanupJob = null;
     console.log("[Database Cleanup] Database cleanup scheduler stopped");
+  }
+  
+  if (strategyLearningJob) {
+    strategyLearningJob.stop();
+    strategyLearningJob = null;
+    console.log("[Strategy Learning] Strategy learning scheduler stopped");
   }
   
   console.log("[AI Bot Scheduler] All schedulers stopped successfully");
@@ -2437,6 +2444,17 @@ export function startAITradingBotScheduler() {
   // Run initial cleanup on startup
   cleanupMemory();
   
+  // Strategy learning every 3 hours (AI analyzes trade journal and regenerates strategy)
+  strategyLearningJob = cron.schedule("0 */3 * * *", () => {
+    runStrategyLearning().catch((error) => {
+      console.error("[Strategy Learning] Unexpected error:", error);
+    });
+  });
+  
+  console.log("[Strategy Learning] 🧠 AI-Powered Strategy Learning initialized");
+  console.log("[Strategy Learning] Schedule: Every 3 hours (analyzes trade patterns and optimizes strategy)");
+  console.log("[Strategy Learning] ✅ Active (learns from wins/losses to improve trading decisions)");
+  
   // Sync all portfolios on startup (removes orphaned positions)
   console.log("[AI Bot Scheduler] Syncing portfolios on startup...");
   (async () => {
@@ -2468,6 +2486,84 @@ export function startAITradingBotScheduler() {
   console.log("  - Strategy updates: Every 3 hours (adaptive hivemind rebalancing)");
   console.log("  - Memory cleanup: Every hour (removes inactive bots and expired cache)");
   console.log("  - Circuit Breaker: Auto-disables failing models for 5 minutes");
+}
+
+/**
+ * AI Strategy Learning - Analyzes trade journal patterns and regenerates optimal trading strategy
+ * Runs every 3 hours to learn from wins/losses and continuously improve decision-making
+ */
+async function runStrategyLearning() {
+  console.log("[Strategy Learning] 🧠 Starting AI-powered strategy analysis...");
+  logActivity('strategy_learning', 'info', '🧠 Analyzing trade patterns for strategy optimization');
+  
+  try {
+    const configs = await storage.getAllAIBotConfigs();
+    const enabledConfigs = configs.filter(c => c.isEnabled);
+    
+    if (enabledConfigs.length === 0) {
+      console.log("[Strategy Learning] No active wallets - skipping");
+      return;
+    }
+    
+    for (const config of enabledConfigs) {
+      try {
+        // Fetch trade patterns from journal
+        const patterns = await storage.getTradePatterns(config.ownerWalletAddress);
+        
+        if (patterns.totalTrades < 3) {
+          console.log(`[Strategy Learning] ${config.ownerWalletAddress.slice(0,8)}...: Insufficient history (${patterns.totalTrades} trades) - needs 3+ for learning`);
+          continue;
+        }
+        
+        console.log(`[Strategy Learning] 📊 ${config.ownerWalletAddress.slice(0,8)}...: Analyzing ${patterns.totalTrades} completed trades`);
+        console.log(`[Strategy Learning]    Win Rate: ${patterns.winRate.toFixed(1)}%, Avg Profit: ${patterns.avgProfit.toFixed(2)}%`);
+        
+        // Log failure patterns
+        if (patterns.commonFailureReasons.length > 0) {
+          console.log(`[Strategy Learning]    Common failures:`);
+          patterns.commonFailureReasons.slice(0, 3).forEach(f => {
+            console.log(`[Strategy Learning]      - ${f.reason}: ${f.count}x`);
+          });
+        }
+        
+        // Log winning characteristics
+        if (patterns.bestTokenCharacteristics.length > 0) {
+          const winChars = patterns.bestTokenCharacteristics[0];
+          console.log(`[Strategy Learning]    Winning token profile:`);
+          console.log(`[Strategy Learning]      - Organic Score: ${winChars.avgOrganicScore?.toFixed(0) || 'N/A'}%`);
+          console.log(`[Strategy Learning]      - Quality Score: ${winChars.avgQualityScore?.toFixed(0) || 'N/A'}%`);
+          console.log(`[Strategy Learning]      - Avg Liquidity: $${((winChars.avgLiquidityUSD || 0) / 1000).toFixed(0)}k`);
+          console.log(`[Strategy Learning]      - Avg Volume: $${((winChars.avgVolumeUSD || 0) / 1000).toFixed(0)}k`);
+        }
+        
+        // Generate new AI-optimized strategy based on patterns
+        const { generateHivemindStrategy } = await import("./hivemind-strategy");
+        const recentPerformance = {
+          winRate: patterns.winRate,
+          avgProfit: patterns.avgProfit,
+          totalTrades: patterns.totalTrades,
+        };
+        
+        const newStrategy = await generateHivemindStrategy(config.ownerWalletAddress, recentPerformance);
+        
+        // Save new strategy to database
+        await storage.saveHivemindStrategy(config.ownerWalletAddress, newStrategy);
+        
+        console.log(`[Strategy Learning] ✅ ${config.ownerWalletAddress.slice(0,8)}...: Updated strategy (${newStrategy.riskLevel} risk, ${newStrategy.minConfidenceThreshold}% min confidence)`);
+        logActivity('strategy_learning', 'success', `✅ Optimized strategy for ${config.ownerWalletAddress.slice(0,8)}... - ${newStrategy.riskLevel} risk, ${patterns.winRate.toFixed(1)}% win rate`);
+        
+      } catch (error) {
+        console.error(`[Strategy Learning] Error for ${config.ownerWalletAddress}:`, error);
+        logActivity('strategy_learning', 'warning', `⚠️ Failed to update strategy for ${config.ownerWalletAddress.slice(0,8)}...`);
+      }
+    }
+    
+    console.log("[Strategy Learning] 🎓 Strategy learning cycle complete");
+    
+  } catch (error) {
+    console.error("[Strategy Learning] Fatal error:", error);
+    logActivity('strategy_learning', 'error', '❌ Strategy learning failed');
+  }
 }
 
 /**

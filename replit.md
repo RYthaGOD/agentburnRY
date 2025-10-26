@@ -68,10 +68,10 @@ A dedicated scheduler service automates buyback execution using `node-cron`, han
 
 **Smart Hivemind AI Workflow:**
 - **Position Monitoring:** Every 3 minutes using DeepSeek for sell decisions.
-- **Quick Technical Scans:** Every 2 minutes using 4 highest-priority AI models for scalp trades (62-79% AI confidence).
-- **Deep Scans:** Every 15 minutes using the full 11-model hivemind for high-confidence swing opportunities (75%+ AI confidence).
+- **Quick Technical Scans:** Every 1 minute using 4 highest-priority AI models for scalp trades (62-79% AI confidence).
+- **Deep Scans:** Every 10 minutes using the full 11-model hivemind for high-confidence swing opportunities (75%+ AI confidence).
 - **Automatic Portfolio Rebalancing:** Every 30 minutes using full hivemind analysis.
-- **AI-Powered Strategy Learning:** Every 3 hours, the full hivemind analyzes recent trading performance to optimize strategy parameters.
+- **AI-Powered Strategy Learning:** Every 3 hours, analyzes trade journal patterns (win rate, avg profit, failure reasons, successful token characteristics) and regenerates optimal trading strategy based on performance data.
 - **Trade Journal & Pattern Analysis:** Tracks complete trade lifecycle, categorizes losses, identifies winning patterns, and integrates data into strategy regeneration.
 - **11-Model Hivemind System:** DeepSeek, DeepSeek #2, xAI Grok, Together AI, OpenRouter, Groq, Cerebras, Google Gemini, ChatAnywhere, OpenAI, OpenAI #2. Models run in parallel with majority voting.
 - **Smart Model Prioritization:** 3-tier priority system (free reliable, free with limits, paid) to optimize cost/performance.
