@@ -4889,12 +4889,17 @@ async function executeSellForPosition(
     console.log(`[Position Monitor] ✅ SOLD ${position.tokenSymbol}!`);
     console.log(`[Position Monitor] 📝 Transaction: https://solscan.io/tx/${signature}`);
 
-    // Calculate profit/loss
+    // Calculate profit/loss using PERCENTAGE, not raw token math
+    // The old calculation was wrong: (currentPrice - entryPrice) * tokenAmount resulted in absurd values
+    // because tokenAmount is in RAW units (billions), not SOL value
     const currentPrice = parseFloat(position.lastCheckPriceSOL || position.entryPriceSOL);
     const profitPercent = parseFloat(position.lastCheckProfitPercent || "0");
-    const profitSOL = (currentPrice - entryPrice) * tokenAmount;
     
-    console.log(`[Position Monitor] 💰 P&L: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}% (${profitSOL > 0 ? '+' : ''}${profitSOL.toFixed(4)} SOL)`);
+    // Correct P&L: % change applied to initial SOL investment
+    const profitSOL = (profitPercent / 100) * amountSOL;
+    const finalValueSOL = amountSOL + profitSOL;
+    
+    console.log(`[Position Monitor] 💰 P&L: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}% | Invested: ${amountSOL.toFixed(4)} SOL → Final: ${finalValueSOL.toFixed(4)} SOL (${profitSOL > 0 ? '+' : ''}${profitSOL.toFixed(4)} SOL profit)`);
 
     // 🔥 AUTOMATIC BUYBACK & BURN: Use 5% of profit to buyback and destroy MY BOT token
     if (profitSOL > 0 && config.buybackEnabled) {
