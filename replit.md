@@ -43,6 +43,14 @@ A dedicated `node-cron` service automates hourly checks for buyback execution, i
 
 **Intelligent Circuit Breaker Protection:** Disables failing AI models, rotates to healthy models, and prioritizes reliable models based on health scoring.
 
+**Advanced AI Rate Limiting & Retry System (Oct 27, 2025):**
+- **Universal Rate Limiting:** Per-provider request queuing prevents concurrent API overload and respects rate limits
+- **Provider-Specific Delays:** Conservative delays configured for each AI provider (Cerebras: 3s, Google Gemini: 2s, ChatAnywhere: 5s, etc.)
+- **Exponential Backoff Retry:** Automatic retry logic for 429 (rate limit) errors with 2s, 4s, 8s delays (up to 3 attempts)
+- **Smart Circuit Breaker:** Distinguishes between rate limits (retry with backoff) vs permanent failures (disable for 30 minutes)
+- **Rate Limit Awareness:** 429 errors don't count toward circuit breaker threshold, only permanent failures (402/401) do
+- **Improved Resilience:** System continues with healthy models while rate-limited models recover
+
 **Dual-Mode Trading Strategy:**
 - **SCALP Mode:** 62-79% AI confidence, 3-6% portfolio, max 30-minute hold, -8% to -12% stop-loss, +4-8% profit targets. Minimum 2% profit before selling.
 - **SWING Mode:** 80%+ AI confidence, 5-9% portfolio, max 24-hour hold, -15% to -25% stop-loss, +15% minimum profit target. Minimum 5% profit before selling.
