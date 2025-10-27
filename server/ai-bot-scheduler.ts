@@ -2593,48 +2593,22 @@ async function executeQuickTrade(
 
     console.log(`[Quick Scan] Dynamic trade amount: ${tradeAmount.toFixed(4)} SOL (confidence: ${(analysis.confidence * 100).toFixed(1)}%, will be ${finalProjectedPercent.toFixed(1)}% of portfolio)`);
 
-    // Check if we already hold this token (using pre-fetched positions)
-    const existingPosition = existingPositions.find(p => p.tokenMint === token.mint);
+    // 🔧 FIX #4: Check database directly for ANY existing position with this token mint
+    // (Prevents duplicates caused by stale pre-fetched array in rapid trading)
+    const freshPositionCheck = await storage.getAIBotPositions(config.ownerWalletAddress);
+    const existingPosition = freshPositionCheck.find(p => p.tokenMint === token.mint);
     
     if (existingPosition) {
       const entryPrice = parseFloat(existingPosition.entryPriceSOL);
-      const currentPrice = token.priceSOL;
-      const priceChangePercent = ((currentPrice - entryPrice) / entryPrice) * 100;
-      const previousConfidence = existingPosition.aiConfidenceAtBuy || 0;
-      const newConfidence = analysis.confidence * 100; // Convert to 0-100 scale
-      const currentRebuyCount = existingPosition.rebuyCount || 0;
+      const currentProfit = parseFloat(existingPosition.profitPercent || "0");
+      const strategyType = existingPosition.strategyType || 'SCALP';
       
-      // Check if we've hit max re-buys (2)
-      if (currentRebuyCount >= 2) {
-        console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol} - Max re-buys reached (${currentRebuyCount}/2)`);
-        console.log(`[Quick Scan]    Position opened at: ${entryPrice.toFixed(8)} SOL`);
-        console.log(`[Quick Scan]    Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`);
-        logActivity('quick_scan', 'info', `⏭️ SKIP ${token.symbol}: Max re-buys (${currentRebuyCount}/2) - ${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%`);
-        return;
-      }
-      
-      // Only buy more if ALL conditions are met:
-      // 1. Price has dropped at least 10% (drawback/dip)
-      // 2. New AI confidence is higher than previous
-      // 3. Haven't exceeded max 2 re-buys
-      const hasDrawback = priceChangePercent <= -10; // Price down 10%+
-      const hasHigherConfidence = newConfidence > previousConfidence;
-      
-      if (!hasDrawback || !hasHigherConfidence) {
-        console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol} - Already holding position:`);
-        console.log(`[Quick Scan]    Previous entry: ${entryPrice.toFixed(8)} SOL (confidence: ${previousConfidence}%)`);
-        console.log(`[Quick Scan]    Current price: ${currentPrice.toFixed(8)} SOL (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%)`);
-        console.log(`[Quick Scan]    New confidence: ${newConfidence.toFixed(1)}%`);
-        console.log(`[Quick Scan]    Re-buys: ${currentRebuyCount}/2`);
-        console.log(`[Quick Scan]    Drawback requirement: ${hasDrawback ? '✅' : '❌'} (need -10% dip, have ${priceChangePercent.toFixed(2)}%)`);
-        console.log(`[Quick Scan]    Higher confidence: ${hasHigherConfidence ? '✅' : '❌'} (need >${previousConfidence}%, have ${newConfidence.toFixed(1)}%)`);
-        logActivity('quick_scan', 'info', `💼 SKIP ${token.symbol}: Holding (${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}%) - AI ${newConfidence.toFixed(0)}% vs ${previousConfidence}%`);
-        return;
-      }
-      
-      console.log(`[Quick Scan] ✅ Adding to position ${token.symbol} (re-buy ${currentRebuyCount + 1}/2):`);
-      console.log(`[Quick Scan]    Price dropped ${Math.abs(priceChangePercent).toFixed(2)}% from entry (${entryPrice.toFixed(8)} → ${currentPrice.toFixed(8)} SOL)`);
-      console.log(`[Quick Scan]    Confidence increased from ${previousConfidence}% → ${newConfidence.toFixed(1)}%`);
+      console.log(`[Quick Scan] ⏭️ SKIP ${token.symbol}: Already holding position (${strategyType} strategy)`);
+      console.log(`[Quick Scan]    Entry: ${entryPrice.toFixed(8)} SOL`);
+      console.log(`[Quick Scan]    Current: ${token.priceSOL.toFixed(8)} SOL`);
+      console.log(`[Quick Scan]    P/L: ${currentProfit > 0 ? '+' : ''}${currentProfit.toFixed(2)}%`);
+      logActivity('quick_scan', 'info', `⏭️ BLOCKED ${token.symbol}: Duplicate position prevented (already holding ${strategyType} strategy, ${currentProfit > 0 ? '+' : ''}${currentProfit.toFixed(2)}% P/L)`);
+      return;
     }
 
     // Deduct platform fee (1% on all trades, except exempt wallets)
