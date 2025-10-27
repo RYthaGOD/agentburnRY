@@ -88,6 +88,7 @@ A dedicated `node-cron` service automates hourly checks for buyback execution, i
 - **Minimum Profit Thresholds:** Enforces minimum profit thresholds (2% SCALP, 5% SWING) before selling.
 - **Smart Exit Logic:** Allows early exits only when in actual loss, protecting profitable positions.
 - **Profit-Hunting Strategy:** Includes peak profit tracking, smart stop-loss based on actual losses, buy-the-dip detection, and intelligent profit gating.
+- **AI Override for Smart Exits (Oct 27, 2025):** When AI has ≥80% sell confidence, allows position exit even below minimum profit targets to prevent deterioration. Applies to all 3 sell decision paths: Hivemind consensus, high-confidence single model, and fallback single model. Prevents positions from sitting in breakeven/small losses while waiting for profit targets that may never materialize.
 
 **Optimized Slippage Strategy (Oct 27, 2025):**
 - **BUY Operations:** 3% slippage (300 bps) - Optimized for high-quality tokens with good liquidity
