@@ -5271,7 +5271,14 @@ Respond ONLY with valid JSON:
         const topModels = successful.slice(0, 2).map(m => `${m.provider}: ${m.analysis.reasoning.substring(0, 30)}`).join('; ');
         await executeSellForPosition(config, position, treasuryKeyBase58, `Stop-Loss: ${sellVotes.length}/${successful.length} vote SELL, ${currentProfitPercent.toFixed(2)}% loss. ${topModels}...`);
       }
-      // ❌ BLOCK SELL if profit too small
+      // ✅ AI OVERRIDE: Allow high-confidence (≥80%) sells even below profit target to prevent deterioration
+      else if (avgConfidence >= 80) {
+        console.log(`[Position Monitor] ✅ AI OVERRIDE: High confidence (${avgConfidence.toFixed(0)}%) sell signal → executing to prevent deterioration`);
+        logActivity('position_monitor', 'warning', `⚡ AI OVERRIDE ${position.tokenSymbol}: ${avgConfidence.toFixed(0)}% confidence → exit at ${currentProfitPercent.toFixed(2)}%`);
+        const topModels = successful.slice(0, 2).map(m => `${m.provider}: ${m.analysis.reasoning.substring(0, 30)}`).join('; ');
+        await executeSellForPosition(config, position, treasuryKeyBase58, `AI Override: ${sellVotes.length}/${successful.length} vote SELL, ${avgConfidence.toFixed(0)}% avg confidence (below ${minProfitThreshold}% target but preventing deterioration). ${topModels}...`);
+      }
+      // ❌ BLOCK SELL if profit too small and AI not strongly confident
       else {
         console.log(`[Position Monitor] ⏸️ HOLD: Profit ${currentProfitPercent.toFixed(2)}% below ${minProfitThreshold}% minimum (${isSwingPosition ? 'SWING' : 'SCALP'}) - waiting for better exit`);
         logActivity('position_monitor', 'info', `💎 HOLD ${position.tokenSymbol}: ${currentProfitPercent.toFixed(2)}% → waiting for ${minProfitThreshold}% minimum`);
@@ -5289,7 +5296,14 @@ Respond ONLY with valid JSON:
         console.log(`[Position Monitor] ✅ SELL APPROVED: Position in loss (${currentProfitPercent.toFixed(2)}%) - AI stop-loss → executing...`);
         logActivity('position_monitor', 'ai_thought', `🧠 ${highConfModel.provider}: ${position.tokenSymbol} → SELL LOSS (${currentProfitPercent.toFixed(2)}%)`);
         await executeSellForPosition(config, position, treasuryKeyBase58, `Stop-Loss: ${highConfModel.provider} ${highConfModel.analysis.reasoning} (${currentProfitPercent.toFixed(2)}% loss)`);
-      } else {
+      }
+      // ✅ AI OVERRIDE: Single model with very high confidence (≥80%) can override profit target
+      else if (highConfModel.analysis.confidence >= 80) {
+        console.log(`[Position Monitor] ✅ AI OVERRIDE: ${highConfModel.provider} has ${highConfModel.analysis.confidence}% confidence → executing to prevent deterioration`);
+        logActivity('position_monitor', 'warning', `⚡ AI OVERRIDE ${position.tokenSymbol}: ${highConfModel.provider} ${highConfModel.analysis.confidence}% → exit at ${currentProfitPercent.toFixed(2)}%`);
+        await executeSellForPosition(config, position, treasuryKeyBase58, `AI Override: ${highConfModel.provider} ${highConfModel.analysis.reasoning} (${highConfModel.analysis.confidence}% confidence, below ${minProfitThreshold}% target but preventing deterioration)`);
+      }
+      else {
         console.log(`[Position Monitor] ⏸️ HOLD: Profit ${currentProfitPercent.toFixed(2)}% below ${minProfitThreshold}% minimum - waiting for better exit`);
         logActivity('position_monitor', 'info', `💎 HOLD ${position.tokenSymbol}: ${currentProfitPercent.toFixed(2)}% → waiting for ${minProfitThreshold}% minimum`);
       }
@@ -5327,7 +5341,14 @@ Respond ONLY with valid JSON:
         console.log(`[Position Monitor] ✅ SELL APPROVED: Position in loss (${currentProfitPercent.toFixed(2)}%) - AI stop-loss → executing...`);
         logActivity('position_monitor', 'ai_thought', `🧠 ${result.provider}: ${position.tokenSymbol} → SELL LOSS (${currentProfitPercent.toFixed(2)}%)`);
         await executeSellForPosition(config, position, treasuryKeyBase58, `Stop-Loss: ${result.provider} ${result.analysis.reasoning} (${currentProfitPercent.toFixed(2)}% loss)`);
-      } else {
+      }
+      // ✅ AI OVERRIDE: Single model with very high confidence (≥80%) can override profit target
+      else if (result.analysis.confidence >= 80) {
+        console.log(`[Position Monitor] ✅ AI OVERRIDE: ${result.provider} has ${result.analysis.confidence}% confidence → executing to prevent deterioration`);
+        logActivity('position_monitor', 'warning', `⚡ AI OVERRIDE ${position.tokenSymbol}: ${result.provider} ${result.analysis.confidence}% → exit at ${currentProfitPercent.toFixed(2)}%`);
+        await executeSellForPosition(config, position, treasuryKeyBase58, `AI Override: ${result.provider} ${result.analysis.reasoning} (${result.analysis.confidence}% confidence, below ${minProfitThreshold}% target but preventing deterioration)`);
+      }
+      else {
         console.log(`[Position Monitor] ⏸️ HOLD: Profit ${currentProfitPercent.toFixed(2)}% below ${minProfitThreshold}% minimum - waiting for better exit`);
         logActivity('position_monitor', 'info', `💎 HOLD ${position.tokenSymbol}: ${currentProfitPercent.toFixed(2)}% → waiting for ${minProfitThreshold}% minimum`);
       }
