@@ -1644,8 +1644,10 @@ async function runQuickTechnicalScan() {
         
         // MULTI-STRATEGY SYSTEM: Evaluate all tokens with complementary strategies
         // Runs independently of AI-driven SCALP/SWING to capture different market conditions
+        console.log('[Multi-Strategy] DEBUG: Starting multi-strategy evaluation block');
         const { evaluateAllStrategies } = await import('./multi-strategy');
         const { executeStrategyTrade } = await import('./strategy-trade-executor');
+        console.log('[Multi-Strategy] DEBUG: Loaded multi-strategy modules');
         const strategyConfig = {
           meanReversionEnabled: config.meanReversionEnabled ?? false,
           meanReversionRSIOversold: config.meanReversionRSIOversold ?? 30,
@@ -1669,6 +1671,9 @@ async function runQuickTechnicalScan() {
         const anyStrategyEnabled = strategyConfig.meanReversionEnabled || 
                                    strategyConfig.momentumBreakoutEnabled || 
                                    strategyConfig.gridTradingEnabled;
+        
+        console.log(`[Multi-Strategy] DEBUG: Strategy status - MeanRev:${strategyConfig.meanReversionEnabled}, Momentum:${strategyConfig.momentumBreakoutEnabled}, Grid:${strategyConfig.gridTradingEnabled}`);
+        console.log(`[Multi-Strategy] DEBUG: anyStrategyEnabled=${anyStrategyEnabled}, opportunities.length=${opportunities.length}`);
         
         if (anyStrategyEnabled && opportunities.length > 0) {
           console.log(`[Multi-Strategy] Evaluating ${opportunities.length} tokens with enabled strategies...`);
