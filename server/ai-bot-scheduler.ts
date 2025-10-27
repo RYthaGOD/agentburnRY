@@ -4640,54 +4640,163 @@ Respond with JSON array:
 ]`;
 
   try {
-    // Use AI model for portfolio analysis (with OpenAI if forced)
-    let client: OpenAI;
-    let model: string;
-    let providerName: string;
+    // 🧠 FULL 11-MODEL HIVEMIND CONSENSUS for portfolio rebalancing
+    console.log(`[Batch Analysis] 🧠 Using FULL 11-MODEL HIVEMIND for maximum accuracy...`);
+    
+    const aiProviders = [
+      { name: "DeepSeek", baseURL: "https://api.deepseek.com", apiKey: process.env.DEEPSEEK_API_KEY, model: "deepseek-chat", weight: 1.2 },
+      { name: "DeepSeek #2", baseURL: "https://api.deepseek.com", apiKey: process.env.DEEPSEEK_API_KEY_2, model: "deepseek-chat", weight: 1.2 },
+      { name: "Together AI", baseURL: "https://api.together.xyz/v1", apiKey: process.env.TOGETHER_API_KEY, model: "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", weight: 1.1 },
+      { name: "ChatAnywhere", baseURL: "https://api.chatanywhere.tech/v1", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o-mini", weight: 1.0 },
+      { name: "Cerebras", baseURL: "https://api.cerebras.ai/v1", apiKey: process.env.CEREBRAS_API_KEY, model: "llama3.3-70b", weight: 1.0 },
+      { name: "Groq", baseURL: "https://api.groq.com/openai/v1", apiKey: process.env.GROQ_API_KEY, model: "llama-3.3-70b-versatile", weight: 1.0 },
+      { name: "Google Gemini", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/", apiKey: process.env.GOOGLE_AI_KEY, model: "gemini-2.0-flash-exp", weight: 1.0 },
+      { name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY, model: "anthropic/claude-3.5-sonnet", weight: 1.1 },
+      { name: "xAI Grok", baseURL: "https://api.x.ai/v1", apiKey: process.env.XAI_API_KEY, model: "grok-2-latest", weight: 1.0 },
+      { name: "OpenAI", baseURL: "https://api.openai.com/v1", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o-mini", weight: 1.3 },
+      { name: "OpenAI #2", baseURL: "https://api.openai.com/v1", apiKey: process.env.OPENAI_API_KEY_2, model: "gpt-4o-mini", weight: 1.3 },
+    ];
 
-    if (forceOpenAI && (process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_2)) {
-      // Force OpenAI usage for maximum accuracy
-      client = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY_2,
-      });
-      model = "gpt-4o-mini";
-      providerName = "OpenAI";
-      console.log(`[Batch Analysis] Using OpenAI (forced) for maximum accuracy in portfolio rebalancing`);
-    } else if (process.env.DEEPSEEK_API_KEY) {
-      // Use DeepSeek for free, high-quality analysis
-      client = new OpenAI({
-        baseURL: "https://api.deepseek.com",
-        apiKey: process.env.DEEPSEEK_API_KEY,
-      });
-      model = "deepseek-chat";
-      providerName = "DeepSeek";
-      console.log(`[Batch Analysis] Using DeepSeek (free tier) for portfolio analysis`);
-    } else {
-      throw new Error("No AI providers available (need OPENAI_API_KEY, OPENAI_API_KEY_2, or DEEPSEEK_API_KEY)");
-    }
-
-    const response = await client.chat.completions.create({
-      model,
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert portfolio manager analyzing cryptocurrency holdings. Provide actionable recommendations for each position. Always respond with valid JSON array."
-        },
-        {
-          role: "user",
-          content: portfolioPrompt
-        }
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.6,
-      max_tokens: 2000,
+    // Filter to only healthy, available providers
+    const availableProviders = aiProviders.filter(p => {
+      if (!p.apiKey) return false;
+      const health = providerHealthScores.get(p.name) || 100;
+      const disabled = disabledProviders.has(p.name);
+      return health >= 30 && !disabled;
     });
 
-    const content = response.choices[0].message.content;
-    if (!content) throw new Error("No response from AI");
+    if (availableProviders.length === 0) {
+      console.error(`[Batch Analysis] ❌ No AI providers available - all are disabled or unhealthy`);
+      throw new Error("No AI providers available for portfolio analysis");
+    }
 
-    const parsed = JSON.parse(content);
-    const recommendations = Array.isArray(parsed) ? parsed : (parsed.positions || parsed.recommendations || []);
+    console.log(`[Batch Analysis] 📊 Running ${availableProviders.length} AI models in parallel...`);
+
+    // Run all available providers in parallel
+    const providerPromises = availableProviders.map(async (provider) => {
+      try {
+        const client = new OpenAI({
+          baseURL: provider.baseURL,
+          apiKey: provider.apiKey,
+        });
+
+        const response = await client.chat.completions.create({
+          model: provider.model,
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert portfolio manager analyzing cryptocurrency holdings. Provide actionable recommendations for each position. Always respond with valid JSON array."
+            },
+            {
+              role: "user",
+              content: portfolioPrompt
+            }
+          ],
+          response_format: { type: "json_object" },
+          temperature: 0.6,
+          max_tokens: 2000,
+        });
+
+        const content = response.choices[0].message.content;
+        if (!content) throw new Error(`No response from ${provider.name}`);
+
+        const parsed = JSON.parse(content);
+        const recommendations = Array.isArray(parsed) ? parsed : (parsed.positions || parsed.recommendations || []);
+
+        return {
+          provider: provider.name,
+          weight: provider.weight,
+          recommendations,
+          success: true
+        };
+      } catch (error: any) {
+        console.warn(`[Batch Analysis] ${provider.name} failed:`, error.message);
+        
+        // Update health score
+        const currentHealth = providerHealthScores.get(provider.name) || 100;
+        providerHealthScores.set(provider.name, Math.max(0, currentHealth - 20));
+        
+        // Check if it's a 402 error (insufficient credits)
+        if (error?.status === 402 || error?.message?.includes('402') || error?.message?.includes('insufficient credits')) {
+          console.warn(`[Circuit Breaker] 🚫 ${provider.name} IMMEDIATELY disabled (insufficient credits/balance). Will retry in 30 minutes.`);
+          disabledProviders.add(provider.name);
+          setTimeout(() => {
+            disabledProviders.delete(provider.name);
+            providerHealthScores.set(provider.name, 100);
+          }, 30 * 60 * 1000);
+        }
+        
+        return {
+          provider: provider.name,
+          weight: provider.weight,
+          recommendations: [],
+          success: false
+        };
+      }
+    });
+
+    const providerResults = await Promise.all(providerPromises);
+    const successfulResults = providerResults.filter(r => r.success);
+
+    if (successfulResults.length === 0) {
+      throw new Error("All AI providers failed - cannot perform portfolio analysis");
+    }
+
+    console.log(`[Batch Analysis] ✅ ${successfulResults.length}/${availableProviders.length} models responded successfully`);
+
+    // CONSENSUS VOTING: Aggregate recommendations across all successful models
+    const consensusMap = new Map<string, { sellVotes: number; holdVotes: number; addVotes: number; totalWeight: number; reasonings: string[] }>();
+
+    for (const result of successfulResults) {
+      for (const rec of result.recommendations) {
+        const existing = consensusMap.get(rec.symbol) || {
+          sellVotes: 0,
+          holdVotes: 0,
+          addVotes: 0,
+          totalWeight: 0,
+          reasonings: []
+        };
+
+        // Weight votes by provider weight
+        if (rec.recommendation === "SELL") existing.sellVotes += result.weight;
+        else if (rec.recommendation === "HOLD") existing.holdVotes += result.weight;
+        else if (rec.recommendation === "ADD") existing.addVotes += result.weight;
+
+        existing.totalWeight += result.weight;
+        existing.reasonings.push(`${result.provider}: ${rec.reasoning}`);
+
+        consensusMap.set(rec.symbol, existing);
+      }
+    }
+
+    // Convert consensus votes to final recommendations
+    const recommendations = Array.from(consensusMap.entries()).map(([symbol, votes]) => {
+      const sellPercent = (votes.sellVotes / votes.totalWeight) * 100;
+      const holdPercent = (votes.holdVotes / votes.totalWeight) * 100;
+      const addPercent = (votes.addVotes / votes.totalWeight) * 100;
+
+      // Determine final recommendation based on majority
+      let recommendation: "SELL" | "HOLD" | "ADD";
+      let confidence = 0;
+
+      if (sellPercent > holdPercent && sellPercent > addPercent) {
+        recommendation = "SELL";
+        confidence = sellPercent;
+      } else if (addPercent > holdPercent && addPercent > sellPercent) {
+        recommendation = "ADD";
+        confidence = addPercent;
+      } else {
+        recommendation = "HOLD";
+        confidence = holdPercent;
+      }
+
+      return {
+        symbol,
+        confidence: Math.round(confidence),
+        recommendation,
+        reasoning: `Hivemind consensus: ${successfulResults.length} models (SELL: ${sellPercent.toFixed(0)}%, HOLD: ${holdPercent.toFixed(0)}%, ADD: ${addPercent.toFixed(0)}%)`
+      };
+    });
 
     // Map results back to positions
     for (const rec of recommendations) {
