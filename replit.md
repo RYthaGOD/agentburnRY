@@ -70,11 +70,17 @@ A dedicated `node-cron` service automates hourly checks for buyback execution, i
 **Bundle Activity Detection & Token Blacklist:** Analyzes tokens for pump-and-dump schemes, auto-blacklisting critical tokens (≥85 score) and warning for suspicious ones (60-84 score).
 
 **AI-Powered Loss Prevention System:**
-- **Pre-Trade Loss Prediction:** AI analyzes tokens for rug pull risk and loss probability, blocking trades with >40% loss probability or unsafe tokens (threshold based on historical scam data showing many scored 40-55%).
+- **Multi-Provider Loss Prediction:** AI analyzes tokens for rug pull risk and loss probability using fallback providers (DeepSeek → OpenAI → Google Gemini). Blocks trades with >40% loss probability or unsafe tokens (threshold based on historical scam data showing many scored 40-55%). If all AI fails, uses technical analysis fallback instead of blocking.
 - **Rug Pull Detection:** Checks 7 critical red flags: unlocked liquidity, low liquidity (<$20k), sudden pumps (>50% 1h), market cap/liquidity mismatch, very new tokens (<24h), low volume/liquidity ratio, negative momentum.
 - **Enhanced Supermajority Consensus:** Requires minimum 3 AI models to respond AND 64%+ agreement for buy trades. Fails closed (blocks trade) if <3 models available or no supermajority reached.
 - **Fail-Closed Architecture:** Blocks trades during degraded conditions (API failures, rate limits). Prevents risky single-model or dual-model buys by requiring minimum 3 AI responses.
 - **Loss Probability Scoring:** Blocks trades with >40% loss risk (conservative threshold).
+
+**Profit Maximization System (NEW):**
+- **Minimum Profit Thresholds:** Never sells winners for tiny profits. SCALP positions require minimum 2% profit, SWING positions require minimum 5% profit before selling.
+- **Smart Exit Logic:** Only allows early exits when in actual loss (AI stop-loss protection). Profitable positions must meet minimum thresholds.
+- **No More Micro-Exits:** Prevents 0.09% exits like previous system - holds positions until meaningful profit targets are reached.
+- **Strategy-Based Minimums:** Different thresholds for different strategies (SCALP 2% vs SWING 5%) to match risk/reward profiles.
 
 **Profit-Hunting Strategy:**
 - **Peak Profit Tracking:** Tracks highest profit per position to distinguish profit pullbacks from losses.
