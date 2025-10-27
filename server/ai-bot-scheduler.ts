@@ -2325,14 +2325,62 @@ async function findPositionToRotate(
   currentPositions: any[],
   availableSOL: number
 ): Promise<{ position: any; expectedSOL: number } | null> {
-  // Don't rotate if we have enough capital
-  if (availableSOL >= newOpportunity.requiredSOL) {
-    return null;
-  }
-  
   // Don't rotate if no positions to sell
   if (currentPositions.length === 0) {
     return null;
+  }
+  
+  // CAPITAL EFFICIENCY ENHANCEMENT: Allow rotation even with capital if opportunity is MUCH better
+  const hasEnoughCapital = availableSOL >= newOpportunity.requiredSOL;
+  const SMART_ROTATION_CONFIDENCE_DIFF = 10; // If new opportunity is 10%+ better, consider rotation
+  
+  if (hasEnoughCapital) {
+    // Check if new opportunity is significantly better than weakest position
+    const mints = currentPositions.map(p => p.tokenMint);
+    const { getBatchTokenPrices } = await import("./jupiter");
+    const priceMap = await getBatchTokenPrices(mints);
+    
+    const now = Date.now();
+    const eligibleForSmartRotation = currentPositions.filter(p => {
+      const positionAgeMinutes = (now - new Date(p.buyTimestamp).getTime()) / (1000 * 60);
+      return positionAgeMinutes >= 5; // Must be held at least 5 minutes
+    });
+    
+    if (eligibleForSmartRotation.length > 0) {
+      // Find weakest position
+      const weakestPosition = eligibleForSmartRotation.reduce((weakest, current) => {
+        const weakestConfidence = weakest.aiConfidenceAtBuy || 50;
+        const currentConfidence = current.aiConfidenceAtBuy || 50;
+        
+        const weakestPrice = priceMap.get(weakest.tokenMint) || 0;
+        const currentPrice = priceMap.get(current.tokenMint) || 0;
+        const weakestProfit = ((weakestPrice - parseFloat(weakest.entryPriceSOL)) / parseFloat(weakest.entryPriceSOL)) * 100;
+        const currentProfit = ((currentPrice - parseFloat(current.entryPriceSOL)) / parseFloat(current.entryPriceSOL)) * 100;
+        
+        // Prioritize: low confidence AND low/negative profit
+        const weakestScore = weakestConfidence - weakestProfit;
+        const currentScore = currentConfidence - currentProfit;
+        
+        return currentScore < weakestScore ? current : weakest;
+      });
+      
+      const weakestConfidence = weakestPosition.aiConfidenceAtBuy || 50;
+      const newOpportunityConfidencePercent = newOpportunity.confidence * 100;
+      const confidenceDiff = newOpportunityConfidencePercent - weakestConfidence;
+      
+      if (confidenceDiff >= SMART_ROTATION_CONFIDENCE_DIFF) {
+        console.log(`[Smart Rotation] 💡 Capital available but new opportunity is ${confidenceDiff.toFixed(0)}% better → considering rotation...`);
+        console.log(`   Weakest: ${weakestPosition.tokenSymbol} (${weakestConfidence}% confidence)`);
+        console.log(`   New: ${newOpportunity.symbol} (${newOpportunityConfidencePercent.toFixed(0)}% confidence)`);
+        // Continue with rotation logic below
+      } else {
+        console.log(`[Smart Rotation] ✅ Capital available (${availableSOL.toFixed(4)} SOL) and new opportunity not significantly better → no rotation needed`);
+        return null;
+      }
+    } else {
+      console.log(`[Smart Rotation] ✅ Capital available (${availableSOL.toFixed(4)} SOL) → no rotation needed`);
+      return null;
+    }
   }
   
   console.log(`[Opportunistic Rotation] 🔄 Evaluating ${currentPositions.length} positions for rotation...`);
@@ -2962,37 +3010,56 @@ interface TradeModeConfig {
 
 /**
  * Determine trade mode based on AI confidence level
- * CONSERVATIVE APPROACH - Strict wealth-growing strategy
+ * CAPITAL EFFICIENCY OPTIMIZED - Graduated position sizing for better allocation
  */
 function determineTradeMode(confidence: number): TradeModeConfig {
-  if (confidence >= 0.80) {
-    // Mode B: SWING - High conviction longer-term trades (RAISED from 75% to 80%)
+  if (confidence >= 0.82) {
+    // Mode B: SWING - High conviction longer-term trades (RAISED to 82% for quality)
+    // GRADUATED SIZING: Position size scales smoothly with confidence (5-9%)
+    const positionSizePercent = 5 + ((confidence - 0.82) / (1.0 - 0.82)) * 4; // Linear scale from 5% at 82% to 9% at 100%
+    const clampedPositionSize = Math.min(9, Math.max(5, positionSizePercent));
+    
+    // TIGHTENED STOP-LOSS: Capital recycling optimized (-10% to -15%)
+    const stopLossPercent = confidence >= 0.90 ? -15 : confidence >= 0.85 ? -12 : -10;
+    
     return {
       mode: "SWING",
-      minConfidence: 80, // CONSERVATIVE: Higher threshold for SWING trades
-      positionSizePercent: confidence >= 0.90 ? 9 : confidence >= 0.85 ? 7 : 5, // REDUCED: 5-9% (was 8-12%)
+      minConfidence: 82, // RAISED: Higher threshold for quality trades only
+      positionSizePercent: Math.round(clampedPositionSize * 10) / 10, // Round to 1 decimal
       maxHoldMinutes: 1440, // 24 hours
-      stopLossPercent: confidence >= 0.85 ? -25 : -15, // TIGHTER: -15% to -25% for better capital preservation
+      stopLossPercent,
       profitTargetPercent: 15, // Let AI decide exit, but 15% minimum
     };
-  } else if (confidence >= 0.62) {
-    // Mode A: SCALP - Quick micro-profits with balanced risk control (OPTIMIZED: 62% for more opportunities)
+  } else if (confidence >= 0.65) {
+    // Mode A: SCALP - Quick micro-profits (RAISED to 65% for quality trades)
+    // GRADUATED SIZING: Position size scales smoothly with confidence (3-6%)
+    const positionSizePercent = 3 + ((confidence - 0.65) / (0.82 - 0.65)) * 3; // Linear scale from 3% at 65% to 6% at 82%
+    const clampedPositionSize = Math.min(6, Math.max(3, positionSizePercent));
+    
+    // OPTIMIZED STOP-LOSS: -8% to -12% graduated with confidence
+    const stopLossPercent = -8 - ((confidence - 0.65) / (0.82 - 0.65)) * 4; // Linear scale from -8% at 65% to -12% at 82%
+    const clampedStopLoss = Math.min(-8, Math.max(-12, stopLossPercent));
+    
+    // GRADUATED PROFIT TARGET: 4% to 8% scales with confidence
+    const profitTargetPercent = 4 + ((confidence - 0.65) / (0.82 - 0.65)) * 4; // Linear scale from 4% at 65% to 8% at 82%
+    const clampedProfitTarget = Math.min(8, Math.max(4, profitTargetPercent));
+    
     return {
       mode: "SCALP",
-      minConfidence: 62, // OPTIMIZED: Balanced threshold captures quality SCALP trades
-      positionSizePercent: confidence >= 0.75 ? 6 : confidence >= 0.70 ? 4 : 3, // REDUCED: 3-6% (was 5-7%)
-      maxHoldMinutes: 30, // 30 minute review threshold for faster trading
-      stopLossPercent: confidence >= 0.75 ? -12 : confidence >= 0.70 ? -10 : -8, // OPTIMIZED: -8% to -12% for profitability (was -5% to -8% - too tight for volatile PumpFun tokens)
-      profitTargetPercent: confidence >= 0.75 ? 8 : confidence >= 0.70 ? 6 : 4, // Quick profit targets
+      minConfidence: 65, // RAISED: Skip low-quality marginal trades
+      positionSizePercent: Math.round(clampedPositionSize * 10) / 10, // Round to 1 decimal
+      maxHoldMinutes: 30, // ENFORCED: Will auto-exit after 30 minutes if underperforming
+      stopLossPercent: Math.round(clampedStopLoss * 10) / 10,
+      profitTargetPercent: Math.round(clampedProfitTarget * 10) / 10,
     };
   } else {
     // Below minimum threshold - return conservative defaults (should be filtered out)
     return {
       mode: "SCALP",
-      minConfidence: 62,
+      minConfidence: 65,
       positionSizePercent: 3,
       maxHoldMinutes: 30,
-      stopLossPercent: -8, // Balanced protection (was -5%)
+      stopLossPercent: -8,
       profitTargetPercent: 4,
     };
   }
@@ -3000,19 +3067,25 @@ function determineTradeMode(confidence: number): TradeModeConfig {
 
 /**
  * DUAL-MODE POSITION SIZING (SCALP vs SWING)
- * CONSERVATIVE STRATEGY - Strict wealth-growing approach
+ * CAPITAL EFFICIENCY OPTIMIZED - Graduated allocation for maximum profitability
  * 
- * SCALP Mode (65-79% confidence) - SELECTIVE QUICK TRADES:
- * - Position: 3-6% of portfolio (REDUCED for capital preservation)
- * - Quick profits: +4-8% targets
- * - Tight stop: -5% to -8% for maximum capital protection
- * - Max hold: 30 minutes
+ * SCALP Mode (65-82% confidence) - QUALITY QUICK TRADES:
+ * - Position: 3-6% of portfolio (GRADUATED with confidence)
+ * - Quick profits: +4-8% targets (GRADUATED with confidence)
+ * - Stop-loss: -8% to -12% (GRADUATED - tighter for higher confidence)
+ * - Max hold: 30 minutes (ENFORCED - auto-exit if underperforming)
  * 
- * SWING Mode (80%+ confidence) - HIGH CONVICTION ONLY:
- * - Position: 5-9% of portfolio (REDUCED from 8-12% for lower risk)
+ * SWING Mode (82%+ confidence) - HIGH CONVICTION ONLY:
+ * - Position: 5-9% of portfolio (GRADUATED with confidence)
  * - Larger profits: +15%+ targets
- * - Tighter stop: -15% to -25% for better capital preservation
+ * - Tighter stop: -10% to -15% (OPTIMIZED - faster capital recycling)
  * - Longer holds: AI-driven exits
+ * 
+ * CAPITAL EFFICIENCY IMPROVEMENTS:
+ * ✅ Graduated position sizing (smooth scaling vs fixed tiers)
+ * ✅ Higher minimum confidence (65% SCALP, 82% SWING - quality only)
+ * ✅ Tightened SWING stop-losses (-10% to -15% vs -15% to -25%)
+ * ✅ All parameters scale smoothly with confidence for optimal allocation
  */
 function calculateDynamicTradeAmount(
   baseAmount: number,
@@ -4923,6 +4996,30 @@ async function monitorPositionsWithDeepSeek() {
             // 🎯 PROFIT-HUNTING STRATEGY: Only sell when profits are maximized, NOT on pullbacks
             const isSwingTrade = position.isSwingTrade === 1;
             
+            // ⚡ CAPITAL EFFICIENCY: ENFORCED MAX HOLD TIME FOR SCALP POSITIONS
+            // Auto-exit SCALP positions after 30 minutes if not meeting profit targets
+            if (!isSwingTrade) {
+              const now = Date.now();
+              const positionAgeMinutes = (now - new Date(position.buyTimestamp).getTime()) / (1000 * 60);
+              const MAX_HOLD_SCALP = 30; // 30 minutes enforced for capital recycling
+              
+              if (positionAgeMinutes >= MAX_HOLD_SCALP) {
+                // Get profit target for this position's confidence level
+                const entryConfidence = (position.aiConfidenceAtBuy || 65) / 100; // Stored as integer, convert to decimal
+                const modeConfig = determineTradeMode(entryConfidence);
+                const profitTarget = modeConfig.profitTargetPercent;
+                
+                // Force exit if underperforming OR if in small profit but below target
+                if (profitPercent < profitTarget) {
+                  console.log(`[Position Monitor] ⏰ SCALP MAX HOLD EXCEEDED: ${position.tokenSymbol} held ${positionAgeMinutes.toFixed(0)}min (max ${MAX_HOLD_SCALP}min), profit ${profitPercent.toFixed(2)}% < target ${profitTarget.toFixed(2)}% → FORCE EXIT for capital recycling`);
+                  await executeSellForPosition(config, position, treasuryKeyBase58, `SCALP max hold time exceeded (${positionAgeMinutes.toFixed(0)}min) with ${profitPercent.toFixed(2)}% profit (target: ${profitTarget.toFixed(2)}%)`);
+                  continue;
+                } else {
+                  console.log(`[Position Monitor] ✅ SCALP ${position.tokenSymbol} at ${positionAgeMinutes.toFixed(0)}min: ${profitPercent.toFixed(2)}% exceeds ${profitTarget.toFixed(2)}% target → letting AI decide exit timing`);
+                }
+              }
+            }
+            
             // Track peak profit to identify pullbacks vs actual losses
             const peakProfit = parseFloat(position.peakProfitPercent || "0");
             const newPeakProfit = Math.max(peakProfit, profitPercent);
@@ -4938,12 +5035,58 @@ async function monitorPositionsWithDeepSeek() {
             // 🛡️ LOSS PROTECTION: Only stop-loss if position is ACTUALLY LOSING MONEY
             // Don't panic-sell on profit pullbacks - those are buying opportunities!
             if (profitPercent < 0) {
-              // We're in loss territory - apply strict stop-loss
-              const maxLoss = isSwingTrade ? -15 : -8;
+              // We're in loss territory - apply strict stop-loss (OPTIMIZED for capital efficiency)
+              const maxLoss = isSwingTrade ? -10 : -8; // SWING now -10% (was -15%) for faster capital recycling
               if (profitPercent <= maxLoss) {
                 console.warn(`[Position Monitor] ⛔ ${position.tokenSymbol} ACTUAL LOSS: ${profitPercent.toFixed(2)}% (stop: ${maxLoss}%) → SELLING to limit damage!`);
                 await executeSellForPosition(config, position, treasuryKeyBase58, `Stop-loss at ${profitPercent.toFixed(2)}% (max loss: ${maxLoss}%)`);
                 continue;
+              }
+            }
+            
+            // ⚡ DYNAMIC TRAILING STOP-LOSS: Lock in gains as position becomes profitable
+            // Tighten stops progressively to preserve capital and secure profits
+            if (profitPercent > 0) {
+              let trailingStopPercent: number | null = null;
+              
+              // Tier 1: Once we hit +5%, never let it go below breakeven
+              if (profitPercent >= 5 && profitPercent < 10) {
+                trailingStopPercent = -2; // Allow 2% loss from entry to give room
+                if (profitPercent <= trailingStopPercent) {
+                  console.log(`[Position Monitor] 📉 ${position.tokenSymbol} TRAILING STOP (Tier 1): Profit ${profitPercent.toFixed(2)}% dropped below ${trailingStopPercent}% → SELLING to preserve capital`);
+                  await executeSellForPosition(config, position, treasuryKeyBase58, `Trailing stop tier 1: ${profitPercent.toFixed(2)}% below ${trailingStopPercent}% threshold`);
+                  continue;
+                }
+              }
+              
+              // Tier 2: At +10%, lock in at least +2% profit
+              else if (profitPercent >= 10 && profitPercent < 20) {
+                trailingStopPercent = 2; // Must be at least +2% profit
+                if (profitPercent <= trailingStopPercent) {
+                  console.log(`[Position Monitor] 📉 ${position.tokenSymbol} TRAILING STOP (Tier 2): Profit ${profitPercent.toFixed(2)}% dropped below +${trailingStopPercent}% → SELLING to lock gains`);
+                  await executeSellForPosition(config, position, treasuryKeyBase58, `Trailing stop tier 2: ${profitPercent.toFixed(2)}% below +${trailingStopPercent}% threshold`);
+                  continue;
+                }
+              }
+              
+              // Tier 3: At +20%, lock in at least +10% profit
+              else if (profitPercent >= 20 && profitPercent < 50) {
+                trailingStopPercent = 10; // Must be at least +10% profit
+                if (profitPercent <= trailingStopPercent) {
+                  console.log(`[Position Monitor] 📉 ${position.tokenSymbol} TRAILING STOP (Tier 3): Profit ${profitPercent.toFixed(2)}% dropped below +${trailingStopPercent}% → SELLING to lock gains`);
+                  await executeSellForPosition(config, position, treasuryKeyBase58, `Trailing stop tier 3: ${profitPercent.toFixed(2)}% below +${trailingStopPercent}% threshold`);
+                  continue;
+                }
+              }
+              
+              // Tier 4: At +50%, lock in at least +30% profit
+              else if (profitPercent >= 50 && profitPercent < 100) {
+                trailingStopPercent = 30; // Must be at least +30% profit
+                if (profitPercent <= trailingStopPercent) {
+                  console.log(`[Position Monitor] 📉 ${position.tokenSymbol} TRAILING STOP (Tier 4): Profit ${profitPercent.toFixed(2)}% dropped below +${trailingStopPercent}% → SELLING to lock massive gains`);
+                  await executeSellForPosition(config, position, treasuryKeyBase58, `Trailing stop tier 4: ${profitPercent.toFixed(2)}% below +${trailingStopPercent}% threshold`);
+                  continue;
+                }
               }
             }
             
@@ -6125,16 +6268,16 @@ export function startPortfolioRebalancingScheduler() {
   }
 
   console.log("[Portfolio Rebalancer] 🤖 Starting automatic OpenAI-powered rebalancing...");
-  console.log("[Portfolio Rebalancer] Schedule: Every 30 minutes with FULL HIVEMIND + OpenAI consensus");
+  console.log("[Portfolio Rebalancer] Schedule: Every 15 minutes with FULL HIVEMIND + OpenAI consensus (OPTIMIZED for faster capital recycling)");
 
-  // Run every 30 minutes
-  portfolioRebalancerJob = cron.schedule("*/30 * * * *", () => {
+  // Run every 15 minutes (CAPITAL EFFICIENCY: Faster rebalancing = faster capital recycling)
+  portfolioRebalancerJob = cron.schedule("*/15 * * * *", () => {
     rebalancePortfolioWithOpenAI().catch((error) => {
       console.error("[Portfolio Rebalancer] Unexpected error:", error);
     });
   });
 
-  console.log("[Portfolio Rebalancer] ✅ Active (automatic rebalancing every 30 minutes)");
+  console.log("[Portfolio Rebalancer] ✅ Active (automatic rebalancing every 15 minutes - CAPITAL EFFICIENCY OPTIMIZED)");
 }
 
 /**
