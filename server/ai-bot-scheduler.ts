@@ -1706,10 +1706,10 @@ Price: $${tokenData.priceUSD.toFixed(6)} (${tokenData.priceSOL.toFixed(9)} SOL)
 Market Cap: $${tokenData.marketCapUSD.toLocaleString()}
 24h Volume: $${tokenData.volumeUSD24h.toLocaleString()}
 Liquidity: $${(tokenData.liquidityUSD ?? 0).toLocaleString()}
-Liquidity Locked: ${tokenData.liquidityLocked ? 'YES ✅' : 'NO ⚠️'}
+Liquidity Locked: ${(tokenData as any).liquidityLocked ? 'YES ✅' : 'NO ⚠️'}
 Price Change 1h: ${(tokenData.priceChange1h ?? 0).toFixed(2)}%
 Price Change 24h: ${(tokenData.priceChange24h ?? 0).toFixed(2)}%
-Age: ${tokenData.tokenAge ? `${Math.floor(tokenData.tokenAge / 3600)}h old` : 'Unknown'}
+Age: ${(tokenData as any).tokenAge ? `${Math.floor((tokenData as any).tokenAge / 3600)}h old` : 'Unknown'}
 
 RED FLAGS TO CHECK:
 1. Liquidity NOT locked = High rug pull risk
@@ -1730,44 +1730,115 @@ Respond ONLY with valid JSON:
   "reasoning": "detailed explanation of risks"
 }`;
 
-  try {
-    const { OpenAI } = await import("openai");
-    
-    // Use DeepSeek (fast + cheap) for loss prediction
-    const client = new OpenAI({
-      baseURL: "https://api.deepseek.com",
-      apiKey: process.env.DEEPSEEK_API_KEY,
-    });
-
-    const response = await client.chat.completions.create({
-      model: "deepseek-chat",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2, // Low temperature for consistent risk assessment
-      max_tokens: 500,
-    });
-
-    const content = response.choices[0]?.message?.content || "{}";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("Failed to parse JSON response");
-    
-    const result = JSON.parse(jsonMatch[0]);
-    
-    console.log(`[Loss Prediction] ${tokenData.symbol}: ${result.safe ? '✅ SAFE' : '⚠️ UNSAFE'} (${result.lossProbability}% loss probability)`);
-    if (result.risks.length > 0) {
-      console.log(`[Loss Prediction] Risks found: ${result.risks.join(', ')}`);
+  // Try multiple AI providers with fallback
+  const providers = [
+    {
+      name: "DeepSeek",
+      fn: async () => {
+        const { OpenAI } = await import("openai");
+        const client = new OpenAI({
+          baseURL: "https://api.deepseek.com",
+          apiKey: process.env.DEEPSEEK_API_KEY,
+        });
+        return await client.chat.completions.create({
+          model: "deepseek-chat",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.2,
+          max_tokens: 500,
+        });
+      }
+    },
+    {
+      name: "OpenAI",
+      fn: async () => {
+        const { OpenAI } = await import("openai");
+        const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY_2 });
+        return await client.chat.completions.create({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.2,
+          max_tokens: 500,
+        });
+      }
+    },
+    {
+      name: "Google Gemini",
+      fn: async () => {
+        const { GoogleGenerativeAI } = await import("@google/generative-ai");
+        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_KEY!);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        return await model.generateContent(prompt);
+      }
     }
-    
-    return result;
-  } catch (error) {
-    console.error(`[Loss Prediction] Error analyzing ${tokenData.symbol}:`, error);
-    // If prediction fails, be conservative and assume unsafe
-    return {
-      safe: false,
-      lossProbability: 80,
-      risks: ["Prediction system error - being conservative"],
-      reasoning: "Failed to analyze token safety - avoiding trade"
-    };
+  ];
+
+  // Try each provider until one succeeds
+  for (const provider of providers) {
+    try {
+      console.log(`[Loss Prediction] Trying ${provider.name} for ${tokenData.symbol}...`);
+      const response = await provider.fn();
+      
+      let content: string;
+      if (provider.name === "Google Gemini") {
+        content = (response as any).response.text();
+      } else {
+        content = (response as any).choices[0]?.message?.content || "{}";
+      }
+      
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Failed to parse JSON response");
+      
+      const result = JSON.parse(jsonMatch[0]);
+      
+      console.log(`[Loss Prediction] ${provider.name} ✅ ${tokenData.symbol}: ${result.safe ? '✅ SAFE' : '⚠️ UNSAFE'} (${result.lossProbability}% loss probability)`);
+      if (result.risks.length > 0) {
+        console.log(`[Loss Prediction] Risks found: ${result.risks.join(', ')}`);
+      }
+      
+      return result;
+    } catch (error) {
+      console.warn(`[Loss Prediction] ${provider.name} failed for ${tokenData.symbol}:`, error instanceof Error ? error.message : error);
+      continue; // Try next provider
+    }
   }
+
+  // ALL AI providers failed - use technical analysis fallback
+  console.warn(`[Loss Prediction] ⚠️ ALL AI providers failed for ${tokenData.symbol} - using TECHNICAL FALLBACK`);
+  
+  // Calculate risk based on technical indicators
+  const risks: string[] = [];
+  let lossProbability = 0;
+  
+  // Check critical red flags
+  if (!(tokenData as any).liquidityLocked) {
+    risks.push("Unlocked liquidity");
+    lossProbability += 30;
+  }
+  if ((tokenData.liquidityUSD ?? 0) < 20000) {
+    risks.push("Low liquidity <$20k");
+    lossProbability += 20;
+  }
+  if ((tokenData.priceChange1h ?? 0) > 50) {
+    risks.push(`Sudden pump +${tokenData.priceChange1h?.toFixed(0)}% 1h`);
+    lossProbability += 25;
+  }
+  if ((tokenData as any).tokenAge && (tokenData as any).tokenAge < 86400) {
+    risks.push("Very new token <24h");
+    lossProbability += 15;
+  }
+  if ((tokenData.priceChange24h ?? 0) < -20) {
+    risks.push("Negative momentum");
+    lossProbability += 10;
+  }
+  
+  const safe = lossProbability < 40;
+  
+  return {
+    safe,
+    lossProbability,
+    risks,
+    reasoning: `Technical analysis: ${safe ? 'Acceptable risk' : 'High risk detected'}. ${risks.length > 0 ? risks.join(', ') : 'No major red flags'}`
+  };
 }
 
 /**
