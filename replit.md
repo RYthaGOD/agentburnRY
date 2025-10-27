@@ -1,7 +1,7 @@
 # BurnBot - Solana Token Buyback & Burn SaaS Platform
 
 ## Overview
-BurnBot is a SaaS platform providing a no-code solution for Solana SPL token creators to automate token buyback and burn operations. It offers a dashboard, flexible scheduling, and transaction monitoring to enhance tokenomics. The platform also includes a Volume Bot, a Buy Bot, and the **GigaBrain** AI Trading Bot. GigaBrain is an autonomous AI trading bot that uses an 11-model AI hivemind to identify and trade trending tokens on Solana, focusing on profit potential, autonomous capital management, dynamic position sizing, and intelligent bundle activity detection to avoid pump-and-dump schemes. The platform aims to convert users through transparency, real-time stats, and a free token analysis tool, leading to a subscription model with 20 free trades, followed by a 2-week subscription and a 1% platform fee, with a portion of subscription payments used for token buyback and burn. The system is designed as a profit-hunting machine with robust safety guardrails.
+BurnBot is a SaaS platform providing a no-code solution for Solana SPL token creators to automate token buyback and burn operations. It features a dashboard, flexible scheduling, transaction monitoring, and an autonomous AI Trading Bot named GigaBrain. GigaBrain utilizes an 11-model AI hivemind to identify and trade trending tokens on Solana, focusing on profit potential, autonomous capital management, dynamic position sizing, and intelligent bundle activity detection to avoid pump-and-dump schemes. The platform aims to enhance tokenomics, offer robust trading tools, and operate as a profit-hunting machine with strong safety guardrails. It includes a subscription model with free trades, followed by a paid subscription and a platform fee, a portion of which is used for token buyback and burn.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -9,13 +9,13 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Frontend
-Built with React 18+, TypeScript, Vite, Wouter for routing, shadcn/ui (New York variant) on Radix UI, and Tailwind CSS for dark mode. TanStack Query manages server state, and React Hook Form with Zod handles form validation. The GigaBrain AI interface uses a "Black and Gold" theme. Real-time performance monitoring is implemented via WebSockets, broadcasting 17 trading metrics.
+The frontend is built with React 18+, TypeScript, Vite, Wouter for routing, shadcn/ui (New York variant) on Radix UI, and Tailwind CSS (dark mode). It uses TanStack Query for server state management and React Hook Form with Zod for validation. The GigaBrain AI interface features a "Black and Gold" theme, displaying 17 real-time trading metrics via WebSockets.
 
 ### Backend
-An Express.js server in TypeScript, utilizing an ESM module system, a RESTful API, centralized error handling, Zod schema validation, a storage abstraction layer, and a repository pattern for database operations.
+The backend is an Express.js server in TypeScript, employing an ESM module system, a RESTful API, centralized error handling, Zod schema validation, a storage abstraction layer, and a repository pattern.
 
 ### Scheduling System
-A dedicated `node-cron` service automates hourly checks for buyback execution, including payment validation, treasury balance verification, Jupiter Ultra API for swaps, and PumpFun creator reward claims. SPL Token instructions are used for token burns.
+A `node-cron` service automates hourly checks for buyback execution, including payment validation, treasury balance verification, Jupiter Ultra API for swaps, and PumpFun creator reward claims, utilizing SPL Token instructions for burns.
 
 ### Trading Bot System
 
@@ -24,156 +24,63 @@ A dedicated `node-cron` service automates hourly checks for buyback execution, i
 - **Buy Bot (Limit Orders):** Executes buy orders based on target SOL prices with configurable limits and slippage protection.
 
 #### GigaBrain AI Trading Bot (Standalone)
-**GigaBrain** operates autonomously with an 11-model AI hivemind system, restricted to whitelisted wallets.
+**GigaBrain** operates autonomously with an 11-model AI hivemind, restricted to whitelisted wallets. Key features include:
 
-**Autonomous Capital Management:**
-- Maintains 10% liquidity reserve, percentage-based position sizing (3-6% SCALP, 5-9% SWING), and AI-driven exits with 75%+ AI confidence.
-- Strict quality filters for token selection (e.g., 80%+ organic score, $25k+ volume).
-- Portfolio diversification (max 25% concentration per position) and optimized stop-loss protection (-8% to -12% SCALP, -15% to -25% SWING).
-- Portfolio Drawdown Circuit Breaker pauses trading if portfolio drops >20% from peak and auto-resumes at -10% recovery.
-- AI sell confidence exit threshold at 45%.
-
-**Token Discovery:** Aggregates tokens from DexScreener Trending, PumpFun-style tokens, newly migrated PumpFun to PumpSwap tokens, and low-cap new launches.
-
-**Smart Hivemind AI Workflow:**
-- Features position monitoring, quick technical scans, deep scans (full 11-model hivemind), and automatic portfolio rebalancing.
-- AI-Powered Strategy Learning occurs every 3 hours by analyzing trade journals.
-- The 11-Model Hivemind System uses DeepSeek, xAI Grok, Together AI, OpenRouter, Groq, Cerebras, Google Gemini, ChatAnywhere, OpenAI, with weighted confidence voting and smart model prioritization.
-- Improved AI Consensus Algorithm includes weighted voting, smart tie-breaking, and better decision clarity.
-
-**Intelligent Circuit Breaker Protection:** Disables failing AI models, rotates to healthy models, and prioritizes reliable models based on health scoring.
-
-**Advanced AI Rate Limiting & Retry System (Oct 27, 2025):**
-- **Universal Rate Limiting:** Per-provider request queuing prevents concurrent API overload and respects rate limits
-- **Provider-Specific Delays:** Conservative delays configured for each AI provider (Cerebras: 3s, Google Gemini: 2s, ChatAnywhere: 5s, etc.)
-- **Exponential Backoff Retry:** Automatic retry logic for 429 (rate limit) errors with 2s, 4s, 8s delays (up to 3 attempts)
-- **Smart Circuit Breaker:** Distinguishes between rate limits (retry with backoff) vs permanent failures (disable for 30 minutes)
-- **Rate Limit Awareness:** 429 errors don't count toward circuit breaker threshold, only permanent failures (402/401) do
-- **Improved Resilience:** System continues with healthy models while rate-limited models recover
-
-**Dual-Mode Trading Strategy:**
-- **SCALP Mode:** 62-79% AI confidence, 3-6% portfolio, max 30-minute hold, -8% to -12% stop-loss, +4-8% profit targets. Minimum 2% profit before selling.
-- **SWING Mode:** 80%+ AI confidence, 5-9% portfolio, max 24-hour hold, -15% to -25% stop-loss, +15% minimum profit target. Minimum 5% profit before selling.
-
-**Advanced Technical Analysis:** Integrates RSI, EMA (9/21), and Bollinger Bands into buy/sell decisions, generating a Technical Score.
-
-**Sell Decision Framework:** AI continuously monitors positions using technical indicators, market metrics, with automatic stop-loss override and exit criteria based on AI confidence, profit target, technical signals, or max hold time. Includes peak profit tracking and tiered profit protection.
-
-**Opportunistic Position Rotation:** Automatically sells weaker positions to free capital and maintains a 10% liquidity reserve.
-
-**Automatic Buyback & Burn Mechanism:** Configurable automatic buyback and immediate on-chain burning of specified tokens using a percentage of profits (default 5%) from successful trades.
-
-**Memory Management System:** Automated hourly cleanup of inactive bot states and optimized activity log handling.
-
-**System Stability & Error Handling:** Global error handlers, graceful shutdown, timeout protection, and automatic restart.
-
-**Performance Optimizations:** Eliminated Jupiter Balances API, improved portfolio calculations, and optimized scan/strategy update speed.
-
-**Automatic Wallet Synchronization:** Runs every 5 minutes to reconcile database positions with Solana blockchain holdings.
-
-**Automatic Database Cleanup:** Runs daily and on startup to remove expired data.
-
-**Bundle Activity Detection & Token Blacklist:** Analyzes tokens for pump-and-dump schemes, auto-blacklisting critical tokens (≥85 score) and warning for suspicious ones (60-84 score).
-
-**AI-Powered Loss Prevention System:**
-- **Centralized Trading Guard:** Ensures all trading paths respect drawdown protection, blocking trades when portfolio drops >20% from peak.
-- **Hardened Technical Fallback:** Increased risk weights for technical analysis fallback to match AI conservativeness, blocking trades with >60% loss probability.
-- **Multi-Provider Loss Prediction:** AI analyzes tokens for rug pull risk and loss probability using fallback providers (DeepSeek → OpenAI → Google Gemini).
-- **Rug Pull Detection:** Checks 7 critical red flags (e.g., unlocked liquidity, low liquidity, sudden pumps).
-- **Enhanced Supermajority Consensus:** Requires minimum 3 AI models to respond AND 64%+ agreement for buy trades. If a majority (2+ of 3) AIs indicate >70% loss probability, the trade is blocked.
-- **Fail-Closed Architecture:** Blocks trades during degraded conditions and requires minimum AI consensus for trades.
-- **Loss Probability Scoring:** Blocks trades with >40% loss risk (conservative threshold).
-
-**Profit Maximization System:**
-- **Minimum Profit Thresholds:** Enforces minimum profit thresholds (2% SCALP, 5% SWING) before selling.
-- **Smart Exit Logic:** Allows early exits only when in actual loss, protecting profitable positions.
-- **Profit-Hunting Strategy:** Includes peak profit tracking, smart stop-loss based on actual losses, buy-the-dip detection, and intelligent profit gating.
-- **AI Override for Smart Exits (Oct 27, 2025):** When AI has ≥80% sell confidence, allows position exit even below minimum profit targets to prevent deterioration. Applies to all 3 sell decision paths: Hivemind consensus, high-confidence single model, and fallback single model. Prevents positions from sitting in breakeven/small losses while waiting for profit targets that may never materialize.
-
-**Optimized Slippage Strategy (Oct 27, 2025):**
-- **BUY Operations:** 3% slippage (300 bps) - Optimized for high-quality tokens with good liquidity
-- **SELL Operations (Normal):** 5% slippage (500 bps) - Slightly higher for exits while preserving profits
-- **SELL Operations (Emergency Rotation):** 8% slippage (800 bps) - Only when rotating weaker positions
-- **Previous Issue:** Slippage was set to 10-30%, requiring +25-40% gains just to break even on round-trip trades
-- **Current Benefit:** Reduced slippage preserves profits - now only need ~8% gain for break-even (vs previous 20-40%)
-
-**Multi-Strategy Trading System (Oct 27, 2025):**
-Complementary strategies run alongside AI-driven SCALP/SWING to capture different market conditions. **Enhanced with "Buy Low, Sell High" discipline** to maximize profitability:
-
-- **Strategy 1: Mean Reversion (Enhanced with Bollinger Bands)** - Buy oversold at SUPPORT, sell overbought at RESISTANCE
-  - Position Size: 5% of portfolio (default)
-  - Profit Target: +10% (default)
-  - Stop Loss: -8% (default)
-  - Entry: RSI <30 (oversold) + near lower Bollinger Band (support = LOW price)
-  - Exit: RSI >70 (overbought) + near upper Bollinger Band (resistance = HIGH price)
-  - Best For: Volatile tokens that bounce back from extremes
-  - Logic: Buys at SUPPORT (LOW), sells at RESISTANCE (HIGH), maximizes profit from mean reversion
-
-- **Strategy 2: Momentum Breakout (Enhanced with "Buy the Dip" filter)** - Catch recoveries AFTER dips, not pump peaks
-  - Position Size: 7% of portfolio (default)
-  - Profit Target: +20% (default)
-  - Stop Loss: -10% (default)
-  - Entry: +15% price spike in 1h + high volume + token previously dipped (24h < 1h) + not already up >30% in 24h
-  - Exit: Hit profit target OR peaked at +15% but now down to half (trailing stop) OR momentum reversed (-5% in 1h)
-  - Best For: Catching early recovery momentum after dips (buying LOW before pump)
-  - Logic: Only buys if token dipped first (buy LOW), exits at profit peaks with trailing stop (sell HIGH)
-
-- **Strategy 3: Grid Trading** - Multiple entry/exit levels for ranging markets
-  - Position Size: 2% per grid level (default)
-  - Grid Levels: 5 levels (default)
-  - Price Gap: 5% between levels (default)
-  - Entry: Price dipped -2% to -8% in ranging market (LOW price zones)
-  - Exit: Price rose to +5% profit target (HIGH price zones)
-  - Best For: Sideways/ranging markets with low volatility
-  - Logic: Buys dips (LOW), sells rips (HIGH) in defined price zones
-  
-**Strategy Integration:**
-- Strategies evaluate up to 10 tokens per scan (vs AI's top 5)
-- Run independently after AI analysis completes
-- Each position tracks strategy type, profit target, and stop loss
-- Strategies disabled by default - must be explicitly enabled
-- All strategies respect drawdown protection and trading guards
-- 1% platform fee applies to all strategy trades
+-   **Autonomous Capital Management:** Manages liquidity reserves, employs percentage-based position sizing, and uses AI-driven exits. It includes strict quality filters for token selection, portfolio diversification, optimized stop-loss protection, and a Portfolio Drawdown Circuit Breaker.
+-   **Token Discovery:** Aggregates tokens from various sources like DexScreener Trending and PumpFun.
+-   **Smart Hivemind AI Workflow:** Features position monitoring, quick and deep technical scans (full 11-model hivemind), and automatic portfolio rebalancing. The 11-Model Hivemind System uses various AI providers (e.g., DeepSeek, xAI Grok, Google Gemini, OpenAI) with weighted confidence voting and smart model prioritization.
+-   **Intelligent Circuit Breaker Protection:** Disables and rotates failing AI models, prioritizing reliable ones based on health scoring.
+-   **Advanced AI Rate Limiting & Retry System:** Implements universal and provider-specific rate limiting, exponential backoff for retries, and a smart circuit breaker to distinguish between rate limits and permanent failures.
+-   **Dual-Mode Trading Strategy:** Supports SCALP (short-term, high confidence) and SWING (longer-term, higher confidence) modes with distinct portfolio allocations, hold times, stop-losses, and profit targets.
+-   **Advanced Technical Analysis:** Integrates RSI, EMA, and Bollinger Bands into buy/sell decisions, generating a Technical Score.
+-   **Sell Decision Framework:** AI continuously monitors positions with dynamic exit criteria based on confidence, profit targets, technical signals, or max hold time, including peak profit tracking and tiered profit protection.
+-   **Opportunistic Position Rotation:** Automatically sells weaker positions to free up capital and maintain liquidity.
+-   **Automatic Buyback & Burn Mechanism:** Configurable automatic buyback and immediate on-chain burning of tokens using a percentage of profits from successful trades.
+-   **AI-Powered Loss Prevention System:** Includes a centralized trading guard, hardened technical fallback, multi-provider loss prediction for rug pull risks, enhanced supermajority consensus for trades, and a fail-closed architecture, blocking trades with high loss probability.
+-   **Profit Maximization System:** Enforces minimum profit thresholds, smart exit logic, and a profit-hunting strategy with features like peak profit tracking, smart stop-loss, buy-the-dip detection, and AI override for smart exits when AI confidence is high.
+-   **Optimized Slippage Strategy:** Implements tiered slippage settings for BUY (3%), Normal SELL (5%), and Emergency Rotation SELL (8%) operations to preserve profits.
+-   **Multi-Strategy Trading System:** Complementary strategies (Mean Reversion, Momentum Breakout, Grid Trading) run alongside AI-driven SCALP/SWING, focusing on "Buy Low, Sell High" principles with configurable parameters for position sizing, profit targets, and stop losses.
+-   **AI-Driven Trade Execution Filters:** Deep scans now include technical "buy low" filters (Bollinger Band proximity, 24h pump filter) before executing AI-driven buy trades, ensuring purchases at support levels and preventing FOMO buying at peaks.
 
 ### Data Storage
-PostgreSQL via Neon's serverless driver and Drizzle ORM, using UUID primary keys, decimal types, and automatic timestamps.
+Uses PostgreSQL via Neon's serverless driver and Drizzle ORM, with UUID primary keys, decimal types, and automatic timestamps.
 
 ### Authentication & Authorization
 Wallet-based authentication using cryptographic signature verification via tweetnacl and Solana Wallet Adapter.
 
 ### Security Infrastructure
-Defense-in-depth security: rate limiting, DDoS protection, security headers (Helmet.js), input validation (XSS, Solana address, Zod, SQL injection prevention), audit logging, and secure environment variable handling.
+Employs defense-in-depth security measures including rate limiting, DDoS protection, security headers (Helmet.js), input validation (XSS, Solana address, Zod, SQL injection prevention), audit logging, and secure environment variable handling.
 
 ### Production Readiness & Automated Workflow
-Supports secure encrypted key management, automated PumpFun rewards claiming, balance checks, optimal SOL to token swaps via Jupiter Ultra API, and token burns. Includes a payment/trial system with whitelisted wallets.
+Includes secure encrypted key management, automated PumpFun rewards claiming, balance checks, optimal SOL to token swaps via Jupiter Ultra API, token burns, and a payment/trial system with whitelisted wallets.
 
 ### Transaction Fee System
-- **Project-Linked Bots:** 0.5% transaction fee after 60 free transactions.
-- **AI Trading Bot:** 1% platform fee on all buy transactions (deducted pre-execution) to treasury wallet `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`. Exempt wallet `924yATAEdnrYmncJMX2je7dpiEfVRqCSPmQ2NK3QfoXA` has 0% fees.
+-   **Project-Linked Bots:** 0.5% transaction fee after 60 free transactions.
+-   **AI Trading Bot:** 1% platform fee on all buy transactions (deducted pre-execution) to a treasury wallet, with an exempt wallet having 0% fees.
 
 ## External Dependencies
 
 **Blockchain Integration:**
-- Solana Web3.js
-- SPL Token program
-- @solana/wallet-adapter suite
-- bs58
-- tweetnacl
+-   Solana Web3.js
+-   SPL Token program
+-   @solana/wallet-adapter suite
+-   bs58
+-   tweetnacl
 
 **Payment Processing:**
-- Solana-native payments (SOL only) to treasury wallet `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`.
+-   Solana-native payments (SOL only) to treasury wallet.
 
 **Third-Party Services:**
-- Neon Database (PostgreSQL)
-- Jupiter Ultra API (Swap API)
-- Jupiter Price API v3
-- PumpFun Lightning API
-- DexScreener API
-- **AI Hive Mind Providers:**
-    - DeepSeek V3
-    - Cerebras AI
-    - Google Gemini
-    - ChatAnywhere
-    - Groq
-    - OpenAI Primary
-    - OpenAI Backup
+-   Neon Database (PostgreSQL)
+-   Jupiter Ultra API (Swap API)
+-   Jupiter Price API v3
+-   PumpFun Lightning API
+-   DexScreener API
+-   **AI Hive Mind Providers:**
+    -   DeepSeek V3
+    -   Cerebras AI
+    -   Google Gemini
+    -   ChatAnywhere
+    -   Groq
+    -   OpenAI Primary
+    -   OpenAI Backup
