@@ -3724,6 +3724,62 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
         continue;
       }
       
+      // 🔥 TECHNICAL "BUY LOW" FILTERS: Ensure we buy at support, not at tops
+      // These filters complement AI analysis to enforce "buy low, sell high" discipline
+      if (analysis.action === "buy") {
+        const BOLLINGER_TOLERANCE = 0.15; // ±15% proximity to bands
+        const MIN_VALID_PRICE = 1e-9; // Microprice protection
+        const RSI_OVERSOLD = 40; // Prefer buying oversold tokens
+        const MAX_24H_PUMP = 0.30; // Skip tokens already pumped >30% in 24h (0.30 = 30% on 0-1 scale)
+        
+        // Extract technical indicators
+        const currentPrice = token.priceSOL ?? 0;
+        const bollingerLower = token.bollingerLower ?? 0;
+        const bollingerUpper = token.bollingerUpper ?? 0;
+        const rsi = token.rsi ?? 50;
+        const priceChange24h = token.priceChange24h ?? 0;
+        
+        // Validate Bollinger data
+        const hasBollingerData = bollingerLower >= MIN_VALID_PRICE && 
+                                 bollingerUpper >= MIN_VALID_PRICE && 
+                                 currentPrice >= MIN_VALID_PRICE &&
+                                 bollingerUpper > bollingerLower;
+        
+        // Calculate proximity to lower Bollinger Band (support level)
+        const lowerBandMin = bollingerLower * (1 - BOLLINGER_TOLERANCE);
+        const lowerBandMax = bollingerLower * (1 + BOLLINGER_TOLERANCE);
+        const nearLowerBand = hasBollingerData && currentPrice >= lowerBandMin && currentPrice <= lowerBandMax;
+        
+        // FILTER 1: Bollinger Band Proximity - Buy at SUPPORT (lower band ±15%)
+        if (hasBollingerData && !nearLowerBand) {
+          const distancePercent = ((currentPrice - bollingerLower) / bollingerLower * 100).toFixed(1);
+          addLog(`🔴 SKIP ${token.symbol}: Price NOT at support! ${distancePercent}% above lower band (need within ±15%)`, "warning");
+          addLog(`   💡 Enforce "buy low": Wait for price to dip closer to support (${bollingerLower.toFixed(9)} SOL)`, "info");
+          continue;
+        }
+        
+        // FILTER 2: RSI Check - Warn if buying overbought (RSI > 70)
+        if (rsi > 70) {
+          addLog(`⚠️ WARNING ${token.symbol}: Buying OVERBOUGHT token (RSI: ${rsi.toFixed(1)})`, "warning");
+          addLog(`   💡 Prefer RSI < ${RSI_OVERSOLD} for better entry (current: ${rsi.toFixed(1)})`, "info");
+          // Don't skip, just warn - AI confidence may override
+        }
+        
+        // FILTER 3: 24h Pump Filter - Avoid FOMO buying tokens already up >30%
+        if (priceChange24h > MAX_24H_PUMP) {
+          addLog(`🔴 SKIP ${token.symbol}: Already pumped +${(priceChange24h * 100).toFixed(1)}% in 24h (avoid FOMO buying at peaks)`, "warning");
+          addLog(`   💡 Enforce "buy low": Wait for pullback or dip (buying after +${(MAX_24H_PUMP * 100).toFixed(0)}% pump is risky)`, "info");
+          continue;
+        }
+        
+        // ✅ PASSED ALL FILTERS - Proceeding with buy
+        if (hasBollingerData && nearLowerBand) {
+          addLog(`✅ BUY LOW CONFIRMED ${token.symbol}: Price at SUPPORT (within ±15% of lower band)`, "success");
+        } else {
+          addLog(`⚠️ ${token.symbol}: No Bollinger data - proceeding with AI-only decision`, "warning");
+        }
+      }
+      
       // Execute trade based on AI recommendation
       if (analysis.action === "buy") {
         // Calculate dynamic trade amount based on hivemind budget and AI confidence
