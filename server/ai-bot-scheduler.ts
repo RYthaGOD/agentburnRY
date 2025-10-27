@@ -1817,19 +1817,27 @@ Respond ONLY with valid JSON:
       }
     });
     
-    // 🛡️ AI OVERRIDE: Block if ANY AI says >70% loss probability (critical safety threshold)
+    // 🛡️ PROFIT-SEEKING AI CONSENSUS: Block if STRICT MAJORITY (2+ of 3) AIs say >70% loss probability
+    // This prevents truly risky trades while allowing profitable SCALP opportunities (62-79% confidence)
+    // Single AI veto was TOO conservative and blocked winning trades
     const criticalWarnings = successfulAI.filter(ai => ai.lossProbability > 70);
-    if (criticalWarnings.length > 0) {
+    const CRITICAL_CONSENSUS_THRESHOLD = Math.floor(successfulAI.length / 2) + 1; // TRUE majority (2/3, 2/2, 1/1)
+    
+    if (criticalWarnings.length >= CRITICAL_CONSENSUS_THRESHOLD) {
       const worstCase = criticalWarnings.reduce((max, ai) => ai.lossProbability > max.lossProbability ? ai : max);
-      console.log(`[Loss Prediction] 🚨 CRITICAL WARNING from ${worstCase.provider}: ${worstCase.lossProbability}% loss probability`);
-      console.log(`[Loss Prediction] 🛑 TRADE BLOCKED by AI OVERRIDE - Even if other AIs disagree, one critical warning is enough`);
+      console.log(`[Loss Prediction] 🚨 CONSENSUS WARNING: ${criticalWarnings.length}/${successfulAI.length} AIs predict >70% loss probability`);
+      console.log(`[Loss Prediction] 🛑 TRADE BLOCKED by AI CONSENSUS - ${criticalWarnings.map(ai => `${ai.provider}: ${ai.lossProbability}%`).join(', ')}`);
       
       return {
         safe: false,
         lossProbability: worstCase.lossProbability,
         risks: worstCase.risks || [],
-        reasoning: `AI OVERRIDE: ${worstCase.provider} detected critical ${worstCase.lossProbability}% loss probability. ${worstCase.reasoning || 'High risk detected'}`
+        reasoning: `AI CONSENSUS (${criticalWarnings.length}/${successfulAI.length}): Multiple AIs detected >70% loss probability. ${worstCase.reasoning || 'High risk detected'}`
       };
+    } else if (criticalWarnings.length > 0) {
+      // Log dissenting opinion but allow trade (profit-seeking design)
+      console.log(`[Loss Prediction] ⚠️ Dissenting opinion: ${criticalWarnings.length}/${successfulAI.length} AIs warn >70% loss (${criticalWarnings.map(ai => `${ai.provider}: ${ai.lossProbability}%`).join(', ')})`);
+      console.log(`[Loss Prediction] ✅ Trade ALLOWED - majority disagrees, continuing with ensemble consensus`);
     }
     
     // Calculate average loss probability from all successful AIs
@@ -2403,25 +2411,46 @@ async function findPositionToRotate(
  * 🛡️ CENTRALIZED TRADING GUARD - Checks if trading is allowed
  * Enforces drawdown protection, circuit breakers, and other safety checks
  * MUST be called before ANY trade execution (quick scan, deep scan, position rotation)
+ * 
+ * AUTO-RESUME LOGIC: Automatically resumes trading when portfolio recovers to -10% from peak
  */
 async function isTradingAllowed(
   ownerWalletAddress: string,
   portfolioValueSOL: number,
   config: any
 ): Promise<{ allowed: boolean; reason?: string }> {
-  // DRAWDOWN PROTECTION: Check if portfolio has dropped >20% from peak
-  const MAX_DRAWDOWN_PERCENT = -20;
+  // DRAWDOWN PROTECTION: Pause trading at -20%, auto-resume at -10% (profit-seeking design)
+  const MAX_DRAWDOWN_PERCENT = -20; // Pause threshold
+  const AUTO_RESUME_DRAWDOWN = -10; // Auto-resume threshold (allow trading during recovery)
   const portfolioPeak = parseFloat(config.portfolioPeakSOL || portfolioValueSOL.toString());
   const bypassDrawdown = config.bypassDrawdownProtection || false;
   
   if (portfolioPeak > 0) {
     const drawdownPercent = ((portfolioValueSOL - portfolioPeak) / portfolioPeak) * 100;
     
-    if (drawdownPercent <= MAX_DRAWDOWN_PERCENT && !bypassDrawdown) {
+    // PAUSE: Portfolio in drawdown worse than -10% → block new trades until recovery
+    if (drawdownPercent < AUTO_RESUME_DRAWDOWN && !bypassDrawdown) {
+      // Deep drawdown (≤ -20%): Critical protection active
+      if (drawdownPercent <= MAX_DRAWDOWN_PERCENT) {
+        return {
+          allowed: false,
+          reason: `Drawdown protection active: Portfolio down ${Math.abs(drawdownPercent).toFixed(1)}% from peak (${portfolioPeak.toFixed(4)} SOL → ${portfolioValueSOL.toFixed(4)} SOL). Auto-resumes at -10% (${(portfolioPeak * 0.90).toFixed(4)} SOL).`
+        };
+      }
+      
+      // Recovery zone (-20% to -10%): Still paused, but show recovery progress
+      console.log(`[Trading Guard] 📈 Recovery in progress: ${drawdownPercent.toFixed(1)}% from peak (need ${AUTO_RESUME_DRAWDOWN}% to resume)`);
       return {
         allowed: false,
-        reason: `Drawdown protection active: Portfolio down ${Math.abs(drawdownPercent).toFixed(1)}% from peak (${portfolioPeak.toFixed(4)} SOL → ${portfolioValueSOL.toFixed(4)} SOL). Trading paused to prevent further losses.`
+        reason: `Recovery zone: Portfolio at ${drawdownPercent.toFixed(1)}% from peak. Auto-resumes at -10% (${(portfolioPeak * 0.90).toFixed(4)} SOL). Current: ${portfolioValueSOL.toFixed(4)} SOL.`
       };
+    }
+    
+    // AUTO-RESUME: Portfolio recovered to -10% or better → resume trading!
+    if (drawdownPercent >= AUTO_RESUME_DRAWDOWN && drawdownPercent < 0) {
+      console.log(`[Trading Guard] ✅ AUTO-RESUME: Portfolio recovered to ${drawdownPercent.toFixed(1)}% from peak (recovered past ${AUTO_RESUME_DRAWDOWN}% threshold)`);
+      console.log(`[Trading Guard] 🚀 Resuming trading to capture recovery opportunities`);
+      logActivity('trading_guard', 'success', `✅ AUTO-RESUME: Portfolio recovered to ${drawdownPercent.toFixed(1)}% from peak → trading resumed`);
     }
   }
   

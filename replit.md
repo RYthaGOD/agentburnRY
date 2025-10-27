@@ -1,7 +1,7 @@
 # BurnBot - Solana Token Buyback & Burn SaaS Platform
 
 ## Overview
-BurnBot is a SaaS platform providing a no-code solution for Solana SPL token creators to automate token buyback and burn operations. It offers a dashboard, flexible scheduling, and transaction monitoring to enhance tokenomics. The platform also includes a Volume Bot, a Buy Bot, and the **GigaBrain** AI Trading Bot. GigaBrain is an autonomous AI trading bot that uses an 11-model AI hivemind to identify and trade trending tokens on Solana, focusing on profit potential, autonomous capital management, dynamic position sizing, and intelligent bundle activity detection to avoid pump-and-dump schemes. The platform aims to convert users through transparency, real-time stats, and a free token analysis tool, leading to a subscription model with 20 free trades, followed by a 2-week subscription and a 1% platform fee, with a portion of subscription payments used for token buyback and burn.
+BurnBot is a SaaS platform providing a no-code solution for Solana SPL token creators to automate token buyback and burn operations. It offers a dashboard, flexible scheduling, and transaction monitoring to enhance tokenomics. The platform also includes a Volume Bot, a Buy Bot, and the **GigaBrain** AI Trading Bot. GigaBrain is an autonomous AI trading bot that uses an 11-model AI hivemind to identify and trade trending tokens on Solana, focusing on profit potential, autonomous capital management, dynamic position sizing, and intelligent bundle activity detection to avoid pump-and-dump schemes. The platform aims to convert users through transparency, real-time stats, and a free token analysis tool, leading to a subscription model with 20 free trades, followed by a 2-week subscription and a 1% platform fee, with a portion of subscription payments used for token buyback and burn. The system is designed as a profit-hunting machine with robust safety guardrails.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -30,13 +30,13 @@ A dedicated `node-cron` service automates hourly checks for buyback execution, i
 - Maintains 10% liquidity reserve, percentage-based position sizing (3-6% SCALP, 5-9% SWING), and AI-driven exits with 75%+ AI confidence.
 - Strict quality filters for token selection (e.g., 80%+ organic score, $25k+ volume).
 - Portfolio diversification (max 25% concentration per position) and optimized stop-loss protection (-8% to -12% SCALP, -15% to -25% SWING).
-- Portfolio Drawdown Circuit Breaker pauses trading if portfolio drops >20% from peak.
+- Portfolio Drawdown Circuit Breaker pauses trading if portfolio drops >20% from peak and auto-resumes at -10% recovery.
 - AI sell confidence exit threshold at 45%.
 
 **Token Discovery:** Aggregates tokens from DexScreener Trending, PumpFun-style tokens, newly migrated PumpFun to PumpSwap tokens, and low-cap new launches.
 
 **Smart Hivemind AI Workflow:**
-- Features position monitoring, quick technical scans (4 highest-priority AI models for scalp), deep scans (full 11-model hivemind for swing), and automatic portfolio rebalancing.
+- Features position monitoring, quick technical scans, deep scans (full 11-model hivemind), and automatic portfolio rebalancing.
 - AI-Powered Strategy Learning occurs every 3 hours by analyzing trade journals.
 - The 11-Model Hivemind System uses DeepSeek, xAI Grok, Together AI, OpenRouter, Groq, Cerebras, Google Gemini, ChatAnywhere, OpenAI, with weighted confidence voting and smart model prioritization.
 - Improved AI Consensus Algorithm includes weighted voting, smart tie-breaking, and better decision clarity.
@@ -44,16 +44,14 @@ A dedicated `node-cron` service automates hourly checks for buyback execution, i
 **Intelligent Circuit Breaker Protection:** Disables failing AI models, rotates to healthy models, and prioritizes reliable models based on health scoring.
 
 **Dual-Mode Trading Strategy:**
-- **SCALP Mode:** 62-79% AI confidence, 3-6% portfolio, max 30-minute hold, -8% to -12% stop-loss, +4-8% profit targets.
-- **SWING Mode:** 80%+ AI confidence, 5-9% portfolio, max 24-hour hold, -15% to -25% stop-loss, +15% minimum profit target.
+- **SCALP Mode:** 62-79% AI confidence, 3-6% portfolio, max 30-minute hold, -8% to -12% stop-loss, +4-8% profit targets. Minimum 2% profit before selling.
+- **SWING Mode:** 80%+ AI confidence, 5-9% portfolio, max 24-hour hold, -15% to -25% stop-loss, +15% minimum profit target. Minimum 5% profit before selling.
 
 **Advanced Technical Analysis:** Integrates RSI, EMA (9/21), and Bollinger Bands into buy/sell decisions, generating a Technical Score.
 
-**Sell Decision Framework:** AI continuously monitors positions using technical indicators, market metrics, with automatic stop-loss override and exit criteria based on AI confidence, profit target, technical signals, or max hold time.
+**Sell Decision Framework:** AI continuously monitors positions using technical indicators, market metrics, with automatic stop-loss override and exit criteria based on AI confidence, profit target, technical signals, or max hold time. Includes peak profit tracking and tiered profit protection.
 
 **Opportunistic Position Rotation:** Automatically sells weaker positions to free capital and maintains a 10% liquidity reserve.
-
-**Portfolio-Wide Risk Management:** Tracks portfolio peak value, pauses trading at -20% drawdown, with an optional bypass.
 
 **Automatic Buyback & Burn Mechanism:** Configurable automatic buyback and immediate on-chain burning of specified tokens using a percentage of profits (default 5%) from successful trades.
 
@@ -70,24 +68,18 @@ A dedicated `node-cron` service automates hourly checks for buyback execution, i
 **Bundle Activity Detection & Token Blacklist:** Analyzes tokens for pump-and-dump schemes, auto-blacklisting critical tokens (≥85 score) and warning for suspicious ones (60-84 score).
 
 **AI-Powered Loss Prevention System:**
-- **Multi-Provider Loss Prediction:** AI analyzes tokens for rug pull risk and loss probability using fallback providers (DeepSeek → OpenAI → Google Gemini). Blocks trades with >40% loss probability or unsafe tokens (threshold based on historical scam data showing many scored 40-55%). If all AI fails, uses technical analysis fallback instead of blocking.
-- **Rug Pull Detection:** Checks 7 critical red flags: unlocked liquidity, low liquidity (<$20k), sudden pumps (>50% 1h), market cap/liquidity mismatch, very new tokens (<24h), low volume/liquidity ratio, negative momentum.
-- **Enhanced Supermajority Consensus:** Requires minimum 3 AI models to respond AND 64%+ agreement for buy trades. Fails closed (blocks trade) if <3 models available or no supermajority reached.
-- **Fail-Closed Architecture:** Blocks trades during degraded conditions (API failures, rate limits). Prevents risky single-model or dual-model buys by requiring minimum 3 AI responses.
+- **Centralized Trading Guard:** Ensures all trading paths respect drawdown protection, blocking trades when portfolio drops >20% from peak.
+- **Hardened Technical Fallback:** Increased risk weights for technical analysis fallback to match AI conservativeness, blocking trades with >60% loss probability.
+- **Multi-Provider Loss Prediction:** AI analyzes tokens for rug pull risk and loss probability using fallback providers (DeepSeek → OpenAI → Google Gemini).
+- **Rug Pull Detection:** Checks 7 critical red flags (e.g., unlocked liquidity, low liquidity, sudden pumps).
+- **Enhanced Supermajority Consensus:** Requires minimum 3 AI models to respond AND 64%+ agreement for buy trades. If a majority (2+ of 3) AIs indicate >70% loss probability, the trade is blocked.
+- **Fail-Closed Architecture:** Blocks trades during degraded conditions and requires minimum AI consensus for trades.
 - **Loss Probability Scoring:** Blocks trades with >40% loss risk (conservative threshold).
 
-**Profit Maximization System (NEW):**
-- **Minimum Profit Thresholds:** Never sells winners for tiny profits. SCALP positions require minimum 2% profit, SWING positions require minimum 5% profit before selling.
-- **Smart Exit Logic:** Only allows early exits when in actual loss (AI stop-loss protection). Profitable positions must meet minimum thresholds.
-- **No More Micro-Exits:** Prevents 0.09% exits like previous system - holds positions until meaningful profit targets are reached.
-- **Strategy-Based Minimums:** Different thresholds for different strategies (SCALP 2% vs SWING 5%) to match risk/reward profiles.
-
-**Profit-Hunting Strategy:**
-- **Peak Profit Tracking:** Tracks highest profit per position to distinguish profit pullbacks from losses.
-- **Smart Stop-Loss:** Triggers only on actual losses, not profit pullbacks.
-- **Buy-The-Dip Detection:** Identifies accumulation opportunities when profitable positions retrace 30%+ from peak.
-- **Profit Protection Tiers:** Implements tiered profit protection (e.g., +120% peak protects at +60%).
-- **Intelligent Profit Gating:** AI analyzes exit timing only when target hit or in loss; profitable positions run to maximize gains.
+**Profit Maximization System:**
+- **Minimum Profit Thresholds:** Enforces minimum profit thresholds (2% SCALP, 5% SWING) before selling.
+- **Smart Exit Logic:** Allows early exits only when in actual loss, protecting profitable positions.
+- **Profit-Hunting Strategy:** Includes peak profit tracking, smart stop-loss based on actual losses, buy-the-dip detection, and intelligent profit gating.
 
 ### Data Storage
 PostgreSQL via Neon's serverless driver and Drizzle ORM, using UUID primary keys, decimal types, and automatic timestamps.
@@ -104,61 +96,6 @@ Supports secure encrypted key management, automated PumpFun rewards claiming, ba
 ### Transaction Fee System
 - **Project-Linked Bots:** 0.5% transaction fee after 60 free transactions.
 - **AI Trading Bot:** 1% platform fee on all buy transactions (deducted pre-execution) to treasury wallet `jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38`. Exempt wallet `924yATAEdnrYmncJMX2je7dpiEfVRqCSPmQ2NK3QfoXA` has 0% fees.
-
-## Recent Critical Bug Fixes (Oct 27, 2025)
-
-### Root Cause Analysis
-Comprehensive audit identified 5 critical logic conflicts causing persistent losses despite profit-maximization features. System was trading during extreme drawdowns (-98.5%), approving risky tokens that AI would block (85% loss probability approved at 30% by technical fallback), creating duplicate positions (same token, different strategies), and relying on broken API endpoints.
-
-### Bug Fixes Implemented
-
-1. **Centralized Trading Guard (FIX #1)**
-   - Created `isTradingAllowed()` function enforcing drawdown protection across ALL trading paths (quick scan, deep scan)
-   - Previously: Quick scan bypassed drawdown protection entirely → traded during -98.5% portfolio drawdown
-   - Now: All trades blocked when portfolio drops >20% from peak, preventing cascade losses
-   - Impact: No more trading during extreme drawdowns
-
-2. **Hardened Technical Fallback (FIX #2)**
-   - Increased risk weights to match AI conservativeness when all AI providers fail
-   - Unlocked liquidity: 30 → 50 points (+67% stricter)
-   - Sudden pumps >50%: 25 → 40 points (+60% stricter)
-   - Low liquidity: 20 → 25 points (+25% stricter)
-   - Threshold raised: 40% → 60% loss probability required to block
-   - Previously: Approved LENS at 30% risk (technical fallback) despite AI predicting 85% loss probability
-   - Now: Technical fallback blocks same tokens that AI would block
-   - Impact: Better entries even when AI APIs fail, prevents losses from lenient scoring
-
-3. **Fixed Google Gemini API (FIX #3)**
-   - Corrected model name: `gemini-1.5-flash` → `gemini-2.0-flash-exp`
-   - Previously: 404 errors breaking AI fallback chain at step 2
-   - Now: All 3 loss prediction providers functional (DeepSeek → OpenAI → Google Gemini)
-   - Impact: More reliable loss prediction, fewer fallbacks to technical analysis
-
-4. **Duplicate Position Prevention (FIX #4)**
-   - Added fresh database check before each trade (not relying on stale pre-fetched arrays)
-   - Blocks ANY duplicate position by token mint, regardless of strategy type
-   - Previously: Bought LENS twice in 3 minutes (once as SWING, once as SCALP) = double exposure to risky token
-   - Now: One position per token maximum, prevents concentration risk
-   - Impact: True position limits, proper risk management, no duplicate entries
-
-5. **AI Override Safety System (FIX #5)**
-   - Parallel loss prediction: Queries ALL available AI providers simultaneously (not just first success)
-   - Critical threshold: If ANY AI says >70% loss probability, trade is BLOCKED
-   - Prevents scenarios where one AI says "safe" (30%) but another would say "unsafe" (85%)
-   - Previously: First AI response was final (sequential try-until-success)
-   - Now: All AIs vote, any critical warning (>70%) blocks trade even if others disagree
-   - Impact: Maximum safety - one strong warning is enough to prevent risky trades
-
-### Expected Behavior After Fixes
-- ✅ Trading truly paused during portfolio drawdowns (no bypass)
-- ✅ Technical fallback as conservative as AI (blocks 85% loss probability tokens)
-- ✅ All AI providers functional (no 404 errors)
-- ✅ One position per token (no duplicates across strategies)
-- ✅ Critical warnings respected (any AI >70% loss probability = blocked)
-- ✅ Profit thresholds effective on GOOD entries (2% SCALP, 5% SWING minimums work when entries are sound)
-
-### Design Philosophy
-Fixes enforce "fail-safe" architecture: When in doubt, block the trade. Better to miss opportunities than take bad losses. Profit-hunting features (minimum thresholds, peak tracking, profit protection) only work when paired with excellent entry selection - these fixes ensure every entry meets multiple safety layers.
 
 ## External Dependencies
 
