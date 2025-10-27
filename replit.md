@@ -41,6 +41,7 @@ A `node-cron` service automates hourly checks for buyback execution, including p
 -   **Optimized Slippage Strategy:** Implements tiered slippage settings for BUY (3%), Normal SELL (5%), and Emergency Rotation SELL (8%) operations to preserve profits.
 -   **Multi-Strategy Trading System:** Complementary strategies (Mean Reversion, Momentum Breakout, Grid Trading) run alongside AI-driven SCALP/SWING, focusing on "Buy Low, Sell High" principles with configurable parameters for position sizing, profit targets, and stop losses.
 -   **AI-Driven Trade Execution Filters:** Deep scans now include technical "buy low" filters (Bollinger Band proximity, 24h pump filter) before executing AI-driven buy trades, ensuring purchases at support levels and preventing FOMO buying at peaks.
+-   **Conviction Hold & Accumulate:** AI position monitoring can now accumulate (buy more) of losing positions when the AI has very high conviction (85%+ confidence) that fundamentals remain strong despite the dip. Strict safety limits prevent over-averaging: maximum 2x original position size, maximum -15% drawdown, and requires RSI <30 (extreme oversold), EMA bullish trend intact, and price near Bollinger Band lower support. Accumulation buys 50% of original entry size, averaging down the entry price through dollar-cost averaging.
 
 ### Data Storage
 Uses PostgreSQL via Neon's serverless driver and Drizzle ORM, with UUID primary keys, decimal types, and automatic timestamps.

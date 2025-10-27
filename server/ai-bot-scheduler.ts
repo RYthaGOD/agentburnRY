@@ -5122,9 +5122,9 @@ async function analyzePositionWithAI(
     console.log(`[Position Monitor] 🤔 ${position.tokenSymbol} in PROFIT PULLBACK: Peak +${peakProfit.toFixed(2)}% → Current +${profitPercent.toFixed(2)}% → AI analyzing for best exit`);
   }
   
-  // CASE 3: We're in actual loss territory → Ask AI to evaluate damage control
+  // CASE 3: We're in actual loss territory → Ask AI to evaluate: SELL, HOLD, or ACCUMULATE
   if (profitPercent < 0) {
-    console.log(`[Position Monitor] ⚠️ ${position.tokenSymbol} in LOSS: ${profitPercent.toFixed(2)}% → AI analyzing whether to cut or hold for recovery`);
+    console.log(`[Position Monitor] ⚠️ ${position.tokenSymbol} in LOSS: ${profitPercent.toFixed(2)}% → AI analyzing: cut losses OR hold for recovery OR accumulate if fundamentals strong`);
   }
   
   // CASE 4: We're past profit target → Ask AI for optimal exit timing
@@ -5225,7 +5225,7 @@ TECHNICAL INDICATORS:
 - Overall: ${technicals.overallSignal}`;
   }
 
-  const prompt = `You are an expert technical analyst. Analyze this cryptocurrency position and decide: HOLD or SELL?
+  const prompt = `You are an expert technical analyst. Analyze this cryptocurrency position and decide: SELL, HOLD, or ACCUMULATE?
 
 POSITION DETAILS:
 Token: ${position.tokenSymbol}
@@ -5279,15 +5279,31 @@ DECISION RULES:
 - SELL if 3+ technical red flags appear (RSI overbought, EMA death cross, Bollinger overbought, momentum dying, volume declining, heavy selling, liquidity drain)
 - SELL if any CRITICAL signal (liquidity draining, rug risk)
 - SELL if we're in good profit ${profitPercent > 15 ? `(+${profitPercent.toFixed(0)}%)` : ''} AND multiple technical indicators show reversal
+
+- ACCUMULATE (buy more) ONLY if ALL these conditions are met:
+  * Currently in LOSS (negative profit)
+  * RSI <30 (extreme oversold = dip/discount)
+  * EMA bullish (9 > 21, trend still intact)
+  * Bollinger Bands: price near/below lower band (support level)
+  * Volume stable or increasing (not declining >30%)
+  * Liquidity stable (NOT draining)
+  * Buy pressure >40% (sellers not dominating)
+  * Your conviction is VERY HIGH (85%+ confidence) that fundamentals are strong
+  * This is a "buy the dip" opportunity with strong recovery potential
+
 - HOLD if RSI <50 AND EMA bullish AND Bollinger Bands not overbought
 - HOLD if momentum still healthy OR technical indicators show strength
+- HOLD if in loss but fundamentals unclear (don't accumulate without conviction)
 - HOLD if data unavailable/unclear (better safe than sorry)
 
-Your confidence should be 70%+ to SELL (based on technical indicators + market conditions), otherwise HOLD.
+Your confidence should be:
+- 70%+ to SELL (based on technical indicators + market conditions)
+- 85%+ to ACCUMULATE (very high conviction that fundamentals are strong despite dip)
+- Otherwise HOLD
 
 Respond ONLY with valid JSON:
 {
-  "action": "HOLD" | "SELL",
+  "action": "HOLD" | "SELL" | "ACCUMULATE",
   "confidence": 0-100,
   "reasoning": "specific technical reasons (mention which signals)"
 }`;
@@ -5326,7 +5342,7 @@ Respond ONLY with valid JSON:
       return {
         provider: provider.name,
         analysis: JSON.parse(jsonMatch[0]) as {
-          action: "HOLD" | "SELL";
+          action: "HOLD" | "SELL" | "ACCUMULATE";
           confidence: number;
           reasoning: string;
         }
@@ -5426,9 +5442,49 @@ Respond ONLY with valid JSON:
         logActivity('position_monitor', 'info', `💎 HOLD ${position.tokenSymbol}: ${currentProfitPercent.toFixed(2)}% → waiting for ${minProfitThreshold}% minimum`);
       }
     } else {
-      const actions = successful.map(m => `${m.provider}: ${m.analysis.action} ${m.analysis.confidence}%`).join(', ');
-      console.log(`[Position Monitor] ⏸️ Hivemind: No strong consensus to SELL → HOLDING (${actions})`);
-      logActivity('position_monitor', 'ai_thought', `🧠 Hivemind: ${position.tokenSymbol} → HOLD (${sellVotes.length}/${successful.length} sell votes, ${avgConfidence.toFixed(0)}% avg confidence)`);
+      // Check for ACCUMULATE consensus (majority vote + high conviction + in loss)
+      const accumulateVotes = successful.filter(m => m.analysis.action === "ACCUMULATE");
+      const accumulatePercentage = (accumulateVotes.length / successful.length) * 100;
+      const accumulateAvgConfidence = accumulateVotes.length > 0 
+        ? accumulateVotes.reduce((sum, m) => sum + m.analysis.confidence, 0) / accumulateVotes.length 
+        : 0;
+      
+      const majorityVotesAccumulate = accumulatePercentage > 50;
+      const hasHighConviction = accumulateAvgConfidence >= 85; // Very high conviction required
+      
+      if (majorityVotesAccumulate && hasHighConviction && isInLoss) {
+        console.log(`[Position Monitor] 🎯 ACCUMULATE SIGNAL: ${accumulateVotes.length}/${successful.length} models vote ACCUMULATE (${accumulatePercentage.toFixed(0)}%), avg conviction ${accumulateAvgConfidence.toFixed(0)}%`);
+        
+        // Safety Check 1: Position size limit (max 2x original entry amount)
+        const originalAmountSOL = parseFloat(position.amountSOL || "0");
+        const currentValueSOL = parseFloat(position.tokenAmount || "0") * currentPriceSOL;
+        const positionSizeRatio = currentValueSOL / originalAmountSOL;
+        
+        if (positionSizeRatio >= 2.0) {
+          console.log(`[Position Monitor] ⚠️ ACCUMULATE BLOCKED: Position already 2x original size (${positionSizeRatio.toFixed(2)}x) - safety limit reached`);
+          logActivity('position_monitor', 'warning', `⚠️ ${position.tokenSymbol}: Can't accumulate - already 2x original size`);
+        }
+        // Safety Check 2: Max drawdown limit (-15% max before forced stop-loss)
+        else if (currentProfitPercent < -15) {
+          console.log(`[Position Monitor] ⚠️ ACCUMULATE BLOCKED: Drawdown too deep (${currentProfitPercent.toFixed(2)}%) - forced stop-loss threshold reached`);
+          logActivity('position_monitor', 'warning', `⚠️ ${position.tokenSymbol}: Can't accumulate - drawdown >15%`);
+        }
+        // Execute accumulation
+        else {
+          const accumulateAmount = originalAmountSOL * 0.5; // Buy 50% of original entry size
+          console.log(`[Position Monitor] 💰 ACCUMULATING ${position.tokenSymbol}: Buying ${accumulateAmount.toFixed(4)} SOL more (strong fundamentals despite dip)`);
+          
+          const topModels = accumulateVotes.slice(0, 2).map(m => `${m.provider}: ${m.analysis.reasoning.substring(0, 50)}`).join('; ');
+          logActivity('position_monitor', 'success', `💰 ACCUMULATE ${position.tokenSymbol}: ${accumulateVotes.length}/${successful.length} vote, ${accumulateAvgConfidence.toFixed(0)}% conviction → buying ${accumulateAmount.toFixed(4)} SOL more`);
+          
+          // Execute accumulation buy
+          await executeAccumulateForPosition(config, position, treasuryKeyBase58, accumulateAmount, `Conviction Hold: ${accumulateVotes.length}/${successful.length} vote ACCUMULATE, ${accumulateAvgConfidence.toFixed(0)}% avg conviction (strong fundamentals). ${topModels}...`);
+        }
+      } else {
+        const actions = successful.map(m => `${m.provider}: ${m.analysis.action} ${m.analysis.confidence}%`).join(', ');
+        console.log(`[Position Monitor] ⏸️ Hivemind: No strong consensus to SELL or ACCUMULATE → HOLDING (${actions})`);
+        logActivity('position_monitor', 'ai_thought', `🧠 Hivemind: ${position.tokenSymbol} → HOLD (${sellVotes.length}/${successful.length} sell, ${accumulateVotes.length}/${successful.length} accumulate, ${avgConfidence.toFixed(0)}% avg confidence)`);
+      }
     }
     return;
   }
@@ -5890,6 +5946,84 @@ export async function rebalancePortfolioWithOpenAI() {
 
   } catch (error) {
     console.error("[Portfolio Rebalancer] Error:", error);
+  }
+}
+
+/**
+ * Execute accumulation (buy more of existing position) when AI has high conviction despite dip
+ * Safety limits: max 2x original size, max -15% drawdown
+ */
+async function executeAccumulateForPosition(
+  config: any,
+  position: any,
+  treasuryKeyBase58: string,
+  accumulateAmount: number,
+  reason: string
+): Promise<void> {
+  try {
+    console.log(`[Position Monitor] 💰 Accumulating ${position.tokenSymbol} - Reason: ${reason}`);
+    
+    const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
+    const { getWalletBalance } = await import("./solana");
+    const treasuryKeypair = loadKeypairFromPrivateKey(treasuryKeyBase58);
+    
+    // Check wallet balance
+    const walletBalance = await getWalletBalance(treasuryKeypair.publicKey.toString());
+    const FEE_RESERVE = 0.01; // Always keep 0.01 SOL for fees
+    const availableBalance = Math.max(0, walletBalance - FEE_RESERVE);
+    
+    if (availableBalance < accumulateAmount) {
+      console.log(`[Position Monitor] ⚠️ Insufficient funds to accumulate: Need ${accumulateAmount.toFixed(4)} SOL, have ${availableBalance.toFixed(4)} SOL`);
+      return;
+    }
+    
+    // Execute buy via Jupiter
+    const { buyTokenWithJupiter } = await import("./jupiter");
+    console.log(`[Position Monitor] 🔄 Buying ${accumulateAmount.toFixed(4)} SOL worth of ${position.tokenSymbol} to accumulate position`);
+    
+    const buyResult = await buyTokenWithJupiter(
+      treasuryKeyBase58,
+      position.tokenMint,
+      accumulateAmount,
+      300 // 3% slippage for buy (optimized)
+    );
+    
+    if (!buyResult.success || !buyResult.signature) {
+      console.error(`[Position Monitor] ❌ Failed to accumulate ${position.tokenSymbol}: ${buyResult.error}`);
+      logActivity('position_monitor', 'error', `❌ Accumulate failed for ${position.tokenSymbol}: ${buyResult.error}`);
+      return;
+    }
+    
+    const tokensReceived = buyResult.tokensReceived || 0;
+    console.log(`[Position Monitor] ✅ Accumulated ${position.tokenSymbol}: Received ${tokensReceived.toLocaleString()} tokens`);
+    console.log(`[Position Monitor] 📝 TX: https://solscan.io/tx/${buyResult.signature}`);
+    
+    // Update position with accumulated tokens
+    const currentTokenAmount = parseFloat(position.tokenAmount || "0");
+    const newTokenAmount = currentTokenAmount + tokensReceived;
+    
+    const currentAmountSOL = parseFloat(position.amountSOL || "0");
+    const newAmountSOL = currentAmountSOL + accumulateAmount;
+    
+    // Calculate new average entry price (dollar-cost averaging)
+    const newEntryPriceSOL = newAmountSOL / newTokenAmount;
+    
+    await storage.updateAIBotPosition(position.id, {
+      tokenAmount: newTokenAmount.toString(),
+      amountSOL: newAmountSOL.toString(),
+      entryPriceSOL: newEntryPriceSOL.toString(),
+    });
+    
+    console.log(`[Position Monitor] 📊 Position updated:`);
+    console.log(`  Token Amount: ${currentTokenAmount.toLocaleString()} → ${newTokenAmount.toLocaleString()} (+${((tokensReceived / currentTokenAmount) * 100).toFixed(1)}%)`);
+    console.log(`  SOL Invested: ${currentAmountSOL.toFixed(4)} → ${newAmountSOL.toFixed(4)} SOL`);
+    console.log(`  Avg Entry: ${parseFloat(position.entryPriceSOL).toFixed(9)} → ${newEntryPriceSOL.toFixed(9)} SOL (averaged down)`);
+    
+    logActivity('position_monitor', 'success', `💰 ACCUMULATED ${position.tokenSymbol}: +${accumulateAmount.toFixed(4)} SOL, avg entry ${newEntryPriceSOL.toFixed(9)} SOL`);
+    
+  } catch (error: any) {
+    console.error(`[Position Monitor] ❌ Error accumulating ${position.tokenSymbol}:`, error);
+    logActivity('position_monitor', 'error', `❌ Accumulate error for ${position.tokenSymbol}: ${error.message}`);
   }
 }
 
