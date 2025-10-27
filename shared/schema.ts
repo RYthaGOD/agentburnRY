@@ -197,6 +197,7 @@ export const aiBotPositions = pgTable("ai_bot_positions", {
   lastCheckTimestamp: timestamp("last_check_timestamp").notNull().defaultNow(),
   lastCheckPriceSOL: decimal("last_check_price_sol", { precision: 18, scale: 9 }),
   lastCheckProfitPercent: decimal("last_check_profit_percent", { precision: 10, scale: 2 }),
+  peakProfitPercent: decimal("peak_profit_percent", { precision: 10, scale: 2 }).notNull().default("0"), // Track highest profit achieved (for profit-hunting strategy)
   aiConfidenceAtBuy: integer("ai_confidence_at_buy"),
   aiPotentialAtBuy: decimal("ai_potential_at_buy", { precision: 10, scale: 2 }),
   rebuyCount: integer("rebuy_count").notNull().default(0), // Track number of times we've added to this position (max 2)

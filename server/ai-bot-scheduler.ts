@@ -4407,34 +4407,76 @@ async function monitorPositionsWithDeepSeek() {
 
             console.log(`[Position Monitor] ${position.tokenSymbol}: Entry $${entryPrice.toFixed(9)} → Current $${currentPriceSOL.toFixed(9)} (${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}%)`);
 
-            // 🎯 AGGRESSIVE PROFIT-TAKING: Auto-sell at 100%+ to lock in big winners
-            if (profitPercent >= 100) {
-              console.log(`[Position Monitor] 🎉 ${position.tokenSymbol} hit +100% profit target → SELLING to lock gains!`);
-              await executeSellForPosition(config, position, treasuryKeyBase58, `Profit-taking at +${profitPercent.toFixed(2)}% (100%+ target)`);
-              continue;
-            }
-
-            // 🛡️ TRAILING STOP-LOSS: Lock in profits as position grows
+            // 🎯 PROFIT-HUNTING STRATEGY: Only sell when profits are maximized, NOT on pullbacks
             const isSwingTrade = position.isSwingTrade === 1;
-            // Tightened stop-loss: -15% SWING (was -25%), -8% SCALP to limit losses
-            let stopLossThreshold = isSwingTrade ? -15 : -8;
             
-            // Upgrade stop-loss based on profit level
-            if (profitPercent >= 200) {
-              stopLossThreshold = 100; // At +200%, protect +100% gains
-              console.log(`[Position Monitor] 🛡️ ${position.tokenSymbol} trailing stop upgraded to +100% (from ${profitPercent.toFixed(2)}%)`);
-            } else if (profitPercent >= 100) {
-              stopLossThreshold = 50; // At +100%, protect +50% gains
-              console.log(`[Position Monitor] 🛡️ ${position.tokenSymbol} trailing stop upgraded to +50% (from ${profitPercent.toFixed(2)}%)`);
-            } else if (profitPercent >= 50) {
-              stopLossThreshold = 20; // At +50%, protect +20% gains
-              console.log(`[Position Monitor] 🛡️ ${position.tokenSymbol} trailing stop upgraded to +20% (from ${profitPercent.toFixed(2)}%)`);
+            // Track peak profit to identify pullbacks vs actual losses
+            const peakProfit = parseFloat(position.peakProfitPercent || "0");
+            const newPeakProfit = Math.max(peakProfit, profitPercent);
+            
+            // Update peak profit if we hit a new high
+            if (newPeakProfit > peakProfit) {
+              await storage.updateAIBotPosition(position.id, {
+                peakProfitPercent: newPeakProfit.toString(),
+              });
+              console.log(`[Position Monitor] 🚀 ${position.tokenSymbol} NEW PEAK: ${newPeakProfit.toFixed(2)}% (was ${peakProfit.toFixed(2)}%)`);
             }
             
-            if (profitPercent <= stopLossThreshold) {
-              console.warn(`[Position Monitor] ⚠️ ${position.tokenSymbol} hit ${stopLossThreshold}% trailing stop → SELLING to protect gains!`);
-              await executeSellForPosition(config, position, treasuryKeyBase58, `Trailing stop-loss at ${profitPercent.toFixed(2)}%`);
+            // 🛡️ LOSS PROTECTION: Only stop-loss if position is ACTUALLY LOSING MONEY
+            // Don't panic-sell on profit pullbacks - those are buying opportunities!
+            if (profitPercent < 0) {
+              // We're in loss territory - apply strict stop-loss
+              const maxLoss = isSwingTrade ? -15 : -8;
+              if (profitPercent <= maxLoss) {
+                console.warn(`[Position Monitor] ⛔ ${position.tokenSymbol} ACTUAL LOSS: ${profitPercent.toFixed(2)}% (stop: ${maxLoss}%) → SELLING to limit damage!`);
+                await executeSellForPosition(config, position, treasuryKeyBase58, `Stop-loss at ${profitPercent.toFixed(2)}% (max loss: ${maxLoss}%)`);
+                continue;
+              }
+            }
+            
+            // 💎 PROFIT PROTECTION: Lock in massive gains before fast crashes erase them
+            // Soft trailing stops only for EXTREME profits to prevent total wipeouts
+            if (newPeakProfit >= 200) {
+              // At +200% peak, protect at least +100% (allow 100% pullback from peak)
+              if (profitPercent <= 100) {
+                console.log(`[Position Monitor] 🛡️ ${position.tokenSymbol} PROFIT PROTECTION: Peaked at +${newPeakProfit.toFixed(2)}%, now +${profitPercent.toFixed(2)}% → SELLING to lock gains!`);
+                await executeSellForPosition(config, position, treasuryKeyBase58, `Profit protection: Peak +${newPeakProfit.toFixed(2)}% → +${profitPercent.toFixed(2)}%`);
+                continue;
+              }
+            } else if (newPeakProfit >= 150) {
+              // At +150% peak, protect at least +75% (allow 75% pullback from peak)
+              if (profitPercent <= 75) {
+                console.log(`[Position Monitor] 🛡️ ${position.tokenSymbol} PROFIT PROTECTION: Peaked at +${newPeakProfit.toFixed(2)}%, now +${profitPercent.toFixed(2)}% → SELLING to lock gains!`);
+                await executeSellForPosition(config, position, treasuryKeyBase58, `Profit protection: Peak +${newPeakProfit.toFixed(2)}% → +${profitPercent.toFixed(2)}%`);
+                continue;
+              }
+            } else if (newPeakProfit >= 120) {
+              // At +120% peak, protect at least +60% (allow 60% pullback from peak)
+              if (profitPercent <= 60) {
+                console.log(`[Position Monitor] 🛡️ ${position.tokenSymbol} PROFIT PROTECTION: Peaked at +${newPeakProfit.toFixed(2)}%, now +${profitPercent.toFixed(2)}% → SELLING to lock gains!`);
+                await executeSellForPosition(config, position, treasuryKeyBase58, `Profit protection: Peak +${newPeakProfit.toFixed(2)}% → +${profitPercent.toFixed(2)}%`);
+                continue;
+              }
+            }
+            
+            // 🎯 AUTO-SELL AT EXTREME MEGA-WINS (300%+) - Life-changing money, take it!
+            if (profitPercent >= 300) {
+              console.log(`[Position Monitor] 💰💰💰 ${position.tokenSymbol} MEGA-WIN: +${profitPercent.toFixed(2)}% → SELLING to lock in life-changing gains!`);
+              await executeSellForPosition(config, position, treasuryKeyBase58, `Auto-sell at +${profitPercent.toFixed(2)}% (300%+ mega-win)`);
               continue;
+            }
+            
+            // 📊 BUY THE DIP OPPORTUNITY: If we're still profitable but pulled back significantly
+            // This is a chance to accumulate more and lower average entry price
+            if (profitPercent > 0 && newPeakProfit > 15) {
+              const pullbackFromPeak = ((profitPercent - newPeakProfit) / newPeakProfit) * 100;
+              
+              // If we pulled back 30%+ from peak but still in profit, consider buying more
+              if (pullbackFromPeak <= -30) {
+                console.log(`[Position Monitor] 🎯 ${position.tokenSymbol} BUY THE DIP: Pulled back ${Math.abs(pullbackFromPeak).toFixed(1)}% from peak (+${newPeakProfit.toFixed(2)}% → +${profitPercent.toFixed(2)}%)`);
+                console.log(`[Position Monitor] 💡 This is a profit-maximization opportunity - should accumulate more tokens here!`);
+                // TODO: Implement auto-buy on dip logic here (for future enhancement)
+              }
             }
 
             // Use DeepSeek AI to analyze if we should sell (with OpenAI fallback)
@@ -4547,18 +4589,35 @@ async function analyzePositionWithAI(
   const isSwingTrade = position.isSwingTrade === 1;
   const aiConfidenceAtBuy = parseFloat(position.aiConfidenceAtBuy || "0");
 
-  // 🎯 PROFIT TARGET GATING: Only allow AI sells if we've hit profit targets OR approaching stop-loss
+  // 🎯 PROFIT-MAXIMIZATION GATING: Let AI analyze when we can capture MORE profit
   const profitTarget = isSwingTrade ? 15 : 4; // SWING: +15%, SCALP: +4%
-  const stopLossThreshold = isSwingTrade ? -15 : -8; // SWING: -15% (tightened from -20%), SCALP: -8%
+  const peakProfit = parseFloat(position.peakProfitPercent || "0");
   
-  // If we haven't hit profit target AND we're not near stop-loss, HOLD (don't even ask AI)
-  if (profitPercent < profitTarget && profitPercent > stopLossThreshold) {
-    console.log(`[Position Monitor] 💎 HOLDING ${position.tokenSymbol}: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}% (target: +${profitTarget}%, stop: ${stopLossThreshold}%) - skipping AI analysis`);
-    logActivity('position_monitor', 'info', `💎 HOLD ${position.tokenSymbol}: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}% (below +${profitTarget}% target)`);
-    return; // Don't sell until we hit profit target or stop-loss
+  // Track if we've ever hit profit target (peak-based, not current)
+  const hasHitProfitTarget = peakProfit >= profitTarget;
+  
+  // CASE 1: We're in profit and haven't hit target yet → HOLD and wait for more gains
+  if (profitPercent > 0 && profitPercent < profitTarget && !hasHitProfitTarget) {
+    console.log(`[Position Monitor] 💎 HUNTING PROFITS ${position.tokenSymbol}: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}% → waiting for +${profitTarget}% target (peak: ${peakProfit.toFixed(2)}%)`);
+    logActivity('position_monitor', 'info', `💎 HOLD ${position.tokenSymbol}: ${profitPercent.toFixed(2)}% → targeting +${profitTarget}%`);
+    return; // Keep riding the wave up!
   }
   
-  console.log(`[Position Monitor] 🔍 Analyzing ${position.tokenSymbol} with AI: ${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}% ${profitPercent >= profitTarget ? '(✅ hit profit target)' : '(⚠️ approaching stop-loss)'}`);
+  // CASE 2: We've hit profit target before, now in pullback → Ask AI if this is profit-maximization exit
+  // (e.g., went +20% → now +10%, AI can decide if this is the peak or just a dip)
+  if (hasHitProfitTarget && profitPercent > 0) {
+    console.log(`[Position Monitor] 🤔 ${position.tokenSymbol} in PROFIT PULLBACK: Peak +${peakProfit.toFixed(2)}% → Current +${profitPercent.toFixed(2)}% → AI analyzing for best exit`);
+  }
+  
+  // CASE 3: We're in actual loss territory → Ask AI to evaluate damage control
+  if (profitPercent < 0) {
+    console.log(`[Position Monitor] ⚠️ ${position.tokenSymbol} in LOSS: ${profitPercent.toFixed(2)}% → AI analyzing whether to cut or hold for recovery`);
+  }
+  
+  // CASE 4: We're past profit target → Ask AI for optimal exit timing
+  if (profitPercent >= profitTarget) {
+    console.log(`[Position Monitor] ✅ ${position.tokenSymbol} HIT TARGET: ${profitPercent.toFixed(2)}% (target: +${profitTarget}%) → AI finding optimal exit`);
+  }
 
   // Fetch comprehensive market data from DexScreener
   console.log(`[Position Monitor] 📊 Fetching market data for ${position.tokenSymbol} from DexScreener...`);
