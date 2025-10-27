@@ -105,9 +105,10 @@ export function evaluateMomentumBreakout(
   const priceChange24h = token.priceChange24h ?? 0;
   
   // Calculate volume threshold based on config multiplier
-  // Minimum base volume requirement
-  const minBaseVolume = 50000; // At least $50k volume baseline
-  const volumeIsHigh = volume24h >= minBaseVolume;
+  // Base volume: $50k, then scale by multiplier (default 2.0x)
+  const baseVolume = 50000; // $50k baseline
+  const volumeThreshold = baseVolume * config.momentumBreakoutVolumeMultiplier;
+  const volumeIsHigh = volume24h >= volumeThreshold;
   
   // BUY Signal: Strong 1h price movement + good volume
   if (
