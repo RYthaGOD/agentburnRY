@@ -431,7 +431,7 @@ async function getCachedOrFetchTokens(config?: {
 async function sellTokenWithJupiter(
   walletPrivateKey: string,
   tokenMint: string,
-  slippageBps: number = 1000
+  slippageBps: number = 500 // 5% slippage default (optimized for profit preservation)
 ): Promise<{
   success: boolean;
   signature?: string;
@@ -4101,7 +4101,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
             );
 
             if (tokenAccount.value.length > 0) {
-              const sellResult = await sellTokenWithJupiter(treasuryKeyBase58, mint, 1000);
+              const sellResult = await sellTokenWithJupiter(treasuryKeyBase58, mint, 800); // 8% emergency slippage for stop-loss
               
               if (sellResult.success && sellResult.signature) {
                 const solReceived = position.amountSOL * (1 + profitPercent / 100);
@@ -4228,7 +4228,7 @@ async function executeStandaloneAIBot(ownerWalletAddress: string, collectLogs = 
             const sellResult = await sellTokenWithJupiter(
               treasuryKeyBase58,
               mint,
-              1000 // 10% slippage
+              500 // 5% slippage - optimized for profit preservation
             );
 
             if (sellResult.success && sellResult.signature) {
