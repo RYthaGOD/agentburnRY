@@ -173,6 +173,32 @@ export const aiBotConfigs = pgTable("ai_bot_configs", {
   swingTradeCount: integer("swing_trade_count").notNull().default(0), // Count of SWING trades
   lastPerformanceUpdateAt: timestamp("last_performance_update_at"), // When performance was last recalculated
   
+  // Multi-Strategy Trading System (runs alongside AI-driven SCALP/SWING)
+  // Strategy 1: Mean Reversion - Buy oversold, sell overbought
+  meanReversionEnabled: boolean("mean_reversion_enabled").notNull().default(false),
+  meanReversionRSIOversold: integer("mean_reversion_rsi_oversold").notNull().default(30), // Buy when RSI < this
+  meanReversionRSIOverbought: integer("mean_reversion_rsi_overbought").notNull().default(70), // Sell when RSI > this
+  meanReversionPositionSizePercent: integer("mean_reversion_position_size_percent").notNull().default(5), // % of portfolio per trade
+  meanReversionProfitTargetPercent: integer("mean_reversion_profit_target_percent").notNull().default(10), // Take profit target
+  meanReversionStopLossPercent: integer("mean_reversion_stop_loss_percent").notNull().default(8), // Stop loss
+  meanReversionTradeCount: integer("mean_reversion_trade_count").notNull().default(0), // Track trades from this strategy
+  
+  // Strategy 2: Momentum Breakout - Catch explosive moves early
+  momentumBreakoutEnabled: boolean("momentum_breakout_enabled").notNull().default(false),
+  momentumBreakoutPriceChangePercent: integer("momentum_breakout_price_change_percent").notNull().default(15), // Min 1h price spike
+  momentumBreakoutVolumeMultiplier: decimal("momentum_breakout_volume_multiplier", { precision: 5, scale: 2 }).notNull().default("2.0"), // Volume vs avg
+  momentumBreakoutPositionSizePercent: integer("momentum_breakout_position_size_percent").notNull().default(7), // % of portfolio per trade
+  momentumBreakoutProfitTargetPercent: integer("momentum_breakout_profit_target_percent").notNull().default(20), // Take profit target
+  momentumBreakoutStopLossPercent: integer("momentum_breakout_stop_loss_percent").notNull().default(10), // Stop loss
+  momentumBreakoutTradeCount: integer("momentum_breakout_trade_count").notNull().default(0), // Track trades from this strategy
+  
+  // Strategy 3: Grid Trading - Multiple entry/exit levels for ranging markets
+  gridTradingEnabled: boolean("grid_trading_enabled").notNull().default(false),
+  gridTradingLevels: integer("grid_trading_levels").notNull().default(5), // Number of price levels
+  gridTradingPriceGapPercent: integer("grid_trading_price_gap_percent").notNull().default(5), // % gap between levels
+  gridTradingPerLevelSizePercent: integer("grid_trading_per_level_size_percent").notNull().default(2), // % per level
+  gridTradingTradeCount: integer("grid_trading_trade_count").notNull().default(0), // Track trades from this strategy
+  
   // Status tracking
   lastBotRunAt: timestamp("last_bot_run_at"),
   lastBotStatus: text("last_bot_status"), // "success", "failed", "skipped"
@@ -203,6 +229,9 @@ export const aiBotPositions = pgTable("ai_bot_positions", {
   aiPotentialAtBuy: decimal("ai_potential_at_buy", { precision: 10, scale: 2 }),
   rebuyCount: integer("rebuy_count").notNull().default(0), // Track number of times we've added to this position (max 2)
   isSwingTrade: integer("is_swing_trade").notNull().default(0), // 1 = swing trade (high confidence 85%+), 0 = regular trade
+  strategyType: text("strategy_type").notNull().default("AI_DRIVEN"), // "AI_DRIVEN", "MEAN_REVERSION", "MOMENTUM_BREAKOUT", "GRID_TRADING"
+  strategyProfitTarget: decimal("strategy_profit_target", { precision: 10, scale: 2 }), // Profit target % for this specific strategy
+  strategyStopLoss: decimal("strategy_stop_loss", { precision: 10, scale: 2 }), // Stop loss % for this specific strategy
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   // Unique constraint to prevent duplicate positions for the same token (atomic safeguard against race conditions)
