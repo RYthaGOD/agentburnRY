@@ -2,6 +2,7 @@
 // Supports both Groq (free, Llama 3) and xAI Grok (paid)
 
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 
 /**
  * Circuit Breaker for AI Models - Tracks failures and temporarily disables failing models
@@ -70,6 +71,9 @@ function getRateLimiter(provider: string): RateLimiter {
         break;
       case "xAI Grok":
         minDelay = 2000; // 2 seconds (expensive, use sparingly)
+        break;
+      case "Anthropic Claude":
+        minDelay = 1000; // 1 second (paid tier, high quality)
         break;
     }
     
@@ -454,6 +458,17 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
     });
   }
   
+  // Anthropic Claude Sonnet 4 (PAID, highest quality reasoning) - Priority 3 (premium tier)
+  // Note: Anthropic doesn't use OpenAI-compatible API, handled separately in analyzeSingleModel
+  if (includeOpenAI && process.env.ANTHROPIC_API_KEY && isModelAvailable("Anthropic Claude")) {
+    clients.push({
+      client: new OpenAI({ apiKey: "anthropic-placeholder" }), // Placeholder, actual client created in analyzeSingleModel
+      model: "claude-sonnet-4-20250514",
+      provider: "Anthropic Claude",
+      priority: 3,
+    });
+  }
+  
   // Fallback to xAI Grok (MOST EXPENSIVE - PAID) - Priority 4 (use as LAST RESORT only)
   if (process.env.XAI_API_KEY && isModelAvailable("xAI Grok")) {
     clients.push({
@@ -552,6 +567,7 @@ export function isGrokConfigured(): boolean {
     process.env.GROQ_API_KEY ||
     process.env.OPENAI_API_KEY ||
     process.env.OPENAI_API_KEY_2 ||
+    process.env.ANTHROPIC_API_KEY ||
     process.env.XAI_API_KEY
   );
 }
@@ -735,6 +751,248 @@ export async function analyzeTokenWithHiveMind(
 }
 
 /**
+ * Analyze token with Anthropic Claude (uses different API than OpenAI)
+ */
+async function analyzeSingleModelAnthropic(
+  model: string,
+  provider: string,
+  tokenData: TokenMarketData,
+  userRiskTolerance: "low" | "medium" | "high",
+  budgetPerTrade: number
+): Promise<TradingAnalysis> {
+  // Create Anthropic client
+  const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+  });
+  
+  // Calculate additional metrics for deeper analysis
+  const safeMarketCap = Math.max(tokenData.marketCapUSD, 0.01);
+  const safeVolume = Math.max(tokenData.volumeUSD24h, 0);
+  const safeLiquidity = Math.max(tokenData.liquidityUSD || 0, 0);
+  
+  const volumeToMarketCapRatio = safeVolume / safeMarketCap;
+  const liquidityToMarketCapRatio = safeLiquidity / safeMarketCap;
+  const priceVolatility = Math.abs(tokenData.priceChange24h || 0);
+  const hasRecentMomentum = (tokenData.priceChange1h || 0) > 0 && (tokenData.priceChange24h || 0) > 0;
+  
+  // Enhanced technical indicators
+  const priceChange1h = tokenData.priceChange1h || 0;
+  const priceChange24h = tokenData.priceChange24h || 0;
+  const priceChange5m = tokenData.priceChange5m || 0;
+  
+  // Momentum indicators
+  const isStrongUptrend = priceChange5m > 0 && priceChange1h > 0 && priceChange24h > 0;
+  const isWeakening = priceChange5m < 0 && priceChange1h > 0;
+  const isAccelerating = Math.abs(priceChange5m) > Math.abs(priceChange1h / 12);
+  
+  // Volume analysis
+  const volumeTrend = tokenData.volumeChange24h || 0;
+  const isVolumeIncreasing = volumeTrend > 10;
+  const isHighVolumeBreakout = volumeToMarketCapRatio > 0.2 && isVolumeIncreasing;
+  
+  // Buy/Sell pressure
+  const buyPressure = tokenData.buyPressurePercent || 50;
+  const sellPressure = 100 - buyPressure;
+  const buyerDominance = buyPressure > 60 ? 'STRONG BUYER CONTROL' : buyPressure > 55 ? 'MODERATE BUYER EDGE' : buyPressure < 40 ? 'SELLER PRESSURE' : 'BALANCED';
+  
+  // Liquidity depth analysis
+  const liquidityDepth = safeLiquidity / safeMarketCap;
+  const isLiquidityAdequate = liquidityDepth > 0.1;
+  const liquidityRisk = liquidityDepth < 0.05 ? 'HIGH RISK (thin liquidity)' : liquidityDepth < 0.1 ? 'MODERATE' : 'LOW RISK (deep liquidity)';
+  
+  // Pattern recognition
+  const is24hBreakout = priceChange24h > 15 && isVolumeIncreasing;
+  const isConsolidation = Math.abs(priceChange1h) < 3 && priceChange24h > -5;
+  const isPullback = priceChange1h < -5 && priceChange24h > 10;
+  const isReversal = priceChange5m > 5 && priceChange1h < -10;
+  const isPumpDumping = priceChange1h > 30 && priceChange5m < -10;
+  
+  const prompt = `You are a CONSERVATIVE cryptocurrency trading analyst specializing in HIGH-QUALITY token selection for Solana. Your goal is to identify tokens with strong fundamentals and sustainable growth potential through COMPREHENSIVE, IN-DEPTH ANALYSIS.
+
+**COMPREHENSIVE TOKEN DATA:**
+
+**Basic Information:**
+- Name: ${tokenData.name} (${tokenData.symbol})
+- Mint Address: ${tokenData.mint}
+- Current Price: $${tokenData.priceUSD.toFixed(6)} (${tokenData.priceSOL.toFixed(9)} SOL)
+${tokenData.description ? `- Description: ${tokenData.description}` : ''}
+
+**Market Metrics:**
+- Market Cap: $${tokenData.marketCapUSD.toLocaleString()}
+- 24h Trading Volume: $${tokenData.volumeUSD24h.toLocaleString()}
+- Volume/Market Cap Ratio: ${(volumeToMarketCapRatio * 100).toFixed(2)}% (${volumeToMarketCapRatio > 0.15 ? 'HIGH activity' : volumeToMarketCapRatio > 0.05 ? 'MODERATE activity' : 'LOW activity'})
+- Liquidity: $${(tokenData.liquidityUSD || 0).toLocaleString()}
+- Liquidity/Market Cap Ratio: ${(liquidityToMarketCapRatio * 100).toFixed(2)}% (${liquidityToMarketCapRatio > 0.1 ? 'STRONG' : liquidityToMarketCapRatio > 0.05 ? 'ADEQUATE' : 'WEAK'})
+
+**Price Action Analysis:**
+- 5m Price Change: ${priceChange5m > 0 ? '+' : ''}${priceChange5m.toFixed(2)}% ${isAccelerating ? '⚡ ACCELERATING' : ''}
+- 1h Price Change: ${priceChange1h > 0 ? '+' : ''}${priceChange1h.toFixed(2)}% ${isWeakening ? '⚠️ WEAKENING' : ''}
+- 24h Price Change: ${priceChange24h > 0 ? '+' : ''}${priceChange24h.toFixed(2)}%
+- Momentum Status: ${isStrongUptrend ? '🚀 STRONG UPTREND (all timeframes positive)' : hasRecentMomentum ? 'POSITIVE momentum' : 'NEUTRAL or NEGATIVE'}
+- Price Volatility (24h): ${priceVolatility.toFixed(2)}% (${priceVolatility > 30 ? 'HIGH risk' : priceVolatility > 15 ? 'MODERATE risk' : 'LOW risk'})
+
+**Volume & Liquidity Analysis:**
+- Volume Trend (24h): ${volumeTrend > 0 ? '+' : ''}${volumeTrend.toFixed(1)}% ${isVolumeIncreasing ? '📈 INCREASING' : ''}
+- Volume/Market Cap: ${(volumeToMarketCapRatio * 100).toFixed(2)}% ${isHighVolumeBreakout ? '🔥 HIGH VOLUME BREAKOUT' : ''}
+- Liquidity Depth: ${(liquidityDepth * 100).toFixed(2)}% (${liquidityRisk})
+- Liquidity/Market Cap: ${(liquidityToMarketCapRatio * 100).toFixed(2)}% (${isLiquidityAdequate ? 'ADEQUATE for safe trading' : '⚠️ THIN - slippage risk'})
+
+**Buy/Sell Pressure (Order Flow):**
+- Buy Pressure: ${buyPressure.toFixed(1)}% vs Sell: ${sellPressure.toFixed(1)}%
+- Order Flow Analysis: ${buyerDominance}
+${buyPressure > 65 ? '✅ Strong buying momentum - buyers in control' : buyPressure < 35 ? '❌ Heavy selling pressure - avoid' : '➖ Neutral order flow'}
+
+**Pattern Recognition Signals:**
+${is24hBreakout ? '🚀 **24H BREAKOUT PATTERN** - Price +15% with rising volume (bullish continuation)' : ''}
+${isConsolidation ? '📊 **CONSOLIDATION PATTERN** - Sideways price action (potential breakout setup)' : ''}
+${isPullback ? '💎 **HEALTHY PULLBACK** - Short-term dip in strong uptrend (buying opportunity)' : ''}
+${isReversal ? '🔄 **POTENTIAL REVERSAL** - Recent 5m strength after 1h weakness (bottom forming?)' : ''}
+${isPumpDumping ? '⚠️ **PUMP & DUMP WARNING** - Rapid rise followed by sharp drop (HIGH RISK)' : ''}
+${!is24hBreakout && !isConsolidation && !isPullback && !isReversal && !isPumpDumping ? '➖ No clear pattern identified' : ''}
+
+**Holder & Distribution:**
+${tokenData.holderCount ? `- Holder Count: ${tokenData.holderCount.toLocaleString()} (${tokenData.holderCount > 1000 ? 'GOOD distribution' : tokenData.holderCount > 500 ? 'MODERATE distribution' : 'CONCENTRATED holdings - RISK'})` : '- Holder Count: Not available'}
+
+**REQUIRED IN-DEPTH ANALYSIS FRAMEWORK:**
+
+Perform a COMPREHENSIVE evaluation across ALL of these critical dimensions:
+
+1. **FUNDAMENTAL QUALITY ASSESSMENT (40% weight)**
+   - Token utility and use case strength
+   - Project legitimacy and transparency
+   - Development activity and roadmap
+   - Community engagement and organic growth
+   - Token distribution and concentration risks
+   - Liquidity depth and sustainability
+
+2. **TECHNICAL PRICE ACTION & PATTERN ANALYSIS (30% weight)**
+   - **Momentum Analysis:** 5m, 1h, 24h price trends and acceleration
+   - **Volume Patterns:** Volume trending, breakouts, and volume-price correlation
+   - **Chart Patterns:** Breakouts, consolidations, pullbacks, reversals, pump-dumps
+   - **Order Flow:** Buy/sell pressure balance and buyer/seller dominance
+   - **Support/Resistance:** Key price levels and breakout/breakdown zones
+   - **Volatility Analysis:** Price stability and risk assessment
+   - **Predictable Patterns:** Identify repeatable setups (e.g., volume breakouts, consolidation breakouts, pullback entries)
+   - **Pattern Probability:** Assess likelihood of pattern completion based on historical behavior
+
+3. **MARKET CONDITIONS & TIMING (20% weight)**
+   - Market cap position relative to similar tokens
+   - Volume/liquidity adequacy for safe entry/exit
+   - Current market cycle stage (early, mid, late)
+   - Competitive positioning in sector
+   - Potential catalysts or upcoming events
+
+4. **RISK EVALUATION (15% weight)**
+   - Rug pull indicators (liquidity locks, dev wallets)
+   - Holder concentration (whale manipulation risk)
+   - Smart contract security (if verifiable)
+   - Historical pump-and-dump patterns
+   - Exit liquidity availability
+
+**PATTERN-DRIVEN TRADING STRATEGY:**
+Leverage PREDICTABLE PATTERNS for high-probability trades:
+
+**Pattern Priority (Trade These Setups):**
+1. **Volume Breakout + Consolidation Break:** Price consolidating (flat 1h) then breaks out with 20%+ volume increase
+2. **Healthy Pullback in Uptrend:** 24h up 15-30%, 1h down 5-10% (buying the dip), strong buy pressure returns
+3. **Reversal with Volume:** After 1h decline, 5m shows strong reversal (+5%) with increasing volume
+4. **Strong Uptrend Continuation:** All timeframes (5m, 1h, 24h) positive + volume increasing + buyer dominance >60%
+
+**Avoid These Patterns (High Risk):**
+- Pump & Dump: Rapid >30% gain in 1h followed by sharp 5m reversal
+- Fading Volume: Price rising but volume declining (weak continuation)
+- Seller Dominance: Buy pressure <40% despite price stability
+- Thin Liquidity Spikes: Price volatility >30% with liquidity <5% of market cap
+
+**Use ALL Technical Indicators:**
+- Combine 3+ timeframes (5m, 1h, 24h) for trend confirmation
+- Volume MUST confirm price action (rising price needs rising volume)
+- Buy/sell pressure validates momentum direction
+- Liquidity depth determines position sizing safety
+- Pattern recognition identifies predictable entry/exit points
+
+**Conservative Entry Rules:**
+- ONLY recommend BUY at 65%+ confidence when pattern + fundamentals align
+- Require 2+ bullish indicators (momentum + volume + order flow)
+- Pattern must be clear and historically profitable (breakout, pullback, reversal)
+- Always check for counter-signals (pump-dump, fading volume, seller pressure)
+
+**DECISION CRITERIA:**
+For BUY recommendation (requires 70%+ confidence):
+- Strong fundamentals (utility, team, community)
+- Positive technical momentum (rising volume, bullish price action)
+- Adequate liquidity (>$8k minimum, preferably >$15k)
+- Healthy holder distribution (>500 holders preferred)
+- Volume/market cap ratio >5% (indicates active interest)
+- Clear upside catalyst or growth narrative
+- Low rug pull risk indicators
+
+For HOLD/SELL recommendation:
+- Any red flags in fundamentals or technical analysis
+- Insufficient liquidity or extreme volatility
+- Concentration risks or whale manipulation signs
+- Overextended price (already pumped significantly)
+- Weakening volume or momentum deterioration
+
+**OUTPUT FORMAT:**
+Provide your DETAILED analysis in JSON with these exact fields:
+{
+  "action": "buy" | "sell" | "hold",
+  "confidence": 0.0-1.0 (ONLY use 0.70+ for BUY recommendations),
+  "reasoning": "comprehensive multi-paragraph analysis covering all 4 dimensions above with specific data points and conclusions",
+  "potentialUpsidePercent": number (realistic estimate based on technical analysis and comparable tokens),
+  "riskLevel": "low" | "medium" | "high" (based on thorough risk evaluation),
+  "suggestedBuyAmountSOL": number (optional, if action is buy),
+  "stopLossPercent": number (optional, suggested stop loss level),
+  "takeProfitPercent": number (optional, suggested take profit level),
+  "keyFactors": ["specific factor 1", "specific factor 2", ...] (list 5-8 specific factors that influenced your decision)
+}
+
+Be thorough, analytical, and CONSERVATIVE. Quality analysis over quick decisions.`;
+
+  // Call Anthropic API with exponential backoff
+  const response = await retryWithExponentialBackoff(
+    async () => {
+      return await anthropic.messages.create({
+        model: model,
+        max_tokens: 2000,
+        system: "You are an EXPERT cryptocurrency trading analyst specializing in PATTERN-DRIVEN, HIGH-PROBABILITY trades on Solana. You excel at identifying PREDICTABLE TRADING PATTERNS (breakouts, pullbacks, reversals, consolidations) and combining them with comprehensive technical indicators (momentum, volume, buy/sell pressure, liquidity depth). You analyze ALL available indicators across multiple timeframes (5m, 1h, 24h) to find high-confidence setups. You're data-driven, systematic, and pattern-focused - looking for repeatable setups with strong technical confirmation. Always respond with valid JSON containing detailed pattern and indicator analysis.",
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.3,
+      });
+    },
+    provider,
+    3
+  );
+
+  const analysisText = response.content[0].type === 'text' ? response.content[0].text : '';
+  if (!analysisText) {
+    throw new Error(`No response from ${provider}`);
+  }
+
+  const analysis = JSON.parse(analysisText) as TradingAnalysis;
+
+  // Validate and enforce constraints
+  if (analysis.action === "buy") {
+    if (!analysis.suggestedBuyAmountSOL || analysis.suggestedBuyAmountSOL > budgetPerTrade) {
+      analysis.suggestedBuyAmountSOL = budgetPerTrade;
+    }
+
+    if (analysis.confidence < 0.4) {
+      analysis.action = "hold";
+      analysis.reasoning += " [Confidence below 40% threshold]";
+    }
+  }
+
+  return analysis;
+}
+
+/**
  * Analyze token with single AI model
  */
 async function analyzeSingleModel(
@@ -747,6 +1005,17 @@ async function analyzeSingleModel(
 ): Promise<TradingAnalysis> {
   // Universal rate limiting: Acquire lock for ALL providers to prevent 429 errors
   await acquireRateLimitLock(provider);
+  
+  // Handle Anthropic Claude separately (doesn't use OpenAI API)
+  if (provider === "Anthropic Claude") {
+    return await analyzeSingleModelAnthropic(
+      model,
+      provider,
+      tokenData,
+      userRiskTolerance,
+      budgetPerTrade
+    );
+  }
   
   // Calculate additional metrics for deeper analysis
   // Add safeguards for zero/near-zero values to prevent Infinity/NaN
