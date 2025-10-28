@@ -28,7 +28,14 @@ A `node-cron` service automates hourly checks for buyback execution, including p
 
 -   **Autonomous Capital Management:** Manages liquidity reserves, employs percentage-based position sizing, and uses AI-driven exits. It includes strict quality filters for token selection, portfolio diversification, optimized stop-loss protection, and a Portfolio Drawdown Circuit Breaker.
 -   **Token Discovery:** Aggregates tokens from various sources like DexScreener Trending and PumpFun.
--   **Smart Hivemind AI Workflow:** Features position monitoring, quick and deep technical scans (full 12-model hivemind), and automatic portfolio rebalancing. The 12-Model Hivemind System uses various AI providers (e.g., DeepSeek, Anthropic Claude, xAI Grok, Google Gemini, OpenAI) with weighted confidence voting (OpenAI 1.3x, DeepSeek 1.2x, Claude 1.2x) and smart model prioritization.
+-   **Smart Hivemind AI Workflow with 4-Team Rotation:** Features position monitoring, quick and deep technical scans, and automatic portfolio rebalancing. The system uses a 4-team rotation with 3 AI models per team, each working 6-hour shifts for 24/7 coverage:
+    -   **Team A (0-6 UTC):** DeepSeek (1.2x), OpenAI (1.3x), Cerebras (1.0x)
+    -   **Team B (6-12 UTC):** DeepSeek #2 (1.2x), OpenAI #2 (1.3x), Google Gemini (1.0x)
+    -   **Team C (12-18 UTC):** Anthropic Claude (1.2x), Together AI (1.1x), Groq (1.0x)
+    -   **Team D (18-24 UTC):** OpenRouter (1.1x), ChatAnywhere (1.0x), xAI Grok (1.0x)
+    -   **Auto-Replacement:** When a team member fails, the system automatically swaps in the healthiest inactive model
+    -   **Weighted Voting:** Each AI model has a voting weight multiplier (OpenAI 1.3x, DeepSeek/Claude 1.2x, Together/OpenRouter 1.1x, others 1.0x) for consensus decisions
+    -   **75% Cost Savings:** Only 3 models active at once (instead of 12), reducing API costs dramatically
 -   **Intelligent Circuit Breaker Protection:** Disables and rotates failing AI models, prioritizing reliable ones based on health scoring.
 -   **Advanced AI Rate Limiting & Retry System:** Implements universal and provider-specific rate limiting, exponential backoff for retries, and a smart circuit breaker to distinguish between rate limits and permanent failures.
 -   **Tri-Mode Trading Strategy (PROFITABILITY OPTIMIZED - MAJOR UPDATE Oct 2025):** Supports SCALP, QUICK_2X, and SWING modes with significantly raised confidence thresholds, conservative position sizing, and positive R-multiples to fix 3% win rate:

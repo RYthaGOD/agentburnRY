@@ -65,11 +65,28 @@ function getActiveTeam(): TeamConfig {
 }
 
 /**
- * Get voting weight for a provider based on active team
+ * Global voting weights map for all providers (used for replacements from other teams)
+ */
+const GLOBAL_VOTING_WEIGHTS: Record<string, number> = {
+  "OpenAI": 1.3,
+  "OpenAI #2": 1.3,
+  "DeepSeek": 1.2,
+  "DeepSeek #2": 1.2,
+  "Anthropic Claude": 1.2,
+  "Together AI": 1.1,
+  "OpenRouter": 1.1,
+  "Cerebras": 1.0,
+  "Google Gemini": 1.0,
+  "ChatAnywhere": 1.0,
+  "Groq": 1.0,
+  "xAI Grok": 1.0,
+};
+
+/**
+ * Get voting weight for a provider (works even for replacement providers from other teams)
  */
 function getProviderVotingWeight(provider: string): number {
-  const activeTeam = getActiveTeam();
-  return activeTeam.votingWeights[provider] || 1.0; // Default 1.0x if not specified
+  return GLOBAL_VOTING_WEIGHTS[provider] || 1.0; // Default 1.0x if not specified
 }
 
 /**
@@ -822,10 +839,15 @@ export async function analyzeTokenWithHiveMind(
 
   const totalWeight = buyWeight + sellWeight + holdWeight;
   
-  // Calculate average confidence for each action (for smarter consensus)
-  const buyAvgConfidence = buyVotes.length > 0 ? buyWeight / buyVotes.length : 0;
-  const sellAvgConfidence = sellVotes.length > 0 ? sellWeight / sellVotes.length : 0;
-  const holdAvgConfidence = holdVotes.length > 0 ? holdWeight / holdVotes.length : 0;
+  // Calculate average confidence for each action (divide by sum of weights, not vote count)
+  // This prevents inflated confidence values when using weighted voting
+  const buyWeightSum = buyVotes.reduce((sum, v) => sum + v.votingWeight, 0);
+  const sellWeightSum = sellVotes.reduce((sum, v) => sum + v.votingWeight, 0);
+  const holdWeightSum = holdVotes.reduce((sum, v) => sum + v.votingWeight, 0);
+  
+  const buyAvgConfidence = buyWeightSum > 0 ? Math.min(1.0, buyWeight / buyWeightSum) : 0;
+  const sellAvgConfidence = sellWeightSum > 0 ? Math.min(1.0, sellWeight / sellWeightSum) : 0;
+  const holdAvgConfidence = holdWeightSum > 0 ? Math.min(1.0, holdWeight / holdWeightSum) : 0;
   
   // Determine consensus action using WEIGHTED voting (not just count)
   // This prioritizes high-confidence votes over low-confidence ones
