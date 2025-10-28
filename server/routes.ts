@@ -2110,7 +2110,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Verify message contains the project ID and is recent (within 5 minutes)
       const expectedMessagePrefix = `Delete keys for project ${project.id}`;
-      if (!message.startsWith(expectedMessagePrefix)) {
+      
+      // Use constant-time comparison to prevent timing attacks
+      const messagePrefix = message.substring(0, expectedMessagePrefix.length);
+      const expectedBuffer = Buffer.from(expectedMessagePrefix, 'utf8');
+      const actualBuffer = Buffer.from(messagePrefix, 'utf8');
+      
+      // Pad buffers to same length to ensure constant-time comparison works
+      const maxLength = Math.max(expectedBuffer.length, actualBuffer.length);
+      const paddedExpected = Buffer.alloc(maxLength);
+      const paddedActual = Buffer.alloc(maxLength);
+      expectedBuffer.copy(paddedExpected);
+      actualBuffer.copy(paddedActual);
+      
+      let isValidPrefix = false;
+      try {
+        isValidPrefix = crypto.timingSafeEqual(paddedExpected, paddedActual);
+      } catch (error) {
+        isValidPrefix = false;
+      }
+      
+      if (!isValidPrefix) {
         return res.status(400).json({ 
           message: "Invalid message format" 
         });
@@ -2399,9 +2419,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             tokenAmount: String(amount),
             tokenDecimals: Number(decimals),
             buyTxSignature: "imported", // Mark as imported, not from a trade
-            buyTimestamp: new Date(),
             aiConfidenceAtBuy: 0, // Unknown since manually imported
-            aiPotentialAtBuy: 0,
+            aiPotentialAtBuy: "0",
             rebuyCount: 0,
             isSwingTrade: 0,
           });
