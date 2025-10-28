@@ -340,21 +340,24 @@ interface TokenCache {
 }
 
 const tokenDataCache: Map<string, TokenCache> = new Map();
-const CACHE_DURATION_MS = 45 * 60 * 1000; // 45 minutes (EXTENDED: reduces API calls by 66%)
+const CACHE_DURATION_MS = 20 * 60 * 1000; // 20 minutes (BALANCED: fresh data + API savings)
 
 /**
- * Cache for AI analysis results to avoid re-analyzing same tokens
- * EXTENDED TTL to reduce API usage by 75%+ while maintaining accuracy
+ * Cache for AI analysis results with ADAPTIVE INVALIDATION
+ * Auto-invalidates when price moves significantly, preventing stale decisions
  */
 interface AnalysisCache {
   analysis: any;
   timestamp: number;
   expiresAt: number;
-  priceAtAnalysis?: number; // Track price to detect significant changes
+  priceAtAnalysis: number; // Track price to detect significant changes
+  profitAtAnalysis: number; // Track profit to detect significant changes
 }
 
 const analysisCache: Map<string, AnalysisCache> = new Map();
-const ANALYSIS_CACHE_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours (EXTENDED: massive API savings)
+const ANALYSIS_CACHE_DURATION_MS = 45 * 60 * 1000; // 45 minutes MAX (adaptive invalidation triggers earlier)
+const CACHE_INVALIDATION_PRICE_THRESHOLD = 8; // Invalidate cache if price moves >8%
+const CACHE_INVALIDATION_PROFIT_THRESHOLD = 10; // Invalidate cache if profit moves >10%
 
 /**
  * Position fingerprint cache - skip re-analyzing positions that haven't changed
@@ -4622,17 +4625,60 @@ async function batchAnalyzePositionsWithHivemind(
     return results;
   }
 
-  // 💡 SMART API OPTIMIZATION: Skip positions that haven't changed significantly
+  // 💡 SMART API OPTIMIZATION with ADAPTIVE CACHE INVALIDATION
   const positionsNeedingAnalysis: typeof validPositions = [];
   const now = Date.now();
   const POSITION_CHANGE_THRESHOLD = 3; // Only re-analyze if price changed >3%
-  const MIN_REANALYSIS_INTERVAL_MS = 20 * 60 * 1000; // Minimum 20 minutes between analyses
+  const MIN_REANALYSIS_INTERVAL_MS = 15 * 60 * 1000; // Minimum 15 minutes between analyses
+  const MAX_CACHE_AGE_MS = 40 * 60 * 1000; // Force re-analysis after 40 minutes regardless
 
   for (const pos of validPositions) {
-    const fingerprint = positionFingerprints.get(pos.mint);
+    let needsAnalysis = false;
+    let reason = "";
+
+    // Check cached analysis first (most important check)
+    const cachedAnalysis = analysisCache.get(pos.mint);
     
-    // Check if we can skip re-analysis
-    if (fingerprint) {
+    if (cachedAnalysis && cachedAnalysis.expiresAt > now) {
+      const cacheAge = now - cachedAnalysis.timestamp;
+      
+      // ADAPTIVE INVALIDATION: Check if price/profit moved significantly since analysis
+      const priceChangePercent = Math.abs(((pos.currentPriceSOL - cachedAnalysis.priceAtAnalysis) / cachedAnalysis.priceAtAnalysis) * 100);
+      const profitChangePercent = Math.abs(pos.profitPercent - cachedAnalysis.profitAtAnalysis);
+      
+      // Force re-analysis if:
+      // 1. Cache too old (>40 min) - prevents multi-step staleness
+      // 2. Price moved >8% - significant market change
+      // 3. Profit moved >10% - position performance changed dramatically
+      if (cacheAge > MAX_CACHE_AGE_MS) {
+        needsAnalysis = true;
+        reason = `cache age ${Math.floor(cacheAge / 60000)}min`;
+      } else if (priceChangePercent > CACHE_INVALIDATION_PRICE_THRESHOLD) {
+        needsAnalysis = true;
+        reason = `price moved ${priceChangePercent.toFixed(1)}%`;
+      } else if (profitChangePercent > CACHE_INVALIDATION_PROFIT_THRESHOLD) {
+        needsAnalysis = true;
+        reason = `profit moved ${profitChangePercent.toFixed(1)}%`;
+      } else {
+        // Cache still valid - reuse it!
+        console.log(`[API Saver] ✅ Using cached ${pos.symbol} - age ${Math.floor(cacheAge / 60000)}m, price Δ${priceChangePercent.toFixed(1)}%, profit Δ${profitChangePercent.toFixed(1)}%`);
+        results.set(pos.mint, {
+          confidence: cachedAnalysis.analysis.confidence || 50,
+          recommendation: cachedAnalysis.analysis.recommendation || "HOLD",
+          reasoning: cachedAnalysis.analysis.reasoning || "Cached analysis",
+          errored: false
+        });
+        continue;
+      }
+    } else {
+      // No cache or expired
+      needsAnalysis = true;
+      reason = cachedAnalysis ? "cache expired" : "no cache";
+    }
+    
+    // Additional check: fingerprint (recent micro-movements)
+    const fingerprint = positionFingerprints.get(pos.mint);
+    if (fingerprint && !needsAnalysis) {
       const timeSinceLastAnalysis = now - fingerprint.lastAnalyzedAt;
       const priceChangePercent = Math.abs(((pos.currentPriceSOL - fingerprint.lastPrice) / fingerprint.lastPrice) * 100);
       const profitChangePercent = Math.abs(pos.profitPercent - fingerprint.lastProfit);
@@ -4643,23 +4689,15 @@ async function batchAnalyzePositionsWithHivemind(
         priceChangePercent < POSITION_CHANGE_THRESHOLD &&
         profitChangePercent < POSITION_CHANGE_THRESHOLD
       ) {
-        console.log(`[API Saver] ⏭️  Skipping ${pos.symbol} - no significant change (price: ${priceChangePercent.toFixed(1)}%, profit: ${profitChangePercent.toFixed(1)}%)`);
-        
-        // Use last analysis result from cache
-        const cachedAnalysis = analysisCache.get(pos.mint);
-        if (cachedAnalysis) {
-          results.set(pos.mint, {
-            confidence: cachedAnalysis.analysis.confidence || 50,
-            recommendation: cachedAnalysis.analysis.recommendation || "HOLD",
-            reasoning: `Cached (no change) - ${cachedAnalysis.analysis.reasoning}`,
-            errored: false
-          });
-        }
+        console.log(`[API Saver] ⏭️  Skipping ${pos.symbol} - micro-change (price: ${priceChangePercent.toFixed(1)}%, profit: ${profitChangePercent.toFixed(1)}%)`);
         continue;
       }
     }
     
     // Position needs fresh analysis
+    if (reason) {
+      console.log(`[API Saver] 🔄 Re-analyzing ${pos.symbol} - ${reason}`);
+    }
     positionsNeedingAnalysis.push(pos);
     
     // Update fingerprint
@@ -4900,12 +4938,13 @@ Respond with JSON array:
         
         results.set(position.mint, analysisResult);
         
-        // 💾 CACHE this analysis for 2 hours to reduce future API calls
+        // 💾 CACHE this analysis with adaptive invalidation tracking
         analysisCache.set(position.mint, {
           analysis: analysisResult,
           timestamp: Date.now(),
           expiresAt: Date.now() + ANALYSIS_CACHE_DURATION_MS,
-          priceAtAnalysis: position.currentPriceSOL
+          priceAtAnalysis: position.currentPriceSOL,
+          profitAtAnalysis: position.profitPercent
         });
       }
     }
