@@ -411,7 +411,20 @@ export const tradeJournal = pgTable("trade_journal", {
   index("trade_journal_buy_tx_idx").on(table.buyTxSignature),
 ]);
 
-// No relations for aiBotConfigs, tokenBlacklist, or tradeJournal - all are standalone
+// AI System Recovery Mode Configuration - Global singleton table
+export const aiRecoveryMode = pgTable("ai_recovery_mode", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  enabled: boolean("enabled").notNull().default(false),
+  startedAt: timestamp("started_at"),
+  endsAt: timestamp("ends_at"),
+  recoveryProvider: text("recovery_provider").notNull().default("xAI Grok"), // Which single model to use during recovery
+  reason: text("reason"), // Why recovery mode was activated
+  activatedBy: text("activated_by"), // Wallet address that activated it
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// No relations for aiBotConfigs, tokenBlacklist, tradeJournal, or aiRecoveryMode - all are standalone
 
 export const insertProjectSchema = createInsertSchema(projects).omit({
   id: true,
@@ -557,3 +570,12 @@ export const insertTradeJournalSchema = createInsertSchema(tradeJournal).omit({
 
 export type TradeJournal = typeof tradeJournal.$inferSelect;
 export type InsertTradeJournal = z.infer<typeof insertTradeJournalSchema>;
+
+export const insertAIRecoveryModeSchema = createInsertSchema(aiRecoveryMode).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type AIRecoveryMode = typeof aiRecoveryMode.$inferSelect;
+export type InsertAIRecoveryMode = z.infer<typeof insertAIRecoveryModeSchema>;

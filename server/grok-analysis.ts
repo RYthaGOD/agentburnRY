@@ -3,6 +3,9 @@
 
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
+import { db } from "./db";
+import { aiRecoveryMode } from "@shared/schema";
+import { desc } from "drizzle-orm";
 
 /**
  * 🔄 4-TEAM ROTATION SYSTEM (3 models per team, 6-hour shifts)
@@ -49,9 +52,72 @@ const AI_TEAMS: TeamConfig[] = [
 ];
 
 /**
- * Get currently active team based on UTC hour
+ * Check if system is in recovery mode and return recovery provider
+ * Returns null if not in recovery mode or if recovery period has expired
  */
-function getActiveTeam(): TeamConfig {
+async function getRecoveryModeProvider(): Promise<string | null> {
+  try {
+    // Get the most recent recovery mode configuration
+    const recoveryConfig = await db
+      .select()
+      .from(aiRecoveryMode)
+      .orderBy(desc(aiRecoveryMode.createdAt))
+      .limit(1);
+    
+    if (recoveryConfig.length === 0 || !recoveryConfig[0].enabled) {
+      return null; // No recovery mode configured or disabled
+    }
+    
+    const config = recoveryConfig[0];
+    const now = new Date();
+    
+    // Check if recovery period has ended
+    if (config.endsAt && now > config.endsAt) {
+      console.log(`[Recovery Mode] Period ended at ${config.endsAt.toISOString()}, resuming normal 4-team rotation`);
+      
+      // Auto-disable recovery mode
+      const { eq } = await import("drizzle-orm");
+      await db
+        .update(aiRecoveryMode)
+        .set({ enabled: false, updatedAt: now })
+        .where(eq(aiRecoveryMode.id, config.id));
+      
+      return null; // Recovery period expired
+    }
+    
+    // Recovery mode active - return the recovery provider
+    const hoursRemaining = config.endsAt 
+      ? ((config.endsAt.getTime() - now.getTime()) / (1000 * 60 * 60)).toFixed(1)
+      : 'unlimited';
+    
+    console.log(`[Recovery Mode] 🔧 ACTIVE - Using ${config.recoveryProvider} only (${hoursRemaining}h remaining)`);
+    return config.recoveryProvider;
+  } catch (error) {
+    console.error('[Recovery Mode] Error checking recovery mode:', error);
+    return null; // On error, default to normal operation
+  }
+}
+
+/**
+ * Get currently active team based on UTC hour
+ * Checks for recovery mode first - if active, returns single-provider team
+ */
+async function getActiveTeam(): Promise<TeamConfig> {
+  // Check if in recovery mode
+  const recoveryProvider = await getRecoveryModeProvider();
+  
+  if (recoveryProvider) {
+    // Return a special recovery team with only the recovery provider
+    return {
+      name: "Recovery Mode Team",
+      providers: [recoveryProvider],
+      votingWeights: { [recoveryProvider]: 1.0 },
+      startHour: 0,
+      endHour: 24, // Active 24/7
+    };
+  }
+  
+  // Normal operation - use time-based rotation
   const utcHour = new Date().getUTCHours();
   
   for (const team of AI_TEAMS) {
@@ -104,8 +170,8 @@ function getAllTeamProviders(): string[] {
  * Auto-replace failing team member with healthiest backup from inactive teams
  * Returns replacement provider name or null if no healthy backup available
  */
-function findHealthyReplacement(failedProvider: string): string | null {
-  const activeTeam = getActiveTeam();
+async function findHealthyReplacement(failedProvider: string): Promise<string | null> {
+  const activeTeam = await getActiveTeam();
   const activeProviders = new Set(activeTeam.providers);
   const allProviders = getAllTeamProviders();
   
@@ -449,12 +515,12 @@ function isPeakTradingHours(): boolean {
  * Auto-replaces failing team members with healthy backups from inactive teams
  * @param context Optional context to determine smart OpenAI usage and model limits
  */
-function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: OpenAI; model: string; provider: string; priority: number; votingWeight: number }> {
+async function getAllAIClients(context: OpenAIUsageContext = {}): Promise<Array<{ client: OpenAI; model: string; provider: string; priority: number; votingWeight: number }>> {
   const clients = [];
   const includeOpenAI = shouldIncludeOpenAI(context);
   
-  // Get active team based on current UTC hour (0-6, 6-12, 12-18, 18-24)
-  const activeTeam = getActiveTeam();
+  // Get active team based on current UTC hour (0-6, 6-12, 12-18, 18-24) or recovery mode
+  const activeTeam = await getActiveTeam();
   const activeProviders = new Set(activeTeam.providers);
   
   // Track replacements for failed team members
@@ -463,7 +529,7 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
   // Check if any active team members are down and need replacement
   for (const provider of activeTeam.providers) {
     if (!isModelAvailable(provider)) {
-      const replacement = findHealthyReplacement(provider);
+      const replacement = await findHealthyReplacement(provider);
       if (replacement) {
         replacements.set(provider, replacement);
         activeProviders.delete(provider);
@@ -711,8 +777,8 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
 /**
  * Initialize AI client - Single provider fallback (used for position monitoring)
  */
-export function getAIClient(): { client: OpenAI; model: string; provider: string } {
-  const clients = getAllAIClients();
+export async function getAIClient(): Promise<{ client: OpenAI; model: string; provider: string }> {
+  const clients = await getAllAIClients();
   
   if (clients.length === 0) {
     throw new Error("No AI API key configured. Set CEREBRAS_API_KEY, GOOGLE_AI_KEY, DEEPSEEK_API_KEY, CHATANYWHERE_API_KEY, TOGETHER_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, OPENAI_API_KEY, OPENAI_API_KEY_2, or XAI_API_KEY");
@@ -759,8 +825,8 @@ export async function analyzeTokenWithHiveMind(
     context.isPeakHours = isPeakTradingHours();
   }
 
-  // FORCE FULL HIVEMIND: Always use all 7 models (including premium OpenAI) for every decision
-  const clients = getAllAIClients({ ...context, forceInclude: true });
+  // FORCE FULL HIVEMIND: Always use all models (or single model in recovery mode)
+  const clients = await getAllAIClients({ ...context, forceInclude: true });
   
   if (clients.length === 0) {
     throw new Error("No AI providers configured for hive mind");
@@ -768,8 +834,8 @@ export async function analyzeTokenWithHiveMind(
 
   const providers = clients.map(c => c.provider).join(", ");
   
-  // FULL HIVEMIND: All 7 models used for every decision
-  console.log(`[Hive Mind] 🧠 FULL HIVEMIND: All ${clients.length} AI models running in parallel for maximum accuracy`);
+  // FULL HIVEMIND: All models used for every decision (or single model in recovery mode)
+  console.log(`[Hive Mind] 🧠 FULL HIVEMIND: All ${clients.length} AI model(s) running in parallel for maximum accuracy`);
   console.log(`[Hive Mind] 📊 Providers: ${providers}`);
   
   // Query all models in parallel with circuit breaker tracking
