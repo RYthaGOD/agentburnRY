@@ -24,11 +24,11 @@ A `node-cron` service automates hourly checks for buyback execution, including p
 - **Buy Bot (Limit Orders):** Executes buy orders based on target SOL prices with configurable limits and slippage protection.
 
 #### GigaBrain AI Trading Bot (Standalone)
-**GigaBrain** operates autonomously with an 11-model AI hivemind, restricted to whitelisted wallets. Key features include:
+**GigaBrain** operates autonomously with a 12-model AI hivemind, restricted to whitelisted wallets. Key features include:
 
 -   **Autonomous Capital Management:** Manages liquidity reserves, employs percentage-based position sizing, and uses AI-driven exits. It includes strict quality filters for token selection, portfolio diversification, optimized stop-loss protection, and a Portfolio Drawdown Circuit Breaker.
 -   **Token Discovery:** Aggregates tokens from various sources like DexScreener Trending and PumpFun.
--   **Smart Hivemind AI Workflow:** Features position monitoring, quick and deep technical scans (full 11-model hivemind), and automatic portfolio rebalancing. The 11-Model Hivemind System uses various AI providers (e.g., DeepSeek, xAI Grok, Google Gemini, OpenAI) with weighted confidence voting and smart model prioritization.
+-   **Smart Hivemind AI Workflow:** Features position monitoring, quick and deep technical scans (full 12-model hivemind), and automatic portfolio rebalancing. The 12-Model Hivemind System uses various AI providers (e.g., DeepSeek, Anthropic Claude, xAI Grok, Google Gemini, OpenAI) with weighted confidence voting (OpenAI 1.3x, DeepSeek 1.2x, Claude 1.2x) and smart model prioritization.
 -   **Intelligent Circuit Breaker Protection:** Disables and rotates failing AI models, prioritizing reliable ones based on health scoring.
 -   **Advanced AI Rate Limiting & Retry System:** Implements universal and provider-specific rate limiting, exponential backoff for retries, and a smart circuit breaker to distinguish between rate limits and permanent failures.
 -   **Tri-Mode Trading Strategy (CAPITAL EFFICIENCY OPTIMIZED):** Supports SCALP, QUICK_2X, and SWING modes with graduated position sizing, tightened stop-losses, enforced hold times, and raised quality filters:
@@ -90,5 +90,6 @@ Includes secure encrypted key management, automated PumpFun rewards claiming, ba
     -   Google Gemini
     -   ChatAnywhere
     -   Groq
+    -   Anthropic Claude Sonnet 4
     -   OpenAI Primary
     -   OpenAI Backup

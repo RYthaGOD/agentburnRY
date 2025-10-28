@@ -6,6 +6,7 @@ import { storage } from "./storage";
 import { analyzeTokenWithGrok, analyzeTokenWithHiveMind, isGrokConfigured, getAIClient, type TokenMarketData } from "./grok-analysis";
 import { buyTokenWithJupiter, buyTokenWithFallback, getTokenPrice, getSwapOrder, executeSwapOrder, getWalletBalances } from "./jupiter";
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { sellTokenOnPumpFun } from "./pumpfun";
 import { getTreasuryKey } from "./key-manager";
 import { getWalletBalance } from "./solana";
@@ -1977,7 +1978,7 @@ Respond ONLY with valid JSON:
 }
 
 /**
- * 🔍 ENHANCED CONSENSUS - Require supermajority (7+ out of 11 models) to agree before buying
+ * 🔍 ENHANCED CONSENSUS - Require supermajority (7+ out of 12 models) to agree before buying
  * More conservative than simple majority to prevent losses
  */
 function calculateEnhancedConsensus(
@@ -3251,6 +3252,7 @@ export function startAITradingBotScheduler() {
   if (process.env.TOGETHER_API_KEY) activeProviders.push("Together AI");
   if (process.env.OPENROUTER_API_KEY) activeProviders.push("OpenRouter");
   if (process.env.GROQ_API_KEY) activeProviders.push("Groq");
+  if (process.env.ANTHROPIC_API_KEY) activeProviders.push("Anthropic Claude");
   if (process.env.OPENAI_API_KEY) activeProviders.push("OpenAI");
   if (process.env.OPENAI_API_KEY_2) activeProviders.push("OpenAI #2");
   if (process.env.XAI_API_KEY) activeProviders.push("xAI Grok");
@@ -4748,8 +4750,8 @@ Respond with JSON array:
 ]`;
 
   try {
-    // 🧠 FULL 11-MODEL HIVEMIND CONSENSUS for portfolio rebalancing
-    console.log(`[Batch Analysis] 🧠 Using FULL 11-MODEL HIVEMIND for maximum accuracy...`);
+    // 🧠 FULL 12-MODEL HIVEMIND CONSENSUS for portfolio rebalancing
+    console.log(`[Batch Analysis] 🧠 Using FULL 12-MODEL HIVEMIND for maximum accuracy...`);
     
     const aiProviders = [
       // ⭐ FREE MODELS (prioritized to last longer)
@@ -4764,6 +4766,7 @@ Respond with JSON array:
       { name: "ChatAnywhere", baseURL: "https://api.chatanywhere.tech/v1", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o-mini", weight: 1.0, priority: 2, free: false },
       { name: "OpenRouter", baseURL: "https://openrouter.ai/api/v1", apiKey: process.env.OPENROUTER_API_KEY, model: "anthropic/claude-3.5-sonnet", weight: 1.1, priority: 3, free: false },
       { name: "xAI Grok", baseURL: "https://api.x.ai/v1", apiKey: process.env.XAI_API_KEY, model: "grok-2-latest", weight: 1.0, priority: 3, free: false },
+      { name: "Anthropic Claude", baseURL: "anthropic", apiKey: process.env.ANTHROPIC_API_KEY, model: "claude-sonnet-4-20250514", weight: 1.2, priority: 3, free: false, isAnthropic: true },
       { name: "OpenAI", baseURL: "https://api.openai.com/v1", apiKey: process.env.OPENAI_API_KEY, model: "gpt-4o-mini", weight: 1.3, priority: 3, free: false },
       { name: "OpenAI #2", baseURL: "https://api.openai.com/v1", apiKey: process.env.OPENAI_API_KEY_2, model: "gpt-4o-mini", weight: 1.3, priority: 3, free: false },
     ];
@@ -4802,30 +4805,56 @@ Respond with JSON array:
     // Run all available providers in parallel
     const providerPromises = availableProviders.map(async (provider) => {
       try {
-        const client = new OpenAI({
-          baseURL: provider.baseURL,
-          apiKey: provider.apiKey,
-        });
+        let content: string;
+        
+        // Handle Anthropic Claude separately (different API)
+        if (provider.isAnthropic) {
+          const anthropic = new Anthropic({
+            apiKey: provider.apiKey,
+          });
 
-        const response = await client.chat.completions.create({
-          model: provider.model,
-          messages: [
-            {
-              role: "system",
-              content: "You are an expert portfolio manager analyzing cryptocurrency holdings. Provide actionable recommendations for each position. Always respond with valid JSON array."
-            },
-            {
-              role: "user",
-              content: portfolioPrompt
-            }
-          ],
-          response_format: { type: "json_object" },
-          temperature: 0.6,
-          max_tokens: 2000,
-        });
+          const response = await anthropic.messages.create({
+            model: provider.model,
+            max_tokens: 2000,
+            system: "You are an expert portfolio manager analyzing cryptocurrency holdings. Provide actionable recommendations for each position. Always respond with valid JSON array.",
+            messages: [
+              {
+                role: "user",
+                content: portfolioPrompt
+              }
+            ],
+            temperature: 0.6,
+          });
 
-        const content = response.choices[0].message.content;
-        if (!content) throw new Error(`No response from ${provider.name}`);
+          content = response.content[0].type === 'text' ? response.content[0].text : '';
+          if (!content) throw new Error(`No response from ${provider.name}`);
+        } else {
+          // Standard OpenAI-compatible providers
+          const client = new OpenAI({
+            baseURL: provider.baseURL,
+            apiKey: provider.apiKey,
+          });
+
+          const response = await client.chat.completions.create({
+            model: provider.model,
+            messages: [
+              {
+                role: "system",
+                content: "You are an expert portfolio manager analyzing cryptocurrency holdings. Provide actionable recommendations for each position. Always respond with valid JSON array."
+              },
+              {
+                role: "user",
+                content: portfolioPrompt
+              }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.6,
+            max_tokens: 2000,
+          });
+
+          content = response.choices[0].message.content;
+          if (!content) throw new Error(`No response from ${provider.name}`);
+        }
 
         const parsed = JSON.parse(content);
         const recommendations = Array.isArray(parsed) ? parsed : (parsed.positions || parsed.recommendations || []);
