@@ -5,6 +5,118 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 
 /**
+ * 🔄 4-TEAM ROTATION SYSTEM (3 models per team, 6-hour shifts)
+ * Reduces API costs by 75% while maintaining 24/7 coverage with hivemind consensus
+ * Auto-replaces failing models with healthy backups
+ */
+interface TeamConfig {
+  name: string;
+  providers: string[];
+  votingWeights: Record<string, number>; // Provider-specific voting weights
+  startHour: number; // UTC hour when team becomes active (0-23)
+  endHour: number; // UTC hour when team becomes inactive (0-23)
+}
+
+const AI_TEAMS: TeamConfig[] = [
+  {
+    name: "Team A (Night Shift)",
+    providers: ["DeepSeek", "OpenAI", "Cerebras"],
+    votingWeights: { "DeepSeek": 1.2, "OpenAI": 1.3, "Cerebras": 1.0 },
+    startHour: 0, // Midnight UTC
+    endHour: 6,
+  },
+  {
+    name: "Team B (Morning Shift)",
+    providers: ["DeepSeek #2", "OpenAI #2", "Google Gemini"],
+    votingWeights: { "DeepSeek #2": 1.2, "OpenAI #2": 1.3, "Google Gemini": 1.0 },
+    startHour: 6,
+    endHour: 12,
+  },
+  {
+    name: "Team C (Afternoon Shift)",
+    providers: ["Anthropic Claude", "Together AI", "Groq"],
+    votingWeights: { "Anthropic Claude": 1.2, "Together AI": 1.1, "Groq": 1.0 },
+    startHour: 12,
+    endHour: 18,
+  },
+  {
+    name: "Team D (Evening Shift)",
+    providers: ["OpenRouter", "ChatAnywhere", "xAI Grok"],
+    votingWeights: { "OpenRouter": 1.1, "ChatAnywhere": 1.0, "xAI Grok": 1.0 },
+    startHour: 18,
+    endHour: 24,
+  },
+];
+
+/**
+ * Get currently active team based on UTC hour
+ */
+function getActiveTeam(): TeamConfig {
+  const utcHour = new Date().getUTCHours();
+  
+  for (const team of AI_TEAMS) {
+    if (utcHour >= team.startHour && utcHour < team.endHour) {
+      return team;
+    }
+  }
+  
+  // Fallback to Team A (should never happen)
+  return AI_TEAMS[0];
+}
+
+/**
+ * Get voting weight for a provider based on active team
+ */
+function getProviderVotingWeight(provider: string): number {
+  const activeTeam = getActiveTeam();
+  return activeTeam.votingWeights[provider] || 1.0; // Default 1.0x if not specified
+}
+
+/**
+ * Get all providers from all teams (for backup/replacement pool)
+ */
+function getAllTeamProviders(): string[] {
+  const allProviders = new Set<string>();
+  for (const team of AI_TEAMS) {
+    team.providers.forEach(p => allProviders.add(p));
+  }
+  return Array.from(allProviders);
+}
+
+/**
+ * Auto-replace failing team member with healthiest backup from inactive teams
+ * Returns replacement provider name or null if no healthy backup available
+ */
+function findHealthyReplacement(failedProvider: string): string | null {
+  const activeTeam = getActiveTeam();
+  const activeProviders = new Set(activeTeam.providers);
+  const allProviders = getAllTeamProviders();
+  
+  // Get inactive providers (not in current team)
+  const inactiveProviders = allProviders.filter(p => !activeProviders.has(p) && p !== failedProvider);
+  
+  // Find healthiest inactive provider (lowest failure count, not disabled)
+  let bestReplacement: string | null = null;
+  let bestHealth = -1;
+  
+  for (const provider of inactiveProviders) {
+    if (!isModelAvailable(provider)) continue; // Skip if disabled by circuit breaker
+    
+    const health = getModelHealthScore(provider);
+    if (health > bestHealth) {
+      bestHealth = health;
+      bestReplacement = provider;
+    }
+  }
+  
+  if (bestReplacement) {
+    console.log(`[Team Rotation] 🔄 Auto-replacing failed model ${failedProvider} with healthy backup ${bestReplacement} (health: ${bestHealth})`);
+  }
+  
+  return bestReplacement;
+}
+
+/**
  * Circuit Breaker for AI Models - Tracks failures and temporarily disables failing models
  * OPTIMIZATION: Prevents wasted API calls to consistently failing models
  */
@@ -316,12 +428,38 @@ function isPeakTradingHours(): boolean {
 
 /**
  * Get all available AI clients for hive mind consensus
- * OPTIMIZED: Uses circuit breaker to skip failing models and supports tiered model selection
+ * 🔄 TEAM ROTATION SYSTEM: Returns only active team's 3 models (6-hour shifts)
+ * Auto-replaces failing team members with healthy backups from inactive teams
  * @param context Optional context to determine smart OpenAI usage and model limits
  */
-function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: OpenAI; model: string; provider: string; priority: number }> {
+function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: OpenAI; model: string; provider: string; priority: number; votingWeight: number }> {
   const clients = [];
   const includeOpenAI = shouldIncludeOpenAI(context);
+  
+  // Get active team based on current UTC hour (0-6, 6-12, 12-18, 18-24)
+  const activeTeam = getActiveTeam();
+  const activeProviders = new Set(activeTeam.providers);
+  
+  // Track replacements for failed team members
+  const replacements = new Map<string, string>();
+  
+  // Check if any active team members are down and need replacement
+  for (const provider of activeTeam.providers) {
+    if (!isModelAvailable(provider)) {
+      const replacement = findHealthyReplacement(provider);
+      if (replacement) {
+        replacements.set(provider, replacement);
+        activeProviders.delete(provider);
+        activeProviders.add(replacement);
+      }
+    }
+  }
+  
+  console.log(`[Team Rotation] 🔄 Active: ${activeTeam.name} (${activeTeam.startHour}-${activeTeam.endHour} UTC)`);
+  console.log(`[Team Rotation] 👥 Team members: ${Array.from(activeProviders).join(", ")}`);
+  if (replacements.size > 0) {
+    console.log(`[Team Rotation] 🔄 Replacements: ${Array.from(replacements.entries()).map(([failed, backup]) => `${failed}→${backup}`).join(", ")}`);
+  }
 
   // PRIORITY SYSTEM: Higher priority = more reliable/cheaper
   // Priority 1: Free, reliable models (use first)
@@ -331,7 +469,7 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
 
   // Cerebras (fast, free, Llama 4) - Priority 2 (less reliable, rate limited)
   // NOTE: Rate limiting handled at execution level, not selection level
-  if (process.env.CEREBRAS_API_KEY && isModelAvailable("Cerebras")) {
+  if (activeProviders.has("Cerebras") && process.env.CEREBRAS_API_KEY && isModelAvailable("Cerebras")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.cerebras.ai/v1",
@@ -340,11 +478,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "llama-3.3-70b",
       provider: "Cerebras",
       priority: 2,
+      votingWeight: getProviderVotingWeight("Cerebras"),
     });
   }
 
   // Google Gemini 2.5 Flash (1M tokens/min free, highest volume) - Priority 2 (rate limits)
-  if (process.env.GOOGLE_AI_KEY && isModelAvailable("Google Gemini")) {
+  if (activeProviders.has("Google Gemini") && process.env.GOOGLE_AI_KEY && isModelAvailable("Google Gemini")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -353,11 +492,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "gemini-2.0-flash-exp",
       provider: "Google Gemini",
       priority: 2,
+      votingWeight: getProviderVotingWeight("Google Gemini"),
     });
   }
 
   // DeepSeek V3 Primary (5M free tokens, PRIMARY MODEL) - Priority 1 (most reliable free)
-  if (process.env.DEEPSEEK_API_KEY && isModelAvailable("DeepSeek")) {
+  if (activeProviders.has("DeepSeek") && process.env.DEEPSEEK_API_KEY && isModelAvailable("DeepSeek")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.deepseek.com",
@@ -366,11 +506,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "deepseek-chat",
       provider: "DeepSeek",
       priority: 1,
+      votingWeight: getProviderVotingWeight("DeepSeek"),
     });
   }
 
   // DeepSeek V3 Backup (5M free tokens) - Priority 1 (most reliable free)
-  if (process.env.DEEPSEEK_API_KEY_2 && isModelAvailable("DeepSeek #2")) {
+  if (activeProviders.has("DeepSeek #2") && process.env.DEEPSEEK_API_KEY_2 && isModelAvailable("DeepSeek #2")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.deepseek.com",
@@ -379,11 +520,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "deepseek-chat",
       provider: "DeepSeek #2",
       priority: 1,
+      votingWeight: getProviderVotingWeight("DeepSeek #2"),
     });
   }
 
   // ChatAnywhere GPT-4o-mini (200 req/day free) - Priority 2 (daily limits)
-  if (process.env.CHATANYWHERE_API_KEY && isModelAvailable("ChatAnywhere")) {
+  if (activeProviders.has("ChatAnywhere") && process.env.CHATANYWHERE_API_KEY && isModelAvailable("ChatAnywhere")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.chatanywhere.tech/v1",
@@ -392,11 +534,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "gpt-4o-mini",
       provider: "ChatAnywhere",
       priority: 2,
+      votingWeight: getProviderVotingWeight("ChatAnywhere"),
     });
   }
 
   // Together AI (200+ models, generous free tier) - Priority 1 (very reliable)
-  if (process.env.TOGETHER_API_KEY && isModelAvailable("Together AI")) {
+  if (activeProviders.has("Together AI") && process.env.TOGETHER_API_KEY && isModelAvailable("Together AI")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.together.xyz/v1",
@@ -405,11 +548,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
       provider: "Together AI",
       priority: 1,
+      votingWeight: getProviderVotingWeight("Together AI"),
     });
   }
 
   // OpenRouter (300+ models, free tier) - Priority 1 (very reliable)
-  if (process.env.OPENROUTER_API_KEY && isModelAvailable("OpenRouter")) {
+  if (activeProviders.has("OpenRouter") && process.env.OPENROUTER_API_KEY && isModelAvailable("OpenRouter")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://openrouter.ai/api/v1",
@@ -418,11 +562,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "meta-llama/llama-3.3-70b-instruct",
       provider: "OpenRouter",
       priority: 1,
+      votingWeight: getProviderVotingWeight("OpenRouter"),
     });
   }
 
   // Groq (completely free with generous limits) - Priority 1 (very reliable)
-  if (process.env.GROQ_API_KEY && isModelAvailable("Groq")) {
+  if (activeProviders.has("Groq") && process.env.GROQ_API_KEY && isModelAvailable("Groq")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.groq.com/openai/v1",
@@ -431,11 +576,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "llama-3.3-70b-versatile",
       provider: "Groq",
       priority: 1,
+      votingWeight: getProviderVotingWeight("Groq"),
     });
   }
 
   // OpenAI Primary (GPT-4o-mini, high quality, PAID) - Priority 3 (use sparingly)
-  if (includeOpenAI && process.env.OPENAI_API_KEY && isModelAvailable("OpenAI")) {
+  if (activeProviders.has("OpenAI") && includeOpenAI && process.env.OPENAI_API_KEY && isModelAvailable("OpenAI")) {
     clients.push({
       client: new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
@@ -443,11 +589,12 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "gpt-4o-mini",
       provider: "OpenAI",
       priority: 3,
+      votingWeight: getProviderVotingWeight("OpenAI"),
     });
   }
   
   // OpenAI Backup (GPT-4o-mini, PAID) - Priority 3 (use sparingly)
-  if (includeOpenAI && process.env.OPENAI_API_KEY_2 && isModelAvailable("OpenAI #2")) {
+  if (activeProviders.has("OpenAI #2") && includeOpenAI && process.env.OPENAI_API_KEY_2 && isModelAvailable("OpenAI #2")) {
     clients.push({
       client: new OpenAI({
         apiKey: process.env.OPENAI_API_KEY_2,
@@ -455,22 +602,24 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "gpt-4o-mini",
       provider: "OpenAI #2",
       priority: 3,
+      votingWeight: getProviderVotingWeight("OpenAI #2"),
     });
   }
   
   // Anthropic Claude Sonnet 4 (PAID, highest quality reasoning) - Priority 3 (premium tier)
   // Note: Anthropic doesn't use OpenAI-compatible API, handled separately in analyzeSingleModel
-  if (includeOpenAI && process.env.ANTHROPIC_API_KEY && isModelAvailable("Anthropic Claude")) {
+  if (activeProviders.has("Anthropic Claude") && includeOpenAI && process.env.ANTHROPIC_API_KEY && isModelAvailable("Anthropic Claude")) {
     clients.push({
       client: new OpenAI({ apiKey: "anthropic-placeholder" }), // Placeholder, actual client created in analyzeSingleModel
       model: "claude-sonnet-4-20250514",
       provider: "Anthropic Claude",
       priority: 3,
+      votingWeight: getProviderVotingWeight("Anthropic Claude"),
     });
   }
   
   // Fallback to xAI Grok (MOST EXPENSIVE - PAID) - Priority 4 (use as LAST RESORT only)
-  if (process.env.XAI_API_KEY && isModelAvailable("xAI Grok")) {
+  if (activeProviders.has("xAI Grok") && process.env.XAI_API_KEY && isModelAvailable("xAI Grok")) {
     clients.push({
       client: new OpenAI({
         baseURL: "https://api.x.ai/v1",
@@ -479,6 +628,7 @@ function getAllAIClients(context: OpenAIUsageContext = {}): Array<{ client: Open
       model: "grok-4-fast-reasoning",
       provider: "xAI Grok",
       priority: 4, // LOWEST PRIORITY - most expensive, only use when all others fail
+      votingWeight: getProviderVotingWeight("xAI Grok"),
     });
   }
 
@@ -607,7 +757,7 @@ export async function analyzeTokenWithHiveMind(
   
   // Query all models in parallel with circuit breaker tracking
   const votes = await Promise.all(
-    clients.map(async ({ client, model, provider }) => {
+    clients.map(async ({ client, model, provider, votingWeight }) => {
       try {
         const analysis = await analyzeSingleModel(
           client,
@@ -619,7 +769,7 @@ export async function analyzeTokenWithHiveMind(
         );
         // Track success to reset failure count
         trackModelSuccess(provider);
-        return { provider, analysis, success: true };
+        return { provider, analysis, success: true, votingWeight };
       } catch (error) {
         // Track failure for circuit breaker (pass error for smart detection)
         trackModelFailure(provider, error instanceof Error ? error : new Error(String(error)));
@@ -635,6 +785,7 @@ export async function analyzeTokenWithHiveMind(
             keyFactors: ["Provider error"],
           },
           success: false,
+          votingWeight,
           error: error instanceof Error ? error.message : String(error),
         };
       }
@@ -661,10 +812,13 @@ export async function analyzeTokenWithHiveMind(
   const sellVotes = successfulVotes.filter(v => v.analysis.action === "sell");
   const holdVotes = successfulVotes.filter(v => v.analysis.action === "hold");
 
-  // Weight by confidence (sum of all confidence scores for each action)
-  const buyWeight = buyVotes.reduce((sum, v) => sum + v.analysis.confidence, 0);
-  const sellWeight = sellVotes.reduce((sum, v) => sum + v.analysis.confidence, 0);
-  const holdWeight = holdVotes.reduce((sum, v) => sum + v.analysis.confidence, 0);
+  // Weight by confidence AND voting weight (confidence * votingWeight for each model)
+  // OpenAI (1.3x), DeepSeek/Claude (1.2x), Together/OpenRouter (1.1x), others (1.0x)
+  const buyWeight = buyVotes.reduce((sum, v) => sum + (v.analysis.confidence * v.votingWeight), 0);
+  const sellWeight = sellVotes.reduce((sum, v) => sum + (v.analysis.confidence * v.votingWeight), 0);
+  const holdWeight = holdVotes.reduce((sum, v) => sum + (v.analysis.confidence * v.votingWeight), 0);
+  
+  console.log(`[Hive Mind] 📊 Weighted voting: BUY=${buyWeight.toFixed(2)}, SELL=${sellWeight.toFixed(2)}, HOLD=${holdWeight.toFixed(2)}`);
 
   const totalWeight = buyWeight + sellWeight + holdWeight;
   
