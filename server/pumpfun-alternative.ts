@@ -64,6 +64,62 @@ export interface TokenMarketData {
   priceChange24h?: number;
   priceChange1h?: number;
   holderCount?: number;
+  // Social & Community Metrics (PumpFun-enhanced)
+  tokenAgeHours?: number; // Hours since token/pair creation
+  migrationFreshness?: number; // Hours since graduating from bonding curve (lower = more momentum)
+  transactionCount24h?: number; // Total buy+sell transactions
+  buyPressure?: number; // Buy transaction percentage (0-100, higher = bullish)
+  volumeToLiquidityRatio?: number; // Volume/Liquidity ratio (higher = active trading)
+}
+
+/**
+ * Calculate social and community metrics for a token
+ * Helps AI identify trending/active tokens with strong community engagement
+ */
+function calculateSocialMetrics(pair: any): {
+  tokenAgeHours?: number;
+  migrationFreshness?: number;
+  transactionCount24h?: number;
+  buyPressure?: number;
+  volumeToLiquidityRatio?: number;
+} {
+  const now = Date.now();
+  
+  // Token age (hours since pair created)
+  const tokenAgeHours = pair.pairCreatedAt 
+    ? Math.round((now - pair.pairCreatedAt) / (1000 * 60 * 60))
+    : undefined;
+  
+  // Migration freshness (for PumpSwap/Raydium pairs = bonding curve graduation)
+  const isPumpswap = pair.dexId === 'pumpswap' || pair.labels?.includes('v3');
+  const migrationFreshness = isPumpswap && tokenAgeHours !== undefined
+    ? tokenAgeHours // Fresher = lower hours = more momentum
+    : undefined;
+  
+  // Transaction count (buy + sell)
+  const buyTxns = pair.txns?.h24?.buys || 0;
+  const sellTxns = pair.txns?.h24?.sells || 0;
+  const transactionCount24h = buyTxns + sellTxns;
+  
+  // Buy pressure (% of transactions that are buys)
+  const buyPressure = transactionCount24h > 0
+    ? Math.round((buyTxns / transactionCount24h) * 100)
+    : undefined;
+  
+  // Volume to liquidity ratio (active trading indicator)
+  const volume = pair.volume?.h24 || 0;
+  const liquidity = pair.liquidity?.usd || 1; // Avoid divide by zero
+  const volumeToLiquidityRatio = liquidity > 0 
+    ? Number((volume / liquidity).toFixed(2))
+    : undefined;
+  
+  return {
+    tokenAgeHours,
+    migrationFreshness,
+    transactionCount24h: transactionCount24h > 0 ? transactionCount24h : undefined,
+    buyPressure,
+    volumeToLiquidityRatio,
+  };
 }
 
 /**
@@ -124,6 +180,9 @@ export async function fetchNewlyMigratedPumpTokens(maxTokens: number = 20): Prom
         // Must have some volume to be tradeable
         if ((pumpswapPair.volume?.h24 || 0) < 1000) continue;
         
+        // Calculate social & community metrics
+        const socialMetrics = calculateSocialMetrics(pumpswapPair);
+        
         const tokenData: TokenMarketData = {
           mint: profile.tokenAddress,
           name: pumpswapPair.baseToken?.name || 'Unknown',
@@ -136,6 +195,8 @@ export async function fetchNewlyMigratedPumpTokens(maxTokens: number = 20): Prom
           priceChange24h: pumpswapPair.priceChange?.h24 || 0,
           priceChange1h: pumpswapPair.priceChange?.h1 || 0,
           holderCount: undefined,
+          // Social & Community Metrics (NEW)
+          ...socialMetrics,
         };
         
         tokens.push(tokenData);
@@ -200,6 +261,9 @@ export async function fetchLowCapPumpTokensViaDexScreener(maxTokens: number = 15
           
           seenMints.add(pair.baseToken.address);
           
+          // Calculate social & community metrics
+          const socialMetrics = calculateSocialMetrics(pair);
+          
           tokens.push({
             mint: pair.baseToken.address,
             name: pair.baseToken.name || 'Unknown',
@@ -212,6 +276,8 @@ export async function fetchLowCapPumpTokensViaDexScreener(maxTokens: number = 15
             priceChange24h: pair.priceChange?.h24 || 0,
             priceChange1h: pair.priceChange?.h1 || 0,
             holderCount: undefined,
+            // Social & Community Metrics (NEW)
+            ...socialMetrics,
           });
           
           if (tokens.length >= maxTokens) break;
@@ -287,6 +353,9 @@ export async function fetchTrendingPumpStyleTokens(maxTokens: number = 15): Prom
       const volumeToLiquidity = volume / liquidity;
       if (volumeToLiquidity < 0.5) continue; // At least 50% daily volume of liquidity
       
+      // Calculate social & community metrics
+      const socialMetrics = calculateSocialMetrics(pair);
+      
       tokens.push({
         mint: pair.baseToken.address,
         name: pair.baseToken.name || 'Unknown',
@@ -299,6 +368,8 @@ export async function fetchTrendingPumpStyleTokens(maxTokens: number = 15): Prom
         priceChange24h: pair.priceChange?.h24 || 0,
         priceChange1h: pair.priceChange?.h1 || 0,
         holderCount: undefined,
+        // Social & Community Metrics (NEW)
+        ...socialMetrics,
       });
       
       if (tokens.length >= maxTokens) break;

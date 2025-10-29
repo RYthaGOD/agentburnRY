@@ -28,6 +28,14 @@ BurnBot is a SaaS platform providing a no-code solution for Solana SPL token cre
 - Stop-loss unchanged: -3% for capital protection
 - This allows bot to trade on 52-59% confidence signals (previously blocked)
 
+**PumpFun Social Metrics Integration:**
+- **Buy Pressure:** % of transactions that are buys (higher = bullish sentiment)
+- **Transaction Velocity:** 24h buy+sell transaction count (higher = active community)
+- **Migration Freshness:** Hours since bonding curve graduation (lower = more momentum)
+- **Token Age:** Hours since creation (helps identify trending new launches)
+- **Volume/Liquidity Ratio:** Trading activity relative to pool size (higher = real demand)
+- AI now has 5 additional data points per token for smarter BUY decisions
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 

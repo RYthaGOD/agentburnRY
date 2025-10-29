@@ -1584,6 +1584,16 @@ async function runQuickTechnicalScan() {
           console.log(`[Quick Scan] 🧠 Analyzing top ${topOpportunities.length} with DeepSeek (FREE tier, 30min cache)...`);
 
           for (const token of topOpportunities) {
+            // Log social signals if available (NEW: PumpFun metrics)
+            const socialSignals = [];
+            if (token.buyPressure !== undefined) socialSignals.push(`${token.buyPressure}% buy pressure`);
+            if (token.transactionCount24h !== undefined) socialSignals.push(`${token.transactionCount24h} txns/24h`);
+            if (token.migrationFreshness !== undefined) socialSignals.push(`migrated ${token.migrationFreshness}h ago`);
+            if (token.tokenAgeHours !== undefined) socialSignals.push(`${token.tokenAgeHours}h old`);
+            if (socialSignals.length > 0) {
+              console.log(`[Quick Scan] 📊 ${token.symbol} social signals: ${socialSignals.join(', ')}`);
+            }
+            
             // Bundle activity detection - check before spending AI credits
             const { detectBundleActivity, addToBlacklist } = await import('./bundle-detection');
             const bundleResult = await detectBundleActivity(token.mint);
