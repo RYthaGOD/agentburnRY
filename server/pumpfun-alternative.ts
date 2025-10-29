@@ -180,9 +180,9 @@ export async function fetchNewlyMigratedPumpTokens(maxTokens: number = 20): Prom
         // Must have some volume to be tradeable (lowered for 20k tokens)
         if ((pumpswapPair.volume?.h24 || 0) < 500) continue;
         
-        // 🎯 TARGET: ~$20k market cap for profitability (range: $5k-$100k)
+        // 🎯 WIDENED RANGE: $5k-$200k for more opportunities
         const marketCap = pumpswapPair.fdv || pumpswapPair.marketCap || 0;
-        if (marketCap > 100000 || marketCap < 5000) continue;
+        if (marketCap > 200000 || marketCap < 5000) continue;
         
         // Calculate social & community metrics
         const socialMetrics = calculateSocialMetrics(pumpswapPair);
@@ -253,9 +253,9 @@ export async function fetchLowCapPumpTokensViaDexScreener(maxTokens: number = 15
           if (!pair.baseToken?.address) continue;
           if (seenMints.has(pair.baseToken.address)) continue;
           
-          // 🎯 TARGET: ~$20k market cap for profitability (range: $5k-$100k for more opportunities)
+          // 🎯 WIDENED RANGE: $5k-$200k for more trading opportunities
           const marketCap = pair.fdv || pair.marketCap || 0;
-          if (marketCap > 100000 || marketCap < 5000) continue;
+          if (marketCap > 200000 || marketCap < 5000) continue;
           
           // 📊 Adjusted minimums for smaller market cap tokens
           // Must have volume (lowered for 20k cap tokens)

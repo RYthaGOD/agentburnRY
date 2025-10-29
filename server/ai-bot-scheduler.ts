@@ -399,9 +399,10 @@ async function getCachedOrFetchTokens(config?: {
   const { fetchLowCapPumpTokensViaDexScreener, fetchNewlyMigratedPumpTokens } = await import('./pumpfun-alternative.js');
   
   // Try PumpFun API first, fallback to DexScreener
+  // 🎯 WIDENED RANGE: $5k-$200k to find more trading opportunities
   let pumpFunTokens: any[] = [];
   try {
-    pumpFunTokens = await fetchPumpFunTokensByMarketCap(10000, 50000, 50);
+    pumpFunTokens = await fetchPumpFunTokensByMarketCap(5000, 200000, 50);
   } catch (error) {
     console.log('[AI Bot Cache] PumpFun API unavailable, using DexScreener fallback...');
   }
