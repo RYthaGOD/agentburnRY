@@ -2894,36 +2894,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid Solana token address" });
       }
 
-      console.log("[Token Analyzer] Validation passed, returning mock analysis");
-      // Mock analysis for now - in production, this would call actual AI analysis
-      const mockAnalysis = {
-        tokenMint,
-        symbol: "TOKEN",
-        name: "Sample Token",
-        price: 0.00000123,
-        volume24h: 45000,
-        liquidity: 32000,
-        organicScore: 75,
-        qualityScore: 68,
-        aiConfidence: 65,
-        recommendation: "HOLD" as const,
-        risks: [
-          "Low liquidity may cause high slippage",
-          "Limited holder diversity",
-          "Recent token with short price history"
-        ],
-        opportunities: [
-          "Growing trading volume over 24h",
-          "Organic buy pressure detected",
-          "Positive sentiment in community"
-        ],
-        analysis: "This token shows moderate potential with decent organic activity. The quality score of 68% indicates some positive fundamentals, but the low liquidity of $32K presents risk. AI confidence is 65%, suggesting a HOLD position - not strong enough for immediate buy but worth monitoring. Consider waiting for liquidity to increase above $50K before entering a position."
+      // Fetch real token data from DexScreener
+      const { detectBundleActivity } = await import("./bundle-detection");
+      const { analyzeTokenWithHiveMind } = await import("./grok-analysis");
+      
+      console.log("[Token Analyzer] Fetching token data from DexScreener...");
+      const response = await fetch(
+        `https://api.dexscreener.com/latest/dex/tokens/${tokenMint}`,
+        { headers: { 'Accept': 'application/json' } }
+      );
+      
+      if (!response.ok) {
+        return res.status(404).json({ message: "Token not found on DexScreener" });
+      }
+      
+      const dexData = await response.json();
+      const pair = dexData.pairs?.[0]; // Use first (most liquid) pair
+      
+      if (!pair) {
+        return res.status(404).json({ message: "No trading pairs found for this token" });
+      }
+
+      console.log("[Token Analyzer] Building token data structure...");
+      // Build token data structure for analysis
+      const tokenData = {
+        mint: tokenMint,
+        name: pair.baseToken?.name || 'Unknown',
+        symbol: pair.baseToken?.symbol || 'UNKNOWN',
+        priceUSD: parseFloat(pair.priceUsd || '0'),
+        priceSOL: parseFloat(pair.priceNative || '0'),
+        volumeUSD24h: pair.volume?.h24 || 0,
+        liquidity: pair.liquidity?.usd || 0,
+        holders: pair.holders || 0,
+        marketCap: pair.fdv || 0,
+        priceChange24h: pair.priceChange?.h24 || 0,
+        transactions24h: (pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0),
       };
 
-      res.json(mockAnalysis);
+      console.log("[Token Analyzer] Running bundle detection...");
+      // Get organic and quality scores
+      const bundleAnalysis = await detectBundleActivity(tokenMint, pair);
+      const organicScore = pair.profile?.organicScore ?? 50;
+      const qualityScore = pair.profile?.qualityScore ?? 50;
+
+      console.log("[Token Analyzer] Running AI hivemind analysis...");
+      // Run AI hivemind analysis
+      const aiAnalysis = await analyzeTokenWithHiveMind(
+        tokenData,
+        "medium", // Default risk tolerance
+        0.02, // Default budget per trade
+        0.5, // Minimum agreement
+        { isQuickScan: false, allowOpenAI: true } // Full analysis with all models
+      );
+
+      // Map AI action to recommendation
+      const recommendation = aiAnalysis.action.toUpperCase() as "BUY" | "SELL" | "HOLD";
+      
+      console.log("[Token Analyzer] Analysis complete:", {
+        symbol: tokenData.symbol,
+        recommendation,
+        confidence: (aiAnalysis.confidence * 100).toFixed(1) + "%"
+      });
+
+      const result = {
+        tokenMint,
+        symbol: tokenData.symbol,
+        name: tokenData.name,
+        price: tokenData.priceUSD,
+        volume24h: tokenData.volumeUSD24h,
+        liquidity: tokenData.liquidity,
+        organicScore,
+        qualityScore,
+        aiConfidence: Math.round(aiAnalysis.confidence * 100),
+        recommendation,
+        risks: aiAnalysis.risks,
+        opportunities: aiAnalysis.opportunities || [],
+        analysis: aiAnalysis.reasoning,
+        // Additional metrics
+        holders: tokenData.holders,
+        marketCap: tokenData.marketCap,
+        priceChange24h: tokenData.priceChange24h,
+        transactions24h: tokenData.transactions24h,
+        isSuspicious: bundleAnalysis.isSuspicious,
+      };
+
+      res.json(result);
     } catch (error: any) {
       console.error("Token analysis error:", error);
-      res.status(500).json({ message: error.message });
+      res.status(500).json({ message: error.message || "Failed to analyze token" });
     }
   });
 
