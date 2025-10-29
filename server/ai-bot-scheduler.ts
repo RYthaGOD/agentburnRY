@@ -1634,10 +1634,10 @@ async function runQuickTechnicalScan() {
             );
             const quickAnalysis = hiveMindResult.analysis;
 
-            // TRI-MODE SYSTEM (PROFITABILITY OPTIMIZED): SCALP (70%+), QUICK_2X (78%+), SWING (88%+)
-            const SCALP_THRESHOLD = 0.70; // Mode A: Quick micro-profits (RAISED from 62%)
-            const QUICK_2X_THRESHOLD = 0.78; // Mode B: Fast 25% profits (RAISED from 70%)
-            const SWING_THRESHOLD = 0.88; // Mode C: High-conviction holds (RAISED from 75%)
+            // TRI-MODE SYSTEM (ARCHITECT RECALIBRATED): SCALP (60%+), QUICK_2X (78%+), SWING (88%+)
+            const SCALP_THRESHOLD = 0.60; // Mode A: Quick micro-profits (LOWERED from 70% for more opportunities)
+            const QUICK_2X_THRESHOLD = 0.78; // Mode B: Medium-term 12-18% profits
+            const SWING_THRESHOLD = 0.88; // Mode C: High-conviction 12-18% holds
             const minThreshold = SCALP_THRESHOLD; // Always check for SCALP opportunities in quick scan
             
             // Determine trade mode based on confidence
@@ -3026,12 +3026,12 @@ async function executeQuickTrade(
 }
 
 /**
- * TRI-MODE TRADING SYSTEM (PROFITABILITY OPTIMIZED - RAISED THRESHOLDS)
- * Mode A "SCALP": Quick profits with lower risk (70-77% AI confidence - RAISED +5pts)
- * Mode B "QUICK_2X": Fast 100% profit opportunities (78-87% AI confidence - RAISED +8pts)
- * Mode C "SWING": High-conviction longer holds (88%+ AI confidence - RAISED +6pts)
+ * TRI-MODE TRADING SYSTEM (RECALIBRATED - Architect Optimized Parameters)
+ * Mode A "SCALP": Quick profits with realistic targets (60-77% AI confidence - LOWERED for more opportunities)
+ * Mode B "QUICK_2X": Medium-term profit opportunities (78-87% AI confidence)
+ * Mode C "SWING": High-conviction longer holds (88%+ AI confidence)
  * 
- * ⚠️ CRITICAL: Reduced position sizing to 1-3% until win rate >35%
+ * 🎯 ARCHITECT RECALIBRATION (Oct 2025): More achievable targets + extended hold times for better win rate
  */
 type TradeMode = "SCALP" | "QUICK_2X" | "SWING";
 
@@ -3046,73 +3046,78 @@ interface TradeModeConfig {
 
 /**
  * Determine trade mode based on AI confidence level
- * TRI-MODE SYSTEM - PROFITABILITY OPTIMIZED (Higher thresholds for better win rate)
+ * TRI-MODE SYSTEM - ARCHITECT RECALIBRATED (Realistic targets + extended hold times)
  */
 function determineTradeMode(confidence: number): TradeModeConfig {
   if (confidence >= 0.88) {
-    // Mode C: SWING - High conviction longer-term trades (88%+ for quality - RAISED from 82%)
-    // CONSERVATIVE SIZING: Position size scales smoothly with confidence (1-3% until win rate >35%)
+    // Mode C: SWING - High conviction longer-term trades (88%+ for quality)
+    // CONSERVATIVE SIZING: Position size scales smoothly with confidence (1-3%)
     const positionSizePercent = 1 + ((confidence - 0.88) / (1.0 - 0.88)) * 2; // Linear scale from 1% at 88% to 3% at 100%
     const clampedPositionSize = Math.min(3, Math.max(1, positionSizePercent));
     
-    // TIGHTENED STOP-LOSS: Faster capital recycling (-7% to -10%)
-    const stopLossPercent = confidence >= 0.95 ? -10 : confidence >= 0.92 ? -8 : -7;
+    // RECALIBRATED STOP-LOSS: Fixed -7% (tightened from -7% to -10% range)
+    const stopLossPercent = -7;
+    
+    // RECALIBRATED TARGET: 12-18% range (reduced from 15% for realism)
+    const profitTargetPercent = 12 + ((confidence - 0.88) / (1.0 - 0.88)) * 6; // Scale from 12% at 88% to 18% at 100%
     
     return {
       mode: "SWING",
-      minConfidence: 88, // RAISED +6pts: Higher threshold for quality trades only
-      positionSizePercent: Math.round(clampedPositionSize * 10) / 10, // Round to 1 decimal
-      maxHoldMinutes: 1440, // 24 hours
+      minConfidence: 88,
+      positionSizePercent: Math.round(clampedPositionSize * 10) / 10,
+      maxHoldMinutes: 180, // EXTENDED: 3 hours (was 24h - more realistic for Solana volatility)
       stopLossPercent,
-      profitTargetPercent: 15, // Let AI decide exit, but 15% minimum
+      profitTargetPercent: Math.round(profitTargetPercent * 10) / 10,
     };
   } else if (confidence >= 0.78) {
-    // Mode B: QUICK_2X - Fast profit opportunities (78-87% confidence - RAISED from 70%)
-    // 🚀 STRICTER MODE: Targets 25% profits with rapid entry/exit (more realistic than 100%)
+    // Mode B: QUICK_2X - Medium-term profit opportunities (78-87% confidence)
     // CONSERVATIVE SIZING: Position size scales smoothly with confidence (1-2%)
     const positionSizePercent = 1 + ((confidence - 0.78) / (0.88 - 0.78)) * 1; // Linear scale from 1% at 78% to 2% at 88%
     const clampedPositionSize = Math.min(2, Math.max(1, positionSizePercent));
     
-    // Tighter stop-loss for quick trades: -8% (improved from -12%)
-    const stopLossPercent = -8;
+    // RECALIBRATED STOP-LOSS: Tightened to -6% (from -8% for better capital protection)
+    const stopLossPercent = -6;
+    
+    // RECALIBRATED TARGET: 12-18% range (reduced from unrealistic 25% for better win rate)
+    const profitTargetPercent = 12 + ((confidence - 0.78) / (0.88 - 0.78)) * 6; // Scale from 12% at 78% to 18% at 88%
     
     return {
       mode: "QUICK_2X",
-      minConfidence: 78, // RAISED +8pts for better quality
-      positionSizePercent: Math.round(clampedPositionSize * 10) / 10, // Round to 1 decimal
-      maxHoldMinutes: 60, // 1 hour max hold for quick opportunities
+      minConfidence: 78,
+      positionSizePercent: Math.round(clampedPositionSize * 10) / 10,
+      maxHoldMinutes: 90, // EXTENDED: 90 minutes (was 60min - gives trades more breathing room)
       stopLossPercent,
-      profitTargetPercent: 25, // REALISTIC: Changed from 100% to 25% (more achievable)
+      profitTargetPercent: Math.round(profitTargetPercent * 10) / 10,
     };
-  } else if (confidence >= 0.70) {
-    // Mode A: SCALP - Quick micro-profits (70-77% confidence - RAISED from 65%)
+  } else if (confidence >= 0.60) {
+    // Mode A: SCALP - Quick micro-profits (60-77% confidence - LOWERED from 70% for more opportunities)
     // CONSERVATIVE SIZING: Position size scales smoothly with confidence (1-2%)
-    const positionSizePercent = 1 + ((confidence - 0.70) / (0.78 - 0.70)) * 1; // Linear scale from 1% at 70% to 2% at 78%
+    const positionSizePercent = 1 + ((confidence - 0.60) / (0.78 - 0.60)) * 1; // Linear scale from 1% at 60% to 2% at 78%
     const clampedPositionSize = Math.min(2, Math.max(1, positionSizePercent));
     
-    // CORRECTED STOP-LOSS: -3% for capital preservation (POSITIVE R-multiple)
+    // Keep -3% stop-loss for capital preservation
     const stopLossPercent = -3;
     
-    // REALISTIC PROFIT TARGET: 3.5% (POSITIVE R-multiple: 3.5%/-3% = 1.17R - risks LESS than it earns)
-    const profitTargetPercent = 3.5;
+    // RECALIBRATED TARGET: 2.5-4% range (raised from fixed 3.5% - scales with confidence)
+    const profitTargetPercent = 2.5 + ((confidence - 0.60) / (0.78 - 0.60)) * 1.5; // Scale from 2.5% at 60% to 4% at 78%
     
     return {
       mode: "SCALP",
-      minConfidence: 70, // RAISED +5pts: Skip low-quality marginal trades
-      positionSizePercent: Math.round(clampedPositionSize * 10) / 10, // Round to 1 decimal
-      maxHoldMinutes: 30, // ENFORCED: Will auto-exit after 30 minutes if underperforming
+      minConfidence: 60, // LOWERED: From 70% to capture more opportunities
+      positionSizePercent: Math.round(clampedPositionSize * 10) / 10,
+      maxHoldMinutes: 30 + Math.floor(((confidence - 0.60) / (0.78 - 0.60)) * 15), // EXTENDED: 30-45min (scales with confidence)
       stopLossPercent,
-      profitTargetPercent,
+      profitTargetPercent: Math.round(profitTargetPercent * 10) / 10,
     };
   } else {
     // Below minimum threshold - return conservative defaults (should be filtered out)
     return {
       mode: "SCALP",
-      minConfidence: 70,
+      minConfidence: 60,
       positionSizePercent: 1,
       maxHoldMinutes: 30,
       stopLossPercent: -3,
-      profitTargetPercent: 3.5,
+      profitTargetPercent: 2.5,
     };
   }
 }
@@ -5306,13 +5311,52 @@ async function monitorPositionsWithDeepSeek() {
             const entryPrice = parseFloat(position.entryPriceSOL);
             const profitPercent = ((currentPriceSOL - entryPrice) / entryPrice) * 100;
 
-            // Update position with latest price
+            // Track peak profit and peak price (will be updated further down)
+            const peakProfit = parseFloat(position.peakProfitPercent || "0");
+            const currentPeakProfit = Math.max(peakProfit, profitPercent);
+            const peakPriceSOL = entryPrice * (1 + currentPeakProfit / 100); // Calculate peak price from peak profit
+            
+            // 🛡️ TRAILING STOP-LOSS: Arm after securing ≥1.5% profit to protect gains
+            // CRITICAL FIX: Uses PEAK price (not current) so floor only ratchets upward
+            const TRAILING_STOP_ARM_THRESHOLD = 1.5; // Arm after 1.5% profit
+            const TRAILING_STOP_DISTANCE = 3.0; // Trail by 3% below peak
+            const isTrailingStopArmed = position.trailingStopArmed === 1;
+            
+            let newTrailingStopPrice = position.trailingStopPriceSOL ? parseFloat(position.trailingStopPriceSOL) : null;
+            let shouldArmTrailingStop = false;
+            
+            // Arm trailing stop after reaching threshold (uses current price for first arm)
+            if (!isTrailingStopArmed && profitPercent >= TRAILING_STOP_ARM_THRESHOLD) {
+              shouldArmTrailingStop = true;
+              // CRITICAL: Ensure floor never drops below entry (prevents post-arm losses)
+              const trailingFloor = currentPriceSOL * (1 - TRAILING_STOP_DISTANCE / 100);
+              newTrailingStopPrice = Math.max(entryPrice, trailingFloor);
+              console.log(`[Position Monitor] 🛡️ TRAILING STOP ARMED: ${position.tokenSymbol} reached +${profitPercent.toFixed(2)}% → stop @ $${newTrailingStopPrice.toFixed(9)} (floor: entry ${entryPrice.toFixed(9)})`);
+            }
+            // Update trailing stop if price climbs (uses PEAK price so floor only ratchets upward)
+            else if (isTrailingStopArmed && profitPercent > peakProfit) {
+              // CRITICAL: Use PEAK price (not current) to ensure stop only moves up, never down
+              const trailingFloor = peakPriceSOL * (1 - TRAILING_STOP_DISTANCE / 100);
+              const previousStop = newTrailingStopPrice || entryPrice;
+              newTrailingStopPrice = Math.max(entryPrice, trailingFloor, previousStop); // Also ensure it never goes below previous stop
+              console.log(`[Position Monitor] 📈 TRAILING STOP RAISED: ${position.tokenSymbol} peak +${currentPeakProfit.toFixed(2)}% (${peakPriceSOL.toFixed(9)}) → new stop @ $${newTrailingStopPrice.toFixed(9)} (was ${previousStop.toFixed(9)})`);
+            }
+            
+            // Reset confidence counter if AI is bullish again (prevents false alarms)
+            const shouldResetCounter = profitPercent > 0; // If still profitable, reset counter
+            
             await storage.updateAIBotPosition(position.id, {
               lastCheckPriceSOL: currentPriceSOL.toString(),
               lastCheckProfitPercent: profitPercent.toString(),
+              trailingStopArmed: shouldArmTrailingStop ? 1 : (isTrailingStopArmed ? 1 : 0),
+              trailingStopPriceSOL: newTrailingStopPrice ? newTrailingStopPrice.toString() : null,
+              lowConfidenceSampleCount: shouldResetCounter ? 0 : (position.lowConfidenceSampleCount || 0),
             });
 
             console.log(`[Position Monitor] ${position.tokenSymbol}: Entry $${entryPrice.toFixed(9)} → Current $${currentPriceSOL.toFixed(9)} (${profitPercent > 0 ? '+' : ''}${profitPercent.toFixed(2)}%)`);
+            if (isTrailingStopArmed && newTrailingStopPrice) {
+              console.log(`[Position Monitor]    🛡️ Trailing stop active @ $${newTrailingStopPrice.toFixed(9)} (${TRAILING_STOP_DISTANCE}% below peak)`);
+            }
 
             // 🎯 PROFIT-HUNTING STRATEGY: Only sell when profits are maximized, NOT on pullbacks
             const isSwingTrade = position.isSwingTrade === 1;
@@ -5344,15 +5388,14 @@ async function monitorPositionsWithDeepSeek() {
             }
             
             // Track peak profit to identify pullbacks vs actual losses
-            const peakProfit = parseFloat(position.peakProfitPercent || "0");
-            const newPeakProfit = Math.max(peakProfit, profitPercent);
+            // (peakProfit and currentPeakProfit already declared earlier for trailing stop logic)
             
             // Update peak profit if we hit a new high
-            if (newPeakProfit > peakProfit) {
+            if (currentPeakProfit > peakProfit) {
               await storage.updateAIBotPosition(position.id, {
-                peakProfitPercent: newPeakProfit.toString(),
+                peakProfitPercent: currentPeakProfit.toString(),
               });
-              console.log(`[Position Monitor] 🚀 ${position.tokenSymbol} NEW PEAK: ${newPeakProfit.toFixed(2)}% (was ${peakProfit.toFixed(2)}%)`);
+              console.log(`[Position Monitor] 🚀 ${position.tokenSymbol} NEW PEAK: ${currentPeakProfit.toFixed(2)}% (was ${peakProfit.toFixed(2)}%)`);
             }
             
             // 🛡️ LOSS PROTECTION: Only stop-loss if position is ACTUALLY LOSING MONEY
@@ -5871,12 +5914,40 @@ Respond ONLY with valid JSON:
         const topModels = successful.slice(0, 2).map(m => `${m.provider}: ${m.analysis.reasoning.substring(0, 30)}`).join('; ');
         await executeSellForPosition(config, position, treasuryKeyBase58, `Stop-Loss: ${sellVotes.length}/${successful.length} vote SELL, ${currentProfitPercent.toFixed(2)}% loss. ${topModels}...`);
       }
-      // ✅ AI OVERRIDE: Allow high-confidence (≥80%) sells even below profit target to prevent deterioration
+      // 🛡️ 2-STAGE EXIT FILTER: Require confidence hysteresis AND price drop to prevent premature exits
+      // This prevents selling winners from temporary AI confidence dips
       else if (avgConfidence >= 80) {
-        console.log(`[Position Monitor] ✅ AI OVERRIDE: High confidence (${avgConfidence.toFixed(0)}%) sell signal → executing to prevent deterioration`);
-        logActivity('position_monitor', 'warning', `⚡ AI OVERRIDE ${position.tokenSymbol}: ${avgConfidence.toFixed(0)}% confidence → exit at ${currentProfitPercent.toFixed(2)}%`);
-        const topModels = successful.slice(0, 2).map(m => `${m.provider}: ${m.analysis.reasoning.substring(0, 30)}`).join('; ');
-        await executeSellForPosition(config, position, treasuryKeyBase58, `AI Override: ${sellVotes.length}/${successful.length} vote SELL, ${avgConfidence.toFixed(0)}% avg confidence (below ${minProfitThreshold}% target but preventing deterioration). ${topModels}...`);
+        // Stage 1: Track low confidence samples (hysteresis)
+        const lowConfidenceSamples = (position.lowConfidenceSampleCount || 0) + 1;
+        const REQUIRED_SAMPLES = 2; // Require 2 consecutive checks before selling
+        
+        // Stage 2: Check if price has actually dropped
+        const entryPriceSOL = parseFloat(position.entryPriceSOL || "0");
+        const hasPriceDropped = currentPriceSOL < entryPriceSOL;
+        
+        // Check trailing stop (if armed after 1.5%+ profit)
+        const trailingStopArmed = position.trailingStopArmed === 1;
+        const trailingStopPrice = trailingStopArmed ? parseFloat(position.trailingStopPriceSOL || "0") : 0;
+        const hasBreachedTrailingStop = trailingStopArmed && currentPriceSOL < trailingStopPrice;
+        
+        console.log(`[Position Monitor] ⚠️ AI OVERRIDE SIGNAL: High confidence (${avgConfidence.toFixed(0)}%) - checking 2-stage filter...`);
+        console.log(`[Position Monitor]    Stage 1: ${lowConfidenceSamples}/${REQUIRED_SAMPLES} low-confidence samples`);
+        console.log(`[Position Monitor]    Stage 2: Price drop=${hasPriceDropped} (${currentPriceSOL.toFixed(8)} vs ${entryPriceSOL.toFixed(8)}), Trailing stop breach=${hasBreachedTrailingStop}`);
+        
+        // Execute sell ONLY if both stages pass
+        if (lowConfidenceSamples >= REQUIRED_SAMPLES && (hasPriceDropped || hasBreachedTrailingStop)) {
+          console.log(`[Position Monitor] ✅ 2-STAGE FILTER PASSED: Executing sell to prevent deterioration`);
+          logActivity('position_monitor', 'warning', `⚡ AI OVERRIDE ${position.tokenSymbol}: ${avgConfidence.toFixed(0)}% confidence, ${lowConfidenceSamples} samples, price drop confirmed → exit at ${currentProfitPercent.toFixed(2)}%`);
+          const topModels = successful.slice(0, 2).map(m => `${m.provider}: ${m.analysis.reasoning.substring(0, 30)}`).join('; ');
+          await executeSellForPosition(config, position, treasuryKeyBase58, `2-Stage Filter: ${sellVotes.length}/${successful.length} vote SELL, ${avgConfidence.toFixed(0)}% avg confidence (${lowConfidenceSamples} samples + price drop confirmed). ${topModels}...`);
+        } else {
+          // Increment counter but HOLD position
+          await storage.updateAIBotPosition(position.id, {
+            lowConfidenceSampleCount: lowConfidenceSamples,
+          });
+          console.log(`[Position Monitor] ⏸️ HOLDING: 2-stage filter not met - need ${REQUIRED_SAMPLES - lowConfidenceSamples} more sample(s) ${!hasPriceDropped && !hasBreachedTrailingStop ? 'AND price drop' : ''}`);
+          logActivity('position_monitor', 'info', `💎 HOLD ${position.tokenSymbol}: AI says sell but 2-stage filter blocks (need price drop confirmation)`);
+        }
       }
       // ❌ BLOCK SELL if profit too small and AI not strongly confident
       else {
@@ -5897,11 +5968,27 @@ Respond ONLY with valid JSON:
         logActivity('position_monitor', 'ai_thought', `🧠 ${highConfModel.provider}: ${position.tokenSymbol} → SELL LOSS (${currentProfitPercent.toFixed(2)}%)`);
         await executeSellForPosition(config, position, treasuryKeyBase58, `Stop-Loss: ${highConfModel.provider} ${highConfModel.analysis.reasoning} (${currentProfitPercent.toFixed(2)}% loss)`);
       }
-      // ✅ AI OVERRIDE: Single model with very high confidence (≥80%) can override profit target
+      // 🛡️ 2-STAGE EXIT FILTER: Single high-confidence model
       else if (highConfModel.analysis.confidence >= 80) {
-        console.log(`[Position Monitor] ✅ AI OVERRIDE: ${highConfModel.provider} has ${highConfModel.analysis.confidence}% confidence → executing to prevent deterioration`);
-        logActivity('position_monitor', 'warning', `⚡ AI OVERRIDE ${position.tokenSymbol}: ${highConfModel.provider} ${highConfModel.analysis.confidence}% → exit at ${currentProfitPercent.toFixed(2)}%`);
-        await executeSellForPosition(config, position, treasuryKeyBase58, `AI Override: ${highConfModel.provider} ${highConfModel.analysis.reasoning} (${highConfModel.analysis.confidence}% confidence, below ${minProfitThreshold}% target but preventing deterioration)`);
+        const lowConfidenceSamples = (position.lowConfidenceSampleCount || 0) + 1;
+        const REQUIRED_SAMPLES = 2;
+        const entryPriceSOL = parseFloat(position.entryPriceSOL || "0");
+        const hasPriceDropped = currentPriceSOL < entryPriceSOL;
+        const trailingStopArmed = position.trailingStopArmed === 1;
+        const trailingStopPrice = trailingStopArmed ? parseFloat(position.trailingStopPriceSOL || "0") : 0;
+        const hasBreachedTrailingStop = trailingStopArmed && currentPriceSOL < trailingStopPrice;
+        
+        console.log(`[Position Monitor] ⚠️ ${highConfModel.provider} HIGH CONFIDENCE (${highConfModel.analysis.confidence}%) - checking 2-stage filter...`);
+        
+        if (lowConfidenceSamples >= REQUIRED_SAMPLES && (hasPriceDropped || hasBreachedTrailingStop)) {
+          console.log(`[Position Monitor] ✅ 2-STAGE FILTER PASSED: Executing sell`);
+          logActivity('position_monitor', 'warning', `⚡ AI OVERRIDE ${position.tokenSymbol}: ${highConfModel.provider} ${highConfModel.analysis.confidence}%, ${lowConfidenceSamples} samples, price drop confirmed`);
+          await executeSellForPosition(config, position, treasuryKeyBase58, `2-Stage Filter: ${highConfModel.provider} ${highConfModel.analysis.reasoning} (${highConfModel.analysis.confidence}% confidence, ${lowConfidenceSamples} samples + price drop)`);
+        } else {
+          await storage.updateAIBotPosition(position.id, { lowConfidenceSampleCount: lowConfidenceSamples });
+          console.log(`[Position Monitor] ⏸️ HOLDING: 2-stage filter not met`);
+          logActivity('position_monitor', 'info', `💎 HOLD ${position.tokenSymbol}: ${highConfModel.provider} says sell but filter blocks`);
+        }
       }
       else {
         console.log(`[Position Monitor] ⏸️ HOLD: Profit ${currentProfitPercent.toFixed(2)}% below ${minProfitThreshold}% minimum - waiting for better exit`);
@@ -5982,11 +6069,27 @@ Respond ONLY with valid JSON:
         logActivity('position_monitor', 'ai_thought', `🧠 ${result.provider}: ${position.tokenSymbol} → SELL LOSS (${currentProfitPercent.toFixed(2)}%)`);
         await executeSellForPosition(config, position, treasuryKeyBase58, `Stop-Loss: ${result.provider} ${result.analysis.reasoning} (${currentProfitPercent.toFixed(2)}% loss)`);
       }
-      // ✅ AI OVERRIDE: Single model with very high confidence (≥80%) can override profit target
+      // 🛡️ 2-STAGE EXIT FILTER: Single model with very high confidence
       else if (result.analysis.confidence >= 80) {
-        console.log(`[Position Monitor] ✅ AI OVERRIDE: ${result.provider} has ${result.analysis.confidence}% confidence → executing to prevent deterioration`);
-        logActivity('position_monitor', 'warning', `⚡ AI OVERRIDE ${position.tokenSymbol}: ${result.provider} ${result.analysis.confidence}% → exit at ${currentProfitPercent.toFixed(2)}%`);
-        await executeSellForPosition(config, position, treasuryKeyBase58, `AI Override: ${result.provider} ${result.analysis.reasoning} (${result.analysis.confidence}% confidence, below ${minProfitThreshold}% target but preventing deterioration)`);
+        const lowConfidenceSamples = (position.lowConfidenceSampleCount || 0) + 1;
+        const REQUIRED_SAMPLES = 2;
+        const entryPriceSOL = parseFloat(position.entryPriceSOL || "0");
+        const hasPriceDropped = currentPriceSOL < entryPriceSOL;
+        const trailingStopArmed = position.trailingStopArmed === 1;
+        const trailingStopPrice = trailingStopArmed ? parseFloat(position.trailingStopPriceSOL || "0") : 0;
+        const hasBreachedTrailingStop = trailingStopArmed && currentPriceSOL < trailingStopPrice;
+        
+        console.log(`[Position Monitor] ⚠️ ${result.provider} HIGH CONFIDENCE (${result.analysis.confidence}%) - checking 2-stage filter...`);
+        
+        if (lowConfidenceSamples >= REQUIRED_SAMPLES && (hasPriceDropped || hasBreachedTrailingStop)) {
+          console.log(`[Position Monitor] ✅ 2-STAGE FILTER PASSED: Executing sell`);
+          logActivity('position_monitor', 'warning', `⚡ AI OVERRIDE ${position.tokenSymbol}: ${result.provider} ${result.analysis.confidence}%, ${lowConfidenceSamples} samples, price drop confirmed`);
+          await executeSellForPosition(config, position, treasuryKeyBase58, `2-Stage Filter: ${result.provider} ${result.analysis.reasoning} (${result.analysis.confidence}% confidence, ${lowConfidenceSamples} samples + price drop)`);
+        } else {
+          await storage.updateAIBotPosition(position.id, { lowConfidenceSampleCount: lowConfidenceSamples });
+          console.log(`[Position Monitor] ⏸️ HOLDING: 2-stage filter not met`);
+          logActivity('position_monitor', 'info', `💎 HOLD ${position.tokenSymbol}: ${result.provider} says sell but filter blocks`);
+        }
       }
       else {
         console.log(`[Position Monitor] ⏸️ HOLD: Profit ${currentProfitPercent.toFixed(2)}% below ${minProfitThreshold}% minimum - waiting for better exit`);

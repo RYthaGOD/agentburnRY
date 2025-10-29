@@ -232,6 +232,15 @@ export const aiBotPositions = pgTable("ai_bot_positions", {
   strategyType: text("strategy_type").notNull().default("AI_DRIVEN"), // "AI_DRIVEN", "MEAN_REVERSION", "MOMENTUM_BREAKOUT", "GRID_TRADING"
   strategyProfitTarget: decimal("strategy_profit_target", { precision: 10, scale: 2 }), // Profit target % for this specific strategy
   strategyStopLoss: decimal("strategy_stop_loss", { precision: 10, scale: 2 }), // Stop loss % for this specific strategy
+  
+  // Confidence Hysteresis System (prevents premature exits from temporary confidence dips)
+  lowConfidenceSampleCount: integer("low_confidence_sample_count").notNull().default(0), // Number of consecutive checks with low AI confidence
+  lastSellSignalAt: timestamp("last_sell_signal_at"), // Track when AI last recommended selling (prevent rapid flip-flopping)
+  
+  // Trailing Stop-Loss (arms after securing profit to protect gains)
+  trailingStopPriceSOL: decimal("trailing_stop_price_sol", { precision: 18, scale: 9 }), // Trailing stop price (only set after profit secured)
+  trailingStopArmed: integer("trailing_stop_armed").notNull().default(0), // 1 = armed after 1.5%+ profit, 0 = not armed yet
+  
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
   // Unique constraint to prevent duplicate positions for the same token (atomic safeguard against race conditions)
