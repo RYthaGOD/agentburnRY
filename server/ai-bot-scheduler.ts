@@ -394,32 +394,37 @@ async function getCachedOrFetchTokens(config?: {
 
   console.log("[AI Bot Cache] Cache miss or expired, fetching fresh data...");
   
-  // 🎯 PROFITABILITY FOCUS: Use PumpFun API for tokens with ~$20k market cap
+  // 🚀 HYBRID STRATEGY: Jupiter (reliable) + PumpFun (when available)
+  const { fetchTokensFromJupiter } = await import('./jupiter-token-discovery.js');
   const { fetchPumpFunTokensByMarketCap } = await import('./pumpfun-api.js');
   const { fetchLowCapPumpTokensViaDexScreener, fetchNewlyMigratedPumpTokens } = await import('./pumpfun-alternative.js');
   
-  // Try PumpFun API first, fallback to DexScreener
-  // 🎯 WIDENED RANGE: $5k-$200k to find more trading opportunities
+  // Primary: Jupiter API (100% reliable, always works)
+  const jupiterTokens = await fetchTokensFromJupiter(100);
+  console.log(`[AI Bot Cache] ✅ Jupiter: ${jupiterTokens.length} tokens`);
+  
+  // Supplement: Try PumpFun sources (may be rate-limited)
   let pumpFunTokens: any[] = [];
+  let lowCapTokens: any[] = [];
+  let migratedTokens: any[] = [];
+  
   try {
-    pumpFunTokens = await fetchPumpFunTokensByMarketCap(5000, 200000, 50);
+    [pumpFunTokens, lowCapTokens, migratedTokens] = await Promise.all([
+      fetchPumpFunTokensByMarketCap(5000, 200000, 30).catch(() => []),
+      fetchLowCapPumpTokensViaDexScreener(30).catch(() => []),
+      fetchNewlyMigratedPumpTokens(20).catch(() => []),
+    ]);
   } catch (error) {
-    console.log('[AI Bot Cache] PumpFun API unavailable, using DexScreener fallback...');
+    console.log('[AI Bot Cache] ⚠️ PumpFun sources unavailable, using Jupiter only');
   }
   
-  // Fetch DexScreener tokens as backup/supplement
-  const [lowCapTokens, migratedTokens] = await Promise.all([
-    fetchLowCapPumpTokensViaDexScreener(50), // Target ~$20k market cap tokens
-    fetchNewlyMigratedPumpTokens(30),        // Recently migrated PumpFun tokens
-  ]);
-  
   // Combine all sources and deduplicate
-  const allTokens = [...pumpFunTokens, ...lowCapTokens, ...migratedTokens];
+  const allTokens = [...jupiterTokens, ...pumpFunTokens, ...lowCapTokens, ...migratedTokens];
   const uniqueTokens = Array.from(
     new Map(allTokens.map(t => [t.mint, t])).values()
   );
   
-  console.log(`[AI Bot Cache] 🎯 Token Discovery: ${pumpFunTokens.length} PumpFun API + ${lowCapTokens.length} DexScreener + ${migratedTokens.length} migrated = ${uniqueTokens.length} unique tokens`);
+  console.log(`[AI Bot Cache] 🎯 Discovery: ${jupiterTokens.length} Jupiter + ${pumpFunTokens.length} PumpFun + ${lowCapTokens.length} low-cap + ${migratedTokens.length} migrated = ${uniqueTokens.length} total`);
   
   // Filter out blacklisted tokens
   const blacklistedTokens = await storage.getAllBlacklistedTokens();
