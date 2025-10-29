@@ -39,12 +39,18 @@ A `node-cron` service automates hourly checks for buyback execution, including p
 - **Advanced Technical Analysis:** Integrates RSI, EMA, and Bollinger Bands into buy/sell decisions.
 - **Sell Decision Framework:** AI continuously monitors positions with dynamic exit criteria based on confidence, profit targets, technical signals, or max hold time.
 - **Automatic Buyback & Burn Mechanism:** Configurable automatic buyback and immediate on-chain burning of tokens using a percentage of profits.
-- **AI-Powered Loss Prevention System (AGGRESSIVE MODE):** Multi-provider loss prediction with risk-adjusted position sizing. Only blocks if ALL AIs unanimously predict >95% loss. For risky trades (40-95% loss probability): automatically reduces position size (25-50%) and tightens stop-losses (-1.5% to -2%) for protection.
+- **AI-Powered Loss Prevention System (PROFITABILITY-OPTIMIZED):** Multi-provider loss prediction with risk-adjusted position sizing. Blocks trades with >85% loss probability (was >95%). Hard-blocks tokens with unlocked liquidity (rug pull risk). For risky trades (40-85% loss probability): automatically reduces position size (25-50%) and tightens stop-losses (-1.5% to -2%) for protection.
 - **Profit Maximization System:** Enforces minimum profit thresholds, smart exit logic, and a profit-hunting strategy.
 - **Optimized Slippage Strategy:** Implements tiered slippage settings for BUY (3%), Normal SELL (5%), and Emergency Rotation SELL (8%).
 - **Multi-Strategy Trading System:** Complementary strategies (Mean Reversion, Momentum Breakout, Grid Trading) run alongside AI-driven SCALP/SWING.
-- **AI-Driven Trade Execution Filters:** Deep scans include technical "buy low" filters before executing AI-driven buy trades.
+- **AI-Driven Trade Execution Filters (PROFITABILITY-OPTIMIZED):** Deep scans with tightened "buy low" filters:
+  - Block tokens pumped >20% in 24h (was 30%)
+  - Block tokens pumped >15% in 1h (new filter)
+  - Block overbought tokens with RSI >60 (was warning only at >70)
+  - Allow dip-buying on tokens down -20%+ (buy the dip strategy)
 - **Conviction Hold & Accumulate:** AI can accumulate losing positions when high conviction (85%+) that fundamentals remain strong, with strict safety limits.
+- **Fast Position Monitoring (PROFITABILITY-OPTIMIZED):** Position checks every 1 minute (was 3 minutes) for faster stop-loss execution, preventing late triggers at -27% instead of target -8%.
+- **Quick Profit-Taking (PROFITABILITY-OPTIMIZED):** Automatic sell at +25% profit to lock gains before volatile low-cap tokens crash.
 
 ### Data Storage
 Uses PostgreSQL via Neon's serverless driver and Drizzle ORM, with UUID primary keys, decimal types, and automatic timestamps.
