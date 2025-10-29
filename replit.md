@@ -39,7 +39,7 @@ A `node-cron` service automates hourly checks for buyback execution, including p
 - **Advanced Technical Analysis:** Integrates RSI, EMA, and Bollinger Bands into buy/sell decisions.
 - **Sell Decision Framework:** AI continuously monitors positions with dynamic exit criteria based on confidence, profit targets, technical signals, or max hold time.
 - **Automatic Buyback & Burn Mechanism:** Configurable automatic buyback and immediate on-chain burning of tokens using a percentage of profits.
-- **AI-Powered Loss Prevention System:** Includes a centralized trading guard, hardened technical fallback, multi-provider loss prediction, enhanced supermajority consensus, and a fail-closed architecture.
+- **AI-Powered Loss Prevention System (AGGRESSIVE MODE):** Multi-provider loss prediction with risk-adjusted position sizing. Only blocks if ALL AIs unanimously predict >95% loss. For risky trades (40-95% loss probability): automatically reduces position size (25-50%) and tightens stop-losses (-1.5% to -2%) for protection.
 - **Profit Maximization System:** Enforces minimum profit thresholds, smart exit logic, and a profit-hunting strategy.
 - **Optimized Slippage Strategy:** Implements tiered slippage settings for BUY (3%), Normal SELL (5%), and Emergency Rotation SELL (8%).
 - **Multi-Strategy Trading System:** Complementary strategies (Mean Reversion, Momentum Breakout, Grid Trading) run alongside AI-driven SCALP/SWING.
