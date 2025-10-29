@@ -341,7 +341,7 @@ interface TokenCache {
 }
 
 const tokenDataCache: Map<string, TokenCache> = new Map();
-const CACHE_DURATION_MS = 20 * 60 * 1000; // 20 minutes (BALANCED: fresh data + API savings)
+const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes (MORE FREQUENT: fresher token variety)
 
 /**
  * Cache for AI analysis results with ADAPTIVE INVALIDATION
@@ -399,9 +399,9 @@ async function getCachedOrFetchTokens(config?: {
   
   const [dexTokens, pumpfunTrendingTokens, pumpfunMigratedTokens, pumpfunLowCapTokens] = await Promise.all([
     fetchTrendingPumpFunTokens(config), // DexScreener trending (general Solana)
-    fetchTrendingPumpStyleTokens(15), // DexScreener pump-style tokens (NEW!)
-    fetchNewlyMigratedPumpTokens(20), // Newly migrated tokens via DexScreener (NEW!)
-    fetchLowCapPumpTokensViaDexScreener(15), // Low-cap opportunities via DexScreener (NEW!)
+    fetchTrendingPumpStyleTokens(30), // DexScreener pump-style tokens (EXPANDED 15→30)
+    fetchNewlyMigratedPumpTokens(40), // Newly migrated tokens via DexScreener (EXPANDED 20→40)
+    fetchLowCapPumpTokensViaDexScreener(30), // Low-cap opportunities via DexScreener (EXPANDED 15→30)
   ]);
   
   // Combine all sources, removing duplicates by mint address
@@ -991,12 +991,12 @@ async function fetchTrendingPumpFunTokens(config?: {
         };
       })
       .filter((pair: any) => {
-        // STRICT QUALITY FILTERS: High-quality tokens only to maximize win rate
-        // 80%+ organic score, 70%+ quality score, 100+ holders, 24h+ age
-        const minOrganicScore = config?.minOrganicScore ?? 80;
-        const minQualityScore = config?.minQualityScore ?? 70;
-        const minLiquidity = config?.minLiquidityUSD ?? 20000; // Raised to $20k for safer trades
-        const minTxns = config?.minTransactions24h ?? 50; // More activity = more reliable
+        // BALANCED QUALITY FILTERS: More variety while maintaining safety
+        // 60%+ organic score, 50%+ quality score, 50+ holders, 24h+ age
+        const minOrganicScore = config?.minOrganicScore ?? 60; // LOWERED from 80% for variety
+        const minQualityScore = config?.minQualityScore ?? 50; // LOWERED from 70% for variety
+        const minLiquidity = config?.minLiquidityUSD ?? 10000; // LOWERED from $20k for more opportunities
+        const minTxns = config?.minTransactions24h ?? 30; // LOWERED from 50 for more options
         
         const txns24h = (pair.txns?.h24?.buys || 0) + (pair.txns?.h24?.sells || 0);
         const liquidityUSD = pair.liquidity?.usd || 0;
@@ -1009,7 +1009,7 @@ async function fetchTrendingPumpFunTokens(config?: {
         // DexScreener doesn't provide holder count directly, but we can estimate from transaction count
         // More unique transactions usually means more holders
         const estimatedHolders = Math.floor(txns24h * 0.3); // Rough estimate: 30% of txs are unique holders
-        const minHolders = 100;
+        const minHolders = 50; // LOWERED from 100 for more variety
         const hasEnoughHolders = estimatedHolders >= minHolders;
         
         return (
@@ -1022,12 +1022,12 @@ async function fetchTrendingPumpFunTokens(config?: {
         );
       })
       .sort((a: any, b: any) => b.qualityScore - a.qualityScore) // Sort by quality score (best first)
-      .slice(0, 35); // Take top 35 highest quality tokens
+      .slice(0, 50); // EXPANDED from 35 to 50 for more variety
     
-    const minOrganicScore = config?.minOrganicScore ?? 80;
-    const minQualityScore = config?.minQualityScore ?? 70;
+    const minOrganicScore = config?.minOrganicScore ?? 60;
+    const minQualityScore = config?.minQualityScore ?? 50;
     
-    console.log(`[AI Bot] 📊 Filtered to ${scoredPairs.length} HIGH-QUALITY tokens (min ${minOrganicScore}% organic, min ${minQualityScore}% quality, 24h+ age, 100+ holders)`);
+    console.log(`[AI Bot] 📊 Filtered to ${scoredPairs.length} quality tokens (min ${minOrganicScore}% organic, min ${minQualityScore}% quality, 24h+ age, 50+ holders)`);
     if (scoredPairs.length > 0) {
       const top = scoredPairs[0];
       console.log(`[AI Bot] 🏆 Top token: ${top.baseToken?.symbol} - Quality: ${top.qualityScore.toFixed(1)}%, Organic: ${top.organicScore.toFixed(1)}%`);
