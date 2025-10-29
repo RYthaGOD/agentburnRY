@@ -49,11 +49,9 @@ export default function TokenAnalyzer() {
       {/* Header */}
       <div className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/">
-            <a className="flex items-center gap-2 hover-elevate">
-              <Sparkles className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">GigaBrain</span>
-            </a>
+          <Link href="/" className="flex items-center gap-2 hover-elevate">
+            <Sparkles className="h-6 w-6 text-primary" />
+            <span className="text-xl font-bold">GigaBrain</span>
           </Link>
           <div className="flex items-center gap-4">
             <Link href="/stats">
@@ -131,7 +129,7 @@ export default function TokenAnalyzer() {
             <CardContent className="py-12">
               <div className="text-center space-y-4">
                 <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
-                <p className="text-muted-foreground">Analyzing token with 11-model AI hivemind...</p>
+                <p className="text-muted-foreground">Analyzing token with 12-model AI hivemind...</p>
               </div>
             </CardContent>
           </Card>

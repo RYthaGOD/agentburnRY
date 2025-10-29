@@ -84,6 +84,37 @@ export default function PublicStats() {
           </p>
         </div>
 
+        {/* Fresh Start Banner */}
+        {stats && stats.totalTrades === 0 && (
+          <Card className="border-2 border-green-500/30 bg-gradient-to-br from-green-500/10 to-background">
+            <CardContent className="pt-6">
+              <div className="text-center space-y-3">
+                <div className="flex items-center justify-center gap-2">
+                  <Sparkles className="h-6 w-6 text-green-500" />
+                  <h3 className="text-xl font-bold text-green-500">Fresh Start - System Upgraded</h3>
+                </div>
+                <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
+                  GigaBrain has been upgraded with enhanced token discovery (100+ tokens scanned), 5-minute refresh cycles, and smarter exit strategies. All metrics have been reset to track fresh performance data with the latest improvements.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 max-w-3xl mx-auto">
+                  <div>
+                    <p className="font-semibold text-sm mb-1">3x More Tokens</p>
+                    <p className="text-xs text-muted-foreground">100+ tokens from 4 sources</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm mb-1">4x Faster Discovery</p>
+                    <p className="text-xs text-muted-foreground">5-minute refresh cycles</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm mb-1">Smarter Exits</p>
+                    <p className="text-xs text-muted-foreground">2-stage filter + trailing stops</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Main Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Win Rate */}
@@ -350,10 +381,10 @@ export default function PublicStats() {
             </div>
             <div className="space-y-2">
               <h3 className="font-semibold flex items-center gap-2">
-                🤖 11-Model AI Hivemind
+                🤖 12-Model AI Hivemind
               </h3>
               <p className="text-sm text-muted-foreground">
-                Multiple AI models vote on every trade with automatic failover. Higher accuracy, lower risk.
+                12 AI models in 4-team rotation vote on every trade with automatic failover. Higher accuracy, lower risk.
               </p>
             </div>
             <div className="space-y-2">
@@ -386,7 +417,7 @@ export default function PublicStats() {
             </Link>
           </div>
           <p className="text-sm text-muted-foreground">
-            First 10 trades free • No credit card required • Start in 60 seconds
+            First 20 trades free • No credit card required • Start in 60 seconds
           </p>
         </div>
       </div>
