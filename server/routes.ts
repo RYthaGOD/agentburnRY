@@ -916,6 +916,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Close all positions and restart bot
+  app.post("/api/ai-bot/close-all-positions/:ownerWalletAddress", async (req, res) => {
+    try {
+      const { ownerWalletAddress } = req.params;
+
+      // Verify wallet is whitelisted
+      const { AI_BOT_WHITELISTED_WALLETS } = await import("@shared/config");
+      const isWhitelisted = AI_BOT_WHITELISTED_WALLETS.includes(ownerWalletAddress);
+      
+      if (!isWhitelisted) {
+        return res.status(403).json({ 
+          message: "Access denied: Only whitelisted wallets can close all positions" 
+        });
+      }
+
+      console.log(`[API] Closing all positions for ${ownerWalletAddress}...`);
+
+      // Get bot config for treasury key
+      const config = await storage.getAIBotConfig(ownerWalletAddress);
+      if (!config || !config.treasuryKeyCiphertext || !config.treasuryKeyIv || !config.treasuryKeyAuthTag) {
+        return res.status(404).json({ message: "AI bot config or treasury key not found" });
+      }
+
+      // Decrypt treasury key
+      const { decrypt } = await import("./crypto");
+      const treasuryKeyBase58 = decrypt(
+        config.treasuryKeyCiphertext,
+        config.treasuryKeyIv,
+        config.treasuryKeyAuthTag
+      );
+
+      // Get all active positions
+      const positions = await storage.getAIBotPositions(ownerWalletAddress);
+      console.log(`[API] Found ${positions.length} positions to close`);
+
+      if (positions.length === 0) {
+        return res.json({ 
+          success: true,
+          message: "No positions to close",
+          positionsClosed: 0,
+          errors: []
+        });
+      }
+
+      // Close each position
+      const { sellTokenWithFallback } = await import("./jupiter");
+      const results = [];
+      const errors = [];
+
+      for (const position of positions) {
+        try {
+          const tokenAmount = parseFloat(position.tokenAmount);
+          if (tokenAmount === 0 || isNaN(tokenAmount)) {
+            console.log(`[API] Skipping ${position.tokenSymbol}: Zero token amount`);
+            await storage.deleteAIBotPosition(position.id);
+            continue;
+          }
+
+          const tokenAmountRaw = Math.floor(tokenAmount);
+          console.log(`[API] Selling ${position.tokenSymbol}: ${tokenAmountRaw} tokens`);
+
+          // Sell with 5% slippage
+          const sellResult = await sellTokenWithFallback(
+            treasuryKeyBase58,
+            position.tokenMint,
+            tokenAmountRaw,
+            500 // 5% slippage
+          );
+
+          if (sellResult.success && sellResult.signature) {
+            console.log(`[API] ✅ Sold ${position.tokenSymbol}: ${sellResult.signature}`);
+            results.push({
+              tokenSymbol: position.tokenSymbol,
+              success: true,
+              signature: sellResult.signature
+            });
+          } else {
+            console.error(`[API] ❌ Failed to sell ${position.tokenSymbol}: ${sellResult.error}`);
+            errors.push({
+              tokenSymbol: position.tokenSymbol,
+              error: sellResult.error || "Unknown error"
+            });
+          }
+
+          // Delete position from database
+          await storage.deleteAIBotPosition(position.id);
+        } catch (error: any) {
+          console.error(`[API] Error closing position ${position.tokenSymbol}:`, error);
+          errors.push({
+            tokenSymbol: position.tokenSymbol,
+            error: error.message
+          });
+        }
+      }
+
+      // Reset bot state
+      await storage.createOrUpdateAIBotConfig({
+        ownerWalletAddress,
+        portfolioPeakSOL: "0",
+        budgetUsed: "0",
+      });
+
+      console.log(`[API] ✅ Closed ${results.length} positions, ${errors.length} errors`);
+
+      res.json({
+        success: true,
+        message: `Closed ${results.length} positions successfully`,
+        positionsClosed: results.length,
+        results,
+        errors
+      });
+    } catch (error: any) {
+      console.error("[API] Error closing all positions:", error);
+      res.status(500).json({ 
+        success: false,
+        message: error.message 
+      });
+    }
+  });
+
   // Get trade journal entries for analysis
   app.get("/api/ai-bot/trade-journal/:ownerWalletAddress", async (req, res) => {
     try {
