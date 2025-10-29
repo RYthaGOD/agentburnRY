@@ -460,8 +460,8 @@ function getDefaultStrategy(): HivemindStrategy {
     profitTargetMultiplier: 0.8, // Take profits consistently
     riskLevel: "moderate",
     budgetPerTrade: 0.02, // REDUCED: Smaller trades for capital preservation
-    minVolumeUSD: 10000, // LOWERED: Allow lower volume tokens ($10k minimum)
-    minLiquidityUSD: 10000, // LOWERED: Allow lower liquidity ($10k minimum)
+    minVolumeUSD: 3000, // AGGRESSIVE: Very low volume requirement for maximum opportunities
+    minLiquidityUSD: 3000, // AGGRESSIVE: Very low liquidity requirement for more trading
     minOrganicScore: 60, // LOWERED: Less strict organic requirement (60% minimum)
     minQualityScore: 50, // LOWERED: Less strict quality requirement (50% minimum)
     minTransactions24h: 30, // LOWERED: Allow less active tokens (30 minimum)

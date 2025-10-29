@@ -72,31 +72,46 @@ export async function fetchTrendingTokensFromJupiter(
     const tokens: JupiterToken[] = await response.json();
     console.log(`[Jupiter API] ✅ Fetched ${tokens.length} trending tokens`);
 
-    // Convert to TokenMarketData format
-    const tokenData: TokenMarketData[] = tokens.slice(0, maxTokens).map((token) => {
+    // Convert to TokenMarketData format with detailed logging
+    const tokenData: TokenMarketData[] = [];
+    for (const token of tokens.slice(0, maxTokens)) {
       // Calculate SOL price from USD price
       const SOL_PRICE_USD = 145; // Approximate SOL price
       const priceSOL = token.usdPrice ? token.usdPrice / SOL_PRICE_USD : 0;
+      
+      // Extract volume from different possible locations
+      const volumeUSD24h = token.stats24h?.buyVolume && token.stats24h?.sellVolume
+        ? (token.stats24h.buyVolume + token.stats24h.sellVolume)
+        : (token.stats24h?.volume || 0);
 
-      return {
+      tokenData.push({
         mint: token.id,
         name: token.name,
         symbol: token.symbol,
         priceUSD: token.usdPrice || 0,
         priceSOL: priceSOL,
-        volumeUSD24h: token.stats24h?.volume || 0,
+        volumeUSD24h: volumeUSD24h,
         marketCapUSD: token.mcap || 0,
         liquidityUSD: token.liquidity,
         priceChange24h: token.stats24h?.priceChange,
         priceChange1h: token.stats1h?.priceChange,
         holderCount: token.holderCount,
-        transactionCount24h: token.stats24h?.txnCount,
-        buyPressure: undefined, // Not available in Jupiter API
-        volumeToLiquidityRatio: token.liquidity && token.stats24h?.volume
-          ? Number((token.stats24h.volume / token.liquidity).toFixed(2))
+        transactionCount24h: token.stats24h?.numBuys && token.stats24h?.numSells
+          ? (token.stats24h.numBuys + token.stats24h.numSells)
           : undefined,
-      };
-    });
+        buyPressure: token.stats24h?.numBuys && token.stats24h?.numSells
+          ? Math.round((token.stats24h.numBuys / (token.stats24h.numBuys + token.stats24h.numSells)) * 100)
+          : undefined,
+        volumeToLiquidityRatio: token.liquidity && volumeUSD24h
+          ? Number((volumeUSD24h / token.liquidity).toFixed(2))
+          : undefined,
+      });
+    }
+    
+    // Debug: Show sample token volumes
+    if (tokenData.length > 0) {
+      console.log(`[Jupiter API] Sample volumes: ${tokenData.slice(0, 3).map(t => `${t.symbol}=$${t.volumeUSD24h.toLocaleString()}`).join(', ')}`);
+    }
 
     return tokenData;
   } catch (error) {
@@ -132,28 +147,37 @@ export async function fetchTopTradedTokensFromJupiter(
 
     // Convert to TokenMarketData format
     const SOL_PRICE_USD = 145;
-    const tokenData: TokenMarketData[] = tokens.slice(0, maxTokens).map((token) => {
+    const tokenData: TokenMarketData[] = [];
+    for (const token of tokens.slice(0, maxTokens)) {
       const priceSOL = token.usdPrice ? token.usdPrice / SOL_PRICE_USD : 0;
+      
+      const volumeUSD24h = token.stats24h?.buyVolume && token.stats24h?.sellVolume
+        ? (token.stats24h.buyVolume + token.stats24h.sellVolume)
+        : (token.stats24h?.volume || 0);
 
-      return {
+      tokenData.push({
         mint: token.id,
         name: token.name,
         symbol: token.symbol,
         priceUSD: token.usdPrice || 0,
         priceSOL: priceSOL,
-        volumeUSD24h: token.stats24h?.volume || 0,
+        volumeUSD24h: volumeUSD24h,
         marketCapUSD: token.mcap || 0,
         liquidityUSD: token.liquidity,
         priceChange24h: token.stats24h?.priceChange,
         priceChange1h: token.stats1h?.priceChange,
         holderCount: token.holderCount,
-        transactionCount24h: token.stats24h?.txnCount,
-        buyPressure: undefined,
-        volumeToLiquidityRatio: token.liquidity && token.stats24h?.volume
-          ? Number((token.stats24h.volume / token.liquidity).toFixed(2))
+        transactionCount24h: token.stats24h?.numBuys && token.stats24h?.numSells
+          ? (token.stats24h.numBuys + token.stats24h.numSells)
           : undefined,
-      };
-    });
+        buyPressure: token.stats24h?.numBuys && token.stats24h?.numSells
+          ? Math.round((token.stats24h.numBuys / (token.stats24h.numBuys + token.stats24h.numSells)) * 100)
+          : undefined,
+        volumeToLiquidityRatio: token.liquidity && volumeUSD24h
+          ? Number((volumeUSD24h / token.liquidity).toFixed(2))
+          : undefined,
+      });
+    }
 
     return tokenData;
   } catch (error) {
@@ -190,28 +214,37 @@ export async function fetchHighOrganicScoreTokensFromJupiter(
 
     // Convert to TokenMarketData format
     const SOL_PRICE_USD = 145;
-    const tokenData: TokenMarketData[] = tokens.slice(0, maxTokens).map((token) => {
+    const tokenData: TokenMarketData[] = [];
+    for (const token of tokens.slice(0, maxTokens)) {
       const priceSOL = token.usdPrice ? token.usdPrice / SOL_PRICE_USD : 0;
+      
+      const volumeUSD24h = token.stats24h?.buyVolume && token.stats24h?.sellVolume
+        ? (token.stats24h.buyVolume + token.stats24h.sellVolume)
+        : (token.stats24h?.volume || 0);
 
-      return {
+      tokenData.push({
         mint: token.id,
         name: token.name,
         symbol: token.symbol,
         priceUSD: token.usdPrice || 0,
         priceSOL: priceSOL,
-        volumeUSD24h: token.stats24h?.volume || 0,
+        volumeUSD24h: volumeUSD24h,
         marketCapUSD: token.mcap || 0,
         liquidityUSD: token.liquidity,
         priceChange24h: token.stats24h?.priceChange,
         priceChange1h: token.stats1h?.priceChange,
         holderCount: token.holderCount,
-        transactionCount24h: token.stats24h?.txnCount,
-        buyPressure: undefined,
-        volumeToLiquidityRatio: token.liquidity && token.stats24h?.volume
-          ? Number((token.stats24h.volume / token.liquidity).toFixed(2))
+        transactionCount24h: token.stats24h?.numBuys && token.stats24h?.numSells
+          ? (token.stats24h.numBuys + token.stats24h.numSells)
           : undefined,
-      };
-    });
+        buyPressure: token.stats24h?.numBuys && token.stats24h?.numSells
+          ? Math.round((token.stats24h.numBuys / (token.stats24h.numBuys + token.stats24h.numSells)) * 100)
+          : undefined,
+        volumeToLiquidityRatio: token.liquidity && volumeUSD24h
+          ? Number((volumeUSD24h / token.liquidity).toFixed(2))
+          : undefined,
+      });
+    }
 
     return tokenData;
   } catch (error) {

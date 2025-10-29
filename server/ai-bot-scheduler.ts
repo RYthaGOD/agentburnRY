@@ -1534,13 +1534,30 @@ async function runQuickTechnicalScan() {
         
         const filteredTokens = tokens.filter((t) => t.volumeUSD24h >= minVolumeUSD);
         
+        console.log(`[Quick Scan DEBUG] Total tokens: ${tokens.length}, after volume filter: ${filteredTokens.length}`);
+        console.log(`[Quick Scan DEBUG] Min requirements: volume=${minVolumeUSD}, liquidity=${minLiquidityUSD}`);
+        
+        // Sample a few tokens to see their data
+        if (filteredTokens.length > 0) {
+          const sample = filteredTokens[0];
+          console.log(`[Quick Scan DEBUG] Sample token:`, {
+            symbol: sample.symbol,
+            priceChange1h: sample.priceChange1h,
+            priceChange24h: sample.priceChange24h,
+            volumeUSD24h: sample.volumeUSD24h,
+            liquidityUSD: sample.liquidityUSD,
+          });
+        }
+        
         // Quick technical filters with hivemind liquidity threshold
         const opportunities = filteredTokens.filter(token => {
           const has1hMomentum = (token.priceChange1h ?? 0) > 0;
           const has24hMomentum = (token.priceChange24h ?? 0) > 0;
           const hasVolume = token.volumeUSD24h >= minVolumeUSD;
           const hasLiquidity = (token.liquidityUSD ?? 0) >= minLiquidityUSD;
-          return has1hMomentum && has24hMomentum && hasVolume && hasLiquidity;
+          // RELAXED: Only require ONE positive timeframe (not both) for more opportunities
+          const hasMomentum = has1hMomentum || has24hMomentum;
+          return hasMomentum && hasVolume && hasLiquidity;
         });
         
         if (opportunities.length === 0) {
