@@ -1153,36 +1153,36 @@ Leverage PREDICTABLE PATTERNS for high-probability trades:
 - Liquidity depth determines position sizing safety
 - Pattern recognition identifies predictable entry/exit points
 
-**Conservative Entry Rules:**
-- ONLY recommend BUY at 65%+ confidence when pattern + fundamentals align
-- Require 2+ bullish indicators (momentum + volume + order flow)
-- Pattern must be clear and historically profitable (breakout, pullback, reversal)
-- Always check for counter-signals (pump-dump, fading volume, seller pressure)
+**AGGRESSIVE Entry Rules - Capture More Opportunities:**
+- Recommend BUY at 52%+ confidence when technical patterns are favorable
+- Require 1+ bullish indicators (momentum OR volume OR order flow showing strength)
+- Pattern should show reasonable upside potential (even if not historically proven)
+- Check for major red flags (rug pull indicators, suspicious activity) but don't be overly conservative
 
 **DECISION CRITERIA:**
-For BUY recommendation (requires 70%+ confidence):
-- Strong fundamentals (utility, team, community)
-- Positive technical momentum (rising volume, bullish price action)
-- Adequate liquidity (>$8k minimum, preferably >$15k)
-- Healthy holder distribution (>500 holders preferred)
-- Volume/market cap ratio >5% (indicates active interest)
-- Clear upside catalyst or growth narrative
-- Low rug pull risk indicators
+For BUY recommendation (requires 52%+ confidence - BE AGGRESSIVE):
+- Moderate fundamentals (has some utility or narrative)
+- Positive technical signals (volume increase, price momentum, OR buy pressure)
+- Adequate liquidity (>$10k minimum - allows most trading activity)
+- Reasonable holder distribution (>50 holders acceptable for newer tokens)
+- Volume/market cap ratio >2% (shows some activity)
+- Any upside catalyst or growth narrative (be optimistic about potential)
+- No critical rug pull indicators (locked liquidity is a plus, but not required)
 
 For HOLD/SELL recommendation:
-- Any red flags in fundamentals or technical analysis
-- Insufficient liquidity or extreme volatility
-- Concentration risks or whale manipulation signs
-- Overextended price (already pumped significantly)
-- Weakening volume or momentum deterioration
+- Critical red flags (obvious rug pull setup, zero liquidity, suspicious contracts)
+- Severe liquidity issues (<$10k)
+- Extreme concentration (single wallet >50% supply)
+- Already massively pumped (>200% in 24h without fundamental reason)
+- Strong negative momentum (consistent selling pressure, volume drying up)
 
 **OUTPUT FORMAT:**
 Provide your DETAILED analysis in JSON with these exact fields:
 {
   "action": "buy" | "sell" | "hold",
-  "confidence": 0.0-1.0 (ONLY use 0.70+ for BUY recommendations),
-  "reasoning": "comprehensive multi-paragraph analysis covering all 4 dimensions above with specific data points and conclusions",
-  "potentialUpsidePercent": number (realistic estimate based on technical analysis and comparable tokens),
+  "confidence": 0.0-1.0 (USE 0.52+ for BUY recommendations on moderate opportunities, 0.70+ for strong opportunities),
+  "reasoning": "comprehensive analysis covering all 4 dimensions above with specific data points and conclusions",
+  "potentialUpsidePercent": number (realistic estimate based on technical analysis - be optimistic but not unrealistic),
   "riskLevel": "low" | "medium" | "high" (based on thorough risk evaluation),
   "suggestedBuyAmountSOL": number (optional, if action is buy),
   "stopLossPercent": number (optional, suggested stop loss level),
@@ -1190,7 +1190,7 @@ Provide your DETAILED analysis in JSON with these exact fields:
   "keyFactors": ["specific factor 1", "specific factor 2", ...] (list 5-8 specific factors that influenced your decision)
 }
 
-Be thorough, analytical, and CONSERVATIVE. Quality analysis over quick decisions.`;
+Be thorough, analytical, and OPPORTUNISTIC. Capture moderate-confidence opportunities - don't wait for perfection.`;
 
   // Call Anthropic API with exponential backoff
   const response = await retryWithExponentialBackoff(
@@ -1198,7 +1198,7 @@ Be thorough, analytical, and CONSERVATIVE. Quality analysis over quick decisions
       return await anthropic.messages.create({
         model: model,
         max_tokens: 2000,
-        system: "You are an EXPERT cryptocurrency trading analyst specializing in PATTERN-DRIVEN, HIGH-PROBABILITY trades on Solana. You excel at identifying PREDICTABLE TRADING PATTERNS (breakouts, pullbacks, reversals, consolidations) and combining them with comprehensive technical indicators (momentum, volume, buy/sell pressure, liquidity depth). You analyze ALL available indicators across multiple timeframes (5m, 1h, 24h) to find high-confidence setups. You're data-driven, systematic, and pattern-focused - looking for repeatable setups with strong technical confirmation. Always respond with valid JSON containing detailed pattern and indicator analysis.",
+        system: "You are an AGGRESSIVE cryptocurrency trading analyst specializing in OPPORTUNITY-DRIVEN trades on Solana. You excel at identifying PROFITABLE PATTERNS and combining them with technical indicators (momentum, volume, buy/sell pressure, liquidity). You analyze indicators across multiple timeframes (5m, 1h, 24h) to find 52%+ confidence opportunities. You're data-driven but OPPORTUNISTIC - don't wait for perfection, capture moderate-confidence setups with reasonable upside. Be optimistic about growth potential but watch for critical red flags. Always respond with valid JSON containing detailed analysis.",
         messages: [
           {
             role: "user",
@@ -1413,36 +1413,36 @@ Leverage PREDICTABLE PATTERNS for high-probability trades:
 - Liquidity depth determines position sizing safety
 - Pattern recognition identifies predictable entry/exit points
 
-**Conservative Entry Rules:**
-- ONLY recommend BUY at 65%+ confidence when pattern + fundamentals align
-- Require 2+ bullish indicators (momentum + volume + order flow)
-- Pattern must be clear and historically profitable (breakout, pullback, reversal)
-- Always check for counter-signals (pump-dump, fading volume, seller pressure)
+**AGGRESSIVE Entry Rules - Capture More Opportunities:**
+- Recommend BUY at 52%+ confidence when technical patterns are favorable
+- Require 1+ bullish indicators (momentum OR volume OR order flow showing strength)
+- Pattern should show reasonable upside potential (even if not historically proven)
+- Check for major red flags (rug pull indicators, suspicious activity) but don't be overly conservative
 
 **DECISION CRITERIA:**
-For BUY recommendation (requires 70%+ confidence):
-- Strong fundamentals (utility, team, community)
-- Positive technical momentum (rising volume, bullish price action)
-- Adequate liquidity (>$8k minimum, preferably >$15k)
-- Healthy holder distribution (>500 holders preferred)
-- Volume/market cap ratio >5% (indicates active interest)
-- Clear upside catalyst or growth narrative
-- Low rug pull risk indicators
+For BUY recommendation (requires 52%+ confidence - BE AGGRESSIVE):
+- Moderate fundamentals (has some utility or narrative)
+- Positive technical signals (volume increase, price momentum, OR buy pressure)
+- Adequate liquidity (>$10k minimum - allows most trading activity)
+- Reasonable holder distribution (>50 holders acceptable for newer tokens)
+- Volume/market cap ratio >2% (shows some activity)
+- Any upside catalyst or growth narrative (be optimistic about potential)
+- No critical rug pull indicators (locked liquidity is a plus, but not required)
 
 For HOLD/SELL recommendation:
-- Any red flags in fundamentals or technical analysis
-- Insufficient liquidity or extreme volatility
-- Concentration risks or whale manipulation signs
-- Overextended price (already pumped significantly)
-- Weakening volume or momentum deterioration
+- Critical red flags (obvious rug pull setup, zero liquidity, suspicious contracts)
+- Severe liquidity issues (<$10k)
+- Extreme concentration (single wallet >50% supply)
+- Already massively pumped (>200% in 24h without fundamental reason)
+- Strong negative momentum (consistent selling pressure, volume drying up)
 
 **OUTPUT FORMAT:**
 Provide your DETAILED analysis in JSON with these exact fields:
 {
   "action": "buy" | "sell" | "hold",
-  "confidence": 0.0-1.0 (ONLY use 0.70+ for BUY recommendations),
-  "reasoning": "comprehensive multi-paragraph analysis covering all 4 dimensions above with specific data points and conclusions",
-  "potentialUpsidePercent": number (realistic estimate based on technical analysis and comparable tokens),
+  "confidence": 0.0-1.0 (USE 0.52+ for BUY recommendations on moderate opportunities, 0.70+ for strong opportunities),
+  "reasoning": "comprehensive analysis covering all 4 dimensions above with specific data points and conclusions",
+  "potentialUpsidePercent": number (realistic estimate based on technical analysis - be optimistic but not unrealistic),
   "riskLevel": "low" | "medium" | "high" (based on thorough risk evaluation),
   "suggestedBuyAmountSOL": number (optional, if action is buy),
   "stopLossPercent": number (optional, suggested stop loss level),
@@ -1450,7 +1450,7 @@ Provide your DETAILED analysis in JSON with these exact fields:
   "keyFactors": ["specific factor 1", "specific factor 2", ...] (list 5-8 specific factors that influenced your decision)
 }
 
-Be thorough, analytical, and CONSERVATIVE. Quality analysis over quick decisions.`;
+Be thorough, analytical, and OPPORTUNISTIC. Capture moderate-confidence opportunities - don't wait for perfection.`;
 
   // Wrap API call with exponential backoff retry logic for rate limit errors (429)
   const response = await retryWithExponentialBackoff(
