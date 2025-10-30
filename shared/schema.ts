@@ -588,3 +588,86 @@ export const insertAIRecoveryModeSchema = createInsertSchema(aiRecoveryMode).omi
 
 export type AIRecoveryMode = typeof aiRecoveryMode.$inferSelect;
 export type InsertAIRecoveryMode = z.infer<typeof insertAIRecoveryModeSchema>;
+
+// x402 Micropayment tracking table (for hackathon demonstration)
+export const x402Micropayments = pgTable("x402_micropayments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerWalletAddress: text("owner_wallet_address").notNull(),
+  
+  // Payment details
+  paymentType: text("payment_type").notNull(), // "data_api", "burn_execution", "ai_analysis"
+  resourceUrl: text("resource_url").notNull(), // API endpoint that required payment
+  amountUSDC: decimal("amount_usdc", { precision: 18, scale: 6 }).notNull(), // Amount in USDC (6 decimals)
+  amountMicroUSDC: text("amount_micro_usdc").notNull(), // Raw micro-USDC amount as string
+  
+  // Transaction details
+  txSignature: text("tx_signature").notNull(),
+  network: text("network").notNull().default("solana-mainnet"), // "solana-devnet" or "solana-mainnet"
+  status: text("status").notNull().default("pending"), // "pending", "confirmed", "failed"
+  
+  // x402 protocol metadata
+  x402Version: integer("x402_version").notNull().default(1),
+  paymentScheme: text("payment_scheme").notNull().default("exact"), // "exact" or "metered"
+  facilitatorUrl: text("facilitator_url"),
+  
+  // Business context
+  relatedTradeId: varchar("related_trade_id"), // Link to AI bot position if applicable
+  description: text("description"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  confirmedAt: timestamp("confirmed_at"),
+});
+
+export const insertX402MicropaymentSchema = createInsertSchema(x402Micropayments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type X402Micropayment = typeof x402Micropayments.$inferSelect;
+export type InsertX402Micropayment = z.infer<typeof insertX402MicropaymentSchema>;
+
+// Jito BAM Bundle tracking table (for hackathon demonstration)
+export const bamBundles = pgTable("bam_bundles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerWalletAddress: text("owner_wallet_address").notNull(),
+  
+  // Bundle details
+  bundleId: text("bundle_id").notNull().unique(), // Jito bundle UUID
+  bundleType: text("bundle_type").notNull(), // "trade_burn", "arbitrage", "liquidation"
+  transactionCount: integer("transaction_count").notNull(), // Number of txs in bundle (max 5)
+  
+  // Transaction signatures (all txs in the bundle)
+  txSignatures: text("tx_signatures").array().notNull(), // Array of transaction signatures
+  
+  // Bundle execution details
+  status: text("status").notNull().default("pending"), // "pending", "landed", "failed", "rejected"
+  slot: integer("slot"), // Solana slot where bundle landed
+  blockTime: timestamp("block_time"), // When bundle was included in block
+  
+  // MEV protection stats
+  tipAmountLamports: text("tip_amount_lamports").notNull(), // Tip paid to Jito (in lamports)
+  tipAccountUsed: text("tip_account_used").notNull(), // Which tip account received the tip
+  
+  // Business context
+  relatedPositionId: varchar("related_position_id"), // Link to AI bot position
+  tradeAmountSOL: decimal("trade_amount_sol", { precision: 18, scale: 9 }), // SOL amount for trade
+  burnAmountTokens: decimal("burn_amount_tokens", { precision: 30, scale: 9 }), // Tokens burned in bundle
+  
+  // Performance metrics
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  landedAt: timestamp("landed_at"),
+  executionTimeMs: integer("execution_time_ms"), // Time from submit to land
+  
+  // Error tracking
+  errorMessage: text("error_message"),
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertBamBundleSchema = createInsertSchema(bamBundles).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type BamBundle = typeof bamBundles.$inferSelect;
+export type InsertBamBundle = z.infer<typeof insertBamBundleSchema>;
