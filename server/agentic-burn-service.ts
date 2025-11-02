@@ -7,6 +7,71 @@ import { getConnection, loadKeypairFromPrivateKey } from "./solana-sdk";
 import bs58 from "bs58";
 
 /**
+ * DeepSeek AI decision-making for burn execution
+ */
+async function analyzeWithDeepSeek(
+  tokenMint: string,
+  buyAmountSOL: number
+): Promise<{ approved: boolean; reasoning: string }> {
+  try {
+    const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          {
+            role: "system",
+            content: "You are a strategic AI agent analyzing token burn requests for the GigaBrain trading system. Evaluate whether the burn should proceed based on the parameters provided. Respond with a JSON object containing 'approved' (boolean) and 'reasoning' (string)."
+          },
+          {
+            role: "user",
+            content: `Analyze this burn request:\nToken Mint: ${tokenMint}\nBuy Amount: ${buyAmountSOL} SOL\n\nShould this burn be executed?`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 200,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("⚠️ DeepSeek API unavailable, approving by default");
+      return {
+        approved: true,
+        reasoning: "DeepSeek API unavailable, proceeding with burn as requested"
+      };
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content || "";
+    
+    // Try to parse JSON response
+    try {
+      const decision = JSON.parse(content);
+      return {
+        approved: decision.approved ?? true,
+        reasoning: decision.reasoning || "AI analysis completed"
+      };
+    } catch {
+      // If not JSON, assume approval
+      return {
+        approved: true,
+        reasoning: content || "Burn request approved"
+      };
+    }
+  } catch (error) {
+    console.warn("⚠️ DeepSeek analysis failed:", error);
+    return {
+      approved: true,
+      reasoning: "AI analysis unavailable, proceeding with burn"
+    };
+  }
+}
+
+/**
  * Agentic Burn Service - Hackathon Feature
  * 
  * Combines x402 micropayments + BAM atomic bundling for agent-activated burns:
@@ -92,9 +157,27 @@ export async function executeAgenticBurn(
 
   try {
     // =========================================================================
+    // STEP 0: DeepSeek AI DECISION - Should we execute this burn?
+    // =========================================================================
+    console.log("\n🧠 [Step 0/4] DeepSeek AI Analysis: Evaluating burn request...");
+    console.log("-".repeat(80));
+    
+    const aiDecision = await analyzeWithDeepSeek(tokenMint, buyAmountSOL);
+    console.log(`✅ AI Decision: ${aiDecision.approved ? "APPROVED" : "REJECTED"}`);
+    console.log(`💭 Reasoning: ${aiDecision.reasoning}`);
+    
+    if (!aiDecision.approved) {
+      return {
+        success: false,
+        error: `Burn rejected by AI agent: ${aiDecision.reasoning}`,
+        step: "payment",
+      };
+    }
+
+    // =========================================================================
     // STEP 1: x402 MICROPAYMENT - GigaBrain pays BurnBot for burn service
     // =========================================================================
-    console.log("\n📱 [Step 1/3] x402 Micropayment: GigaBrain → BurnBot");
+    console.log("\n📱 [Step 1/4] x402 Micropayment: GigaBrain → BurnBot");
     console.log("-".repeat(80));
     
     const paymentResult = await x402Service.payForBurnExecution(
@@ -122,7 +205,7 @@ export async function executeAgenticBurn(
     // =========================================================================
     // STEP 2: CREATE ATOMIC BUNDLE - Jupiter Swap + Token Burn
     // =========================================================================
-    console.log("\n⚡ [Step 2/3] Creating Atomic BAM Bundle: Swap + Burn");
+    console.log("\n⚡ [Step 2/4] Creating Atomic BAM Bundle: Swap + Burn");
     console.log("-".repeat(80));
 
     const SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -197,7 +280,7 @@ export async function executeAgenticBurn(
     // =========================================================================
     // STEP 3: JITO BAM ATOMIC BURN - MEV-Protected Token Destruction
     // =========================================================================
-    console.log("\n🔥 [Step 3/3] Jito BAM Atomic Burn with MEV Protection");
+    console.log("\n🔥 [Step 3/4] Jito BAM Atomic Burn with MEV Protection");
     console.log("-".repeat(80));
 
     // Create burn instruction

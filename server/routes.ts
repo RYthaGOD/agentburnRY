@@ -3250,21 +3250,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Demo endpoint for testing agentic burn
+  // Get x402 payment stats for a wallet
+  app.get("/api/x402/stats/:walletAddress", async (req, res) => {
+    try {
+      const { walletAddress } = req.params;
+      const payments = await storage.getAllMicropayments();
+      
+      // Filter payments for this wallet
+      const walletPayments = payments.filter(p => 
+        p.payerWallet === walletAddress || p.recipientWallet === walletAddress
+      );
+      
+      const confirmedPayments = walletPayments.filter(p => p.status === "confirmed");
+      const totalPaidUSDC = confirmedPayments.reduce((sum, p) => sum + parseFloat(p.amountUSD), 0);
+      
+      // Group payments by type
+      const paymentsByType = walletPayments.reduce((acc, p) => {
+        acc[p.paymentType] = (acc[p.paymentType] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      res.json({
+        totalPayments: walletPayments.length,
+        confirmedPayments: confirmedPayments.length,
+        totalAmountUSD: walletPayments.reduce((sum, p) => sum + parseFloat(p.amountUSD), 0),
+        totalPaidUSDC,
+        successRate: walletPayments.length > 0 
+          ? (confirmedPayments.length / walletPayments.length) * 100 
+          : 0,
+        paymentsByType,
+        payments: walletPayments,
+      });
+    } catch (error: any) {
+      console.error("Error fetching x402 stats:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get BAM bundle stats for a wallet
+  app.get("/api/bam/stats/:walletAddress", async (req, res) => {
+    try {
+      const { walletAddress } = req.params;
+      const bundles = await storage.getAllBamBundles();
+      
+      // Filter bundles for this wallet
+      const walletBundles = bundles.filter(b => b.walletAddress === walletAddress);
+      const confirmedBundles = walletBundles.filter(b => b.status === "confirmed");
+      const failedBundles = walletBundles.filter(b => b.status === "failed");
+      
+      res.json({
+        totalBundles: walletBundles.length,
+        successfulBundles: confirmedBundles.length,
+        confirmedBundles: confirmedBundles.length,
+        failedBundles: failedBundles.length,
+        successRate: walletBundles.length > 0 
+          ? (confirmedBundles.length / walletBundles.length) * 100 
+          : 0,
+        bundles: walletBundles,
+      });
+    } catch (error: any) {
+      console.error("Error fetching BAM stats:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Demo endpoint for testing agentic burn (with DeepSeek decision-making)
   app.post("/api/agentic-burn/demo", async (req, res) => {
     try {
-      const { walletPrivateKey, tokenMint, burnAmountSOL } = req.body;
+      const { tokenMint, burnAmountSOL } = req.body;
 
-      if (!walletPrivateKey || !tokenMint || !burnAmountSOL) {
+      if (!tokenMint || !burnAmountSOL) {
         return res.status(400).json({
-          message: "Missing required fields: walletPrivateKey, tokenMint, burnAmountSOL",
+          message: "Missing required fields: tokenMint, burnAmountSOL",
         });
       }
+
+      // Generate a temporary demo keypair server-side for security
+      const { Keypair } = await import("@solana/web3.js");
+      const bs58 = await import("bs58");
+      const demoKeypair = Keypair.generate();
+      const demoPrivateKey = bs58.default.encode(demoKeypair.secretKey);
 
       const { demoAgenticBurn } = await import("./agentic-burn-service");
 
       const result = await demoAgenticBurn(
-        walletPrivateKey,
+        demoPrivateKey,
         tokenMint,
         parseFloat(burnAmountSOL)
       );

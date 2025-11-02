@@ -39,9 +39,6 @@ export default function AgenticBurnPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Use a properly formatted base58 devnet keypair for demo
-          // This is a throwaway devnet wallet generated for demo purposes only
-          walletPrivateKey: "5JuSWTQ4EKzh7FGxUwkCNNWM6rJcgd7WLJXVBw8n4k8KCYNEo7zR8KFQZvZoKMLTkVAh2dJPNPPm3oQGj6vUxqZC",
           tokenMint: tokenMint, // User-specified token
           burnAmountSOL: parseFloat(burnAmount), // User-specified amount
         }),
