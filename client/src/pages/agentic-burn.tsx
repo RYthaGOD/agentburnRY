@@ -8,17 +8,28 @@ import { Separator } from "@/components/ui/separator";
 import { Coins, Zap, TrendingUp, DollarSign, Flame, Activity, PlayCircle, Loader2, Brain, CreditCard, ArrowLeftRight, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function AgenticBurnPage() {
   // Mock wallet for demo - in production this would come from user's connected wallet
-  const demoWallet = "jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38";
+  const demoWallet = "HYsXrquHabqWWdh35aGTQ4xWGV4eA4kUJ7PZZj9RCTVV";
   const { toast } = useToast();
   const [testResult, setTestResult] = useState<any>(null);
   
   // User inputs for burn configuration
   const [tokenMint, setTokenMint] = useState("So11111111111111111111111111111111111111112");
   const [burnAmount, setBurnAmount] = useState("0.01");
+  
+  // AI Decision Criteria (user-configurable)
+  const [confidenceThreshold, setConfidenceThreshold] = useState(70);
+  const [maxBurnPercentage, setMaxBurnPercentage] = useState(5);
+  const [requirePositiveSentiment, setRequirePositiveSentiment] = useState(true);
+
+  // Fetch cumulative agentic burn stats
+  const { data: agenticStats, isLoading: statsLoading, refetch: refetchStats } = useQuery<any>({
+    queryKey: [`/api/agentic-burn/stats/${demoWallet}`],
+    enabled: !!demoWallet,
+  });
 
   // Fetch x402 payment stats
   const { data: x402Stats, isLoading: x402Loading, refetch: refetchX402 } = useQuery<any>({
@@ -39,8 +50,13 @@ export default function AgenticBurnPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tokenMint: tokenMint, // User-specified token
-          burnAmountSOL: parseFloat(burnAmount), // User-specified amount
+          tokenMint: tokenMint,
+          burnAmountSOL: parseFloat(burnAmount),
+          criteria: {
+            confidenceThreshold,
+            maxBurnPercentage,
+            requirePositiveSentiment,
+          },
         }),
       });
       return response.json();
@@ -52,7 +68,8 @@ export default function AgenticBurnPage() {
           title: "✅ Agentic Burn Success!",
           description: `x402 payment processed and BAM bundle created. Payment ID: ${response.data?.paymentId?.substring(0, 8)}...`,
         });
-        // Refresh stats
+        // Refresh all stats
+        refetchStats();
         refetchX402();
         refetchBam();
       } else {
@@ -150,6 +167,49 @@ export default function AgenticBurnPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* AI Decision Criteria Configuration */}
+            <div className="space-y-3 p-4 rounded-lg bg-muted/50 border border-primary/20">
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold text-sm">AI Decision Criteria</h3>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="confidence-threshold">Minimum AI Confidence (%)</Label>
+                  <Input
+                    id="confidence-threshold"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={confidenceThreshold}
+                    onChange={(e) => setConfidenceThreshold(parseInt(e.target.value) || 70)}
+                    data-testid="input-confidence-threshold"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Minimum AI confidence required to approve burn (0-100)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="max-burn-percent">Max Burn % of Supply</Label>
+                  <Input
+                    id="max-burn-percent"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={maxBurnPercentage}
+                    onChange={(e) => setMaxBurnPercentage(parseFloat(e.target.value) || 5)}
+                    data-testid="input-max-burn-percentage"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum % of token supply that can be burned
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
             {/* Token Configuration Inputs */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
@@ -215,6 +275,23 @@ export default function AgenticBurnPage() {
                 
                 {testResult.success && testResult.data ? (
                   <div className="space-y-3">
+                    {/* AI Decision Section */}
+                    {testResult.data.aiConfidence !== undefined && (
+                      <div className="space-y-1 border-l-2 border-blue-500 pl-3">
+                        <div className="flex items-center gap-2">
+                          <Brain className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">DeepSeek AI Decision</p>
+                        </div>
+                        <p className="text-xs">Confidence: {testResult.data.aiConfidence}%</p>
+                        {testResult.data.aiReasoning && (
+                          <p className="text-xs italic">{testResult.data.aiReasoning}</p>
+                        )}
+                        {testResult.data.step1DurationMs && (
+                          <p className="text-xs text-muted-foreground">⏱️ {testResult.data.step1DurationMs}ms</p>
+                        )}
+                      </div>
+                    )}
+
                     {/* x402 Payment Section */}
                     <div className="space-y-1 border-l-2 border-primary pl-3">
                       <div className="flex items-center gap-2">
@@ -230,7 +307,21 @@ export default function AgenticBurnPage() {
                       {testResult.data.serviceFeeUSD !== undefined && (
                         <p className="text-xs font-medium">Fee: ${testResult.data.serviceFeeUSD} USDC</p>
                       )}
+                      {testResult.data.step2DurationMs && (
+                        <p className="text-xs text-muted-foreground">⏱️ {testResult.data.step2DurationMs}ms</p>
+                      )}
                     </div>
+
+                    {/* Jupiter Swap Section */}
+                    {testResult.data.step3DurationMs && (
+                      <div className="space-y-1 border-l-2 border-green-500 pl-3">
+                        <div className="flex items-center gap-2">
+                          <ArrowLeftRight className="w-4 h-4 text-green-600 dark:text-green-400" />
+                          <p className="text-sm font-semibold text-green-600 dark:text-green-400">Jupiter Swap</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">⏱️ {testResult.data.step3DurationMs}ms</p>
+                      </div>
+                    )}
 
                     {/* BAM Bundle Section */}
                     <div className="space-y-1 border-l-2 border-purple-500 pl-3">
@@ -242,14 +333,27 @@ export default function AgenticBurnPage() {
                         <p className="text-xs">Bundle ID: {testResult.data.bundleId.substring(0, 32)}...</p>
                       )}
                       {testResult.data.tokensBurned && (
-                        <p className="text-xs font-medium">🔥 Burned: {testResult.data.tokensBurned.toLocaleString()} tokens</p>
+                        <p className="text-xs font-medium">Burned: {testResult.data.tokensBurned.toLocaleString()} tokens</p>
+                      )}
+                      {testResult.data.step4DurationMs && (
+                        <p className="text-xs text-muted-foreground">⏱️ {testResult.data.step4DurationMs}ms</p>
                       )}
                     </div>
+
+                    {/* Total Duration */}
+                    {testResult.data.totalDurationMs && (
+                      <div className="pt-2 border-t">
+                        <p className="text-sm font-semibold">Total Duration: {testResult.data.totalDurationMs}ms</p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-sm text-destructive">
                     {testResult.error && (
                       <p>Error: {testResult.error}</p>
+                    )}
+                    {testResult.data?.aiReasoning && (
+                      <p className="mt-2 text-xs">AI Reasoning: {testResult.data.aiReasoning}</p>
                     )}
                   </div>
                 )}
@@ -258,6 +362,85 @@ export default function AgenticBurnPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Cumulative Agentic Burn Stats */}
+      <Card data-testid="card-cumulative-stats">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Cumulative Agentic Burn Statistics
+          </CardTitle>
+          <CardDescription>
+            Total tokens burned and x402 payments made through AI-powered burns
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {statsLoading ? (
+            <div className="text-center text-muted-foreground">Loading stats...</div>
+          ) : agenticStats ? (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="space-y-2 p-4 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">Total Burns</p>
+                <p className="text-3xl font-bold">{agenticStats.totalBurns || 0}</p>
+                <p className="text-xs text-green-600">
+                  {agenticStats.completedBurns || 0} completed
+                </p>
+              </div>
+              <div className="space-y-2 p-4 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">Tokens Burned</p>
+                <p className="text-3xl font-bold">{(agenticStats.totalTokensBurned || 0).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">
+                  Total destroyed
+                </p>
+              </div>
+              <div className="space-y-2 p-4 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">SOL Spent</p>
+                <p className="text-3xl font-bold">{(agenticStats.totalSOLSpent || 0).toFixed(4)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Total buy amount
+                </p>
+              </div>
+              <div className="space-y-2 p-4 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">x402 Payments</p>
+                <p className="text-3xl font-bold">${(agenticStats.totalPaidUSDC || 0).toFixed(3)}</p>
+                <p className="text-xs text-muted-foreground">
+                  {agenticStats.totalX402Payments || 0} micropayments
+                </p>
+              </div>
+              <div className="space-y-2 p-4 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">Avg AI Confidence</p>
+                <p className="text-3xl font-bold">{agenticStats.avgAIConfidence || 0}%</p>
+                <p className="text-xs text-muted-foreground">
+                  Burn approval confidence
+                </p>
+              </div>
+              <div className="space-y-2 p-4 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">Avg Duration</p>
+                <p className="text-3xl font-bold">{(agenticStats.avgDurationMs || 0).toLocaleString()}ms</p>
+                <p className="text-xs text-muted-foreground">
+                  End-to-end execution
+                </p>
+              </div>
+              <div className="space-y-2 p-4 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">Success Rate</p>
+                <p className="text-3xl font-bold">{(agenticStats.successRate || 0).toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground">
+                  Burn completion rate
+                </p>
+              </div>
+              <div className="space-y-2 p-4 rounded-lg bg-muted/50">
+                <p className="text-sm text-muted-foreground">Failed Burns</p>
+                <p className="text-3xl font-bold text-destructive">{agenticStats.failedBurns || 0}</p>
+                <p className="text-xs text-muted-foreground">
+                  Rejected by AI or errors
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground">No burn history yet. Run your first demo!</div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Feature Highlights */}
       <div className="grid gap-4 md:grid-cols-3">
