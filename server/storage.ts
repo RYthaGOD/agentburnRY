@@ -10,6 +10,8 @@ import {
   tokenBlacklist,
   tradeJournal,
   aiRecoveryMode,
+  x402Micropayments,
+  bamBundles,
   type Project,
   type InsertProject,
   type Transaction,
@@ -32,6 +34,10 @@ import {
   type InsertTradeJournal,
   type AIRecoveryMode,
   type InsertAIRecoveryMode,
+  type X402Micropayment,
+  type InsertX402Micropayment,
+  type BamBundle,
+  type InsertBamBundle,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -137,6 +143,15 @@ export interface IStorage {
     scalpTrades: number;
     swingTrades: number;
   }>;
+
+  // x402 Micropayment operations
+  getAllMicropayments(): Promise<X402Micropayment[]>;
+  createMicropayment(payment: InsertX402Micropayment): Promise<X402Micropayment>;
+
+  // BAM Bundle operations
+  getAllBamBundles(): Promise<BamBundle[]>;
+  createBamBundle(bundle: InsertBamBundle): Promise<BamBundle>;
+  updateBamBundleStatus(bundleId: string, updates: Partial<InsertBamBundle>): Promise<BamBundle | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -808,6 +823,41 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(aiRecoveryMode.id, current.id));
     }
+  }
+
+  // x402 Micropayment operations
+  async getAllMicropayments(): Promise<X402Micropayment[]> {
+    return db.select().from(x402Micropayments).orderBy(desc(x402Micropayments.createdAt));
+  }
+
+  async createMicropayment(payment: InsertX402Micropayment): Promise<X402Micropayment> {
+    const [micropayment] = await db
+      .insert(x402Micropayments)
+      .values(payment)
+      .returning();
+    return micropayment;
+  }
+
+  // BAM Bundle operations
+  async getAllBamBundles(): Promise<BamBundle[]> {
+    return db.select().from(bamBundles).orderBy(desc(bamBundles.submittedAt));
+  }
+
+  async createBamBundle(bundle: InsertBamBundle): Promise<BamBundle> {
+    const [bamBundle] = await db
+      .insert(bamBundles)
+      .values(bundle)
+      .returning();
+    return bamBundle;
+  }
+
+  async updateBamBundleStatus(bundleId: string, updates: Partial<InsertBamBundle>): Promise<BamBundle | undefined> {
+    const [bundle] = await db
+      .update(bamBundles)
+      .set(updates)
+      .where(eq(bamBundles.bundleId, bundleId))
+      .returning();
+    return bundle || undefined;
   }
 }
 

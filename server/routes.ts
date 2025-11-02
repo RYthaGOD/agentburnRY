@@ -3349,6 +3349,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get x402 payment statistics
+  app.get("/api/x402/stats/:walletAddress?", async (req, res) => {
+    try {
+      const walletAddress = req.params.walletAddress;
+      const payments = await storage.getAllMicropayments();
+      
+      // Filter by wallet if provided
+      const filteredPayments = walletAddress
+        ? payments.filter(p => p.payerWallet === walletAddress || p.recipientWallet === walletAddress)
+        : payments;
+
+      // Calculate statistics
+      const totalPayments = filteredPayments.length;
+      const confirmedPayments = filteredPayments.filter(p => p.status === "confirmed").length;
+      const totalPaidUSDC = filteredPayments
+        .filter(p => p.status === "confirmed")
+        .reduce((sum, p) => sum + parseFloat(p.amountUSDC), 0);
+
+      // Group by payment type
+      const paymentsByType = filteredPayments.reduce((acc: any, payment) => {
+        const type = payment.paymentType;
+        if (!acc[type]) {
+          acc[type] = { count: 0, total: 0 };
+        }
+        acc[type].count++;
+        if (payment.status === "confirmed") {
+          acc[type].total += parseFloat(payment.amountUSDC);
+        }
+        return acc;
+      }, {});
+
+      // Get recent payments (last 10)
+      const recentPayments = filteredPayments
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 10);
+
+      res.json({
+        totalPayments,
+        confirmedPayments,
+        totalPaidUSDC,
+        paymentsByType,
+        recentPayments,
+      });
+    } catch (error: any) {
+      console.error("x402 stats error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get BAM bundle statistics
+  app.get("/api/bam/stats/:walletAddress?", async (req, res) => {
+    try {
+      const walletAddress = req.params.walletAddress;
+      const bundles = await storage.getAllBamBundles();
+      
+      // Filter by wallet if provided
+      const filteredBundles = walletAddress
+        ? bundles.filter(b => b.walletAddress === walletAddress)
+        : bundles;
+
+      // Calculate statistics
+      const totalBundles = filteredBundles.length;
+      const landedBundles = filteredBundles.filter(b => b.status === "landed").length;
+      const failedBundles = filteredBundles.filter(b => b.status === "failed").length;
+      const successRate = totalBundles > 0 ? (landedBundles / totalBundles) * 100 : 0;
+
+      const totalTipPaidSOL = filteredBundles
+        .filter(b => b.status === "landed" && b.tipAmountSOL)
+        .reduce((sum, b) => sum + parseFloat(b.tipAmountSOL || "0"), 0);
+
+      const executionTimes = filteredBundles
+        .filter(b => b.executionTimeMs)
+        .map(b => b.executionTimeMs!);
+      const avgExecutionTimeMs = executionTimes.length > 0
+        ? Math.round(executionTimes.reduce((sum, t) => sum + t, 0) / executionTimes.length)
+        : 0;
+
+      // Get recent bundles (last 10)
+      const recentBundles = filteredBundles
+        .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
+        .slice(0, 10);
+
+      res.json({
+        totalBundles,
+        landedBundles,
+        failedBundles,
+        successRate,
+        totalTipPaidSOL,
+        avgExecutionTimeMs,
+        recentBundles,
+      });
+    } catch (error: any) {
+      console.error("BAM stats error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
