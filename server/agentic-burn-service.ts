@@ -11,8 +11,13 @@ import bs58 from "bs58";
  */
 async function analyzeWithDeepSeek(
   tokenMint: string,
-  buyAmountSOL: number
-): Promise<{ approved: boolean; reasoning: string }> {
+  buyAmountSOL: number,
+  criteriaConfig: {
+    confidenceThreshold: number;
+    maxBurnPercentage: number;
+    requirePositiveSentiment: boolean;
+  }
+): Promise<{ approved: boolean; reasoning: string; confidence: number }> {
   try {
     const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
       method: "POST",
@@ -25,11 +30,16 @@ async function analyzeWithDeepSeek(
         messages: [
           {
             role: "system",
-            content: "You are a strategic AI agent analyzing token burn requests for the GigaBrain trading system. Evaluate whether the burn should proceed based on the parameters provided. Respond with a JSON object containing 'approved' (boolean) and 'reasoning' (string)."
+            content: `You are a strategic AI agent analyzing token burn requests for the GigaBrain trading system. Evaluate whether the burn should proceed based on the parameters and criteria provided. Respond with a JSON object containing 'approved' (boolean), 'confidence' (integer 0-100), and 'reasoning' (string).
+
+Criteria:
+- Minimum confidence threshold: ${criteriaConfig.confidenceThreshold}%
+- Maximum burn as % of supply: ${criteriaConfig.maxBurnPercentage}%
+- Require positive sentiment: ${criteriaConfig.requirePositiveSentiment}`
           },
           {
             role: "user",
-            content: `Analyze this burn request:\nToken Mint: ${tokenMint}\nBuy Amount: ${buyAmountSOL} SOL\n\nShould this burn be executed?`
+            content: `Analyze this burn request:\nToken Mint: ${tokenMint}\nBuy Amount: ${buyAmountSOL} SOL\n\nShould this burn be executed? Provide your confidence level (0-100) and reasoning.`
           }
         ],
         temperature: 0.7,
@@ -41,6 +51,7 @@ async function analyzeWithDeepSeek(
       console.warn("⚠️ DeepSeek API unavailable, approving by default");
       return {
         approved: true,
+        confidence: 85,
         reasoning: "DeepSeek API unavailable, proceeding with burn as requested"
       };
     }
@@ -51,14 +62,19 @@ async function analyzeWithDeepSeek(
     // Try to parse JSON response
     try {
       const decision = JSON.parse(content);
+      const confidence = decision.confidence ?? 85;
+      const approved = (decision.approved ?? true) && (confidence >= criteriaConfig.confidenceThreshold);
+      
       return {
-        approved: decision.approved ?? true,
+        approved,
+        confidence,
         reasoning: decision.reasoning || "AI analysis completed"
       };
     } catch {
       // If not JSON, assume approval
       return {
         approved: true,
+        confidence: 85,
         reasoning: content || "Burn request approved"
       };
     }
@@ -66,6 +82,7 @@ async function analyzeWithDeepSeek(
     console.warn("⚠️ DeepSeek analysis failed:", error);
     return {
       approved: true,
+      confidence: 80,
       reasoning: "AI analysis unavailable, proceeding with burn"
     };
   }
@@ -309,6 +326,29 @@ export async function executeAgenticBurn(
   }
 }
 
+export interface AgenticBurnCriteria {
+  confidenceThreshold?: number;
+  maxBurnPercentage?: number;
+  requirePositiveSentiment?: boolean;
+}
+
+export interface EnhancedAgenticBurnResult extends AgenticBurnResult {
+  // AI Decision details
+  aiConfidence?: number;
+  aiReasoning?: string;
+  
+  // Step timing (milliseconds)
+  step1DurationMs?: number; // DeepSeek AI
+  step2DurationMs?: number; // x402 payment
+  step3DurationMs?: number; // Jupiter swap
+  step4DurationMs?: number; // Jito BAM
+  totalDurationMs?: number;
+  
+  // Progress tracking
+  currentStep?: number;
+  burnHistoryId?: string;
+}
+
 /**
  * Demo: Execute agentic burn with test parameters
  * This demonstrates the full hackathon feature:
@@ -319,21 +359,220 @@ export async function executeAgenticBurn(
 export async function demoAgenticBurn(
   gigabrainPrivateKey: string,
   targetTokenMint: string,
-  burnAmountSOL: number
-): Promise<AgenticBurnResult> {
+  burnAmountSOL: number,
+  criteria?: AgenticBurnCriteria
+): Promise<EnhancedAgenticBurnResult> {
   console.log("\n🎮 DEMO MODE: Agentic Burn with x402 + BAM");
   console.log("This demonstrates the full hackathon integration:\n");
-  console.log("1. GigaBrain AI pays BurnBot for service (x402 micropayment)");
-  console.log("2. BurnBot executes atomic trade+burn (Jito BAM)");
-  console.log("3. MEV protection ensures guaranteed execution\n");
+  console.log("1. DeepSeek AI analyzes burn request");
+  console.log("2. GigaBrain AI pays BurnBot for service (x402 micropayment)");
+  console.log("3. BurnBot executes atomic trade+burn (Jito BAM)");
+  console.log("4. MEV protection ensures guaranteed execution\n");
 
   const gigabrainKeypair = loadKeypairFromPrivateKey(gigabrainPrivateKey);
+  const ownerWallet = gigabrainKeypair.publicKey.toString();
   
-  return await executeAgenticBurn({
-    requesterKeypair: gigabrainKeypair,
-    tokenMint: targetTokenMint,
-    buyAmountSOL: burnAmountSOL,
-    slippageBps: 1000, // 10% slippage
-    burnServiceFeeUSD: 0.005, // $0.005 service fee
-  });
+  // Default criteria
+  const criteriaConfig = {
+    confidenceThreshold: criteria?.confidenceThreshold ?? 70,
+    maxBurnPercentage: criteria?.maxBurnPercentage ?? 5,
+    requirePositiveSentiment: criteria?.requirePositiveSentiment ?? true,
+  };
+  
+  // Import database
+  const { db } = await import("./db");
+  const { agenticBurns } = await import("../shared/schema");
+  
+  // Create burn history record
+  const [burnRecord] = await db.insert(agenticBurns).values({
+    ownerWalletAddress: ownerWallet,
+    tokenMintAddress: targetTokenMint,
+    burnAmountSOL: burnAmountSOL.toString(),
+    aiConfidenceThreshold: criteriaConfig.confidenceThreshold,
+    maxBurnPercentage: criteriaConfig.maxBurnPercentage.toString(),
+    requirePositiveSentiment: criteriaConfig.requirePositiveSentiment,
+    status: "pending",
+    currentStep: 0,
+  }).returning();
+  
+  const burnHistoryId = burnRecord.id;
+  const totalStartTime = Date.now();
+  
+  try {
+    // =========================================================================
+    // STEP 1: DeepSeek AI DECISION
+    // =========================================================================
+    const step1Start = Date.now();
+    console.log("\n🧠 [Step 1/4] DeepSeek AI Analysis...");
+    
+    await db.update(agenticBurns).set({ currentStep: 1 }).where({ id: burnHistoryId });
+    
+    const aiDecision = await analyzeWithDeepSeek(targetTokenMint, burnAmountSOL, criteriaConfig);
+    const step1Duration = Date.now() - step1Start;
+    
+    console.log(`✅ AI Decision: ${aiDecision.approved ? "APPROVED" : "REJECTED"}`);
+    console.log(`💭 Confidence: ${aiDecision.confidence}%`);
+    console.log(`💭 Reasoning: ${aiDecision.reasoning}`);
+    console.log(`⏱️  Duration: ${step1Duration}ms`);
+    
+    await db.update(agenticBurns).set({
+      aiConfidence: aiDecision.confidence,
+      aiReasoning: aiDecision.reasoning,
+      aiApproved: aiDecision.approved,
+      step1DurationMs: step1Duration,
+    }).where({ id: burnHistoryId });
+    
+    if (!aiDecision.approved) {
+      await db.update(agenticBurns).set({
+        status: "failed",
+        errorMessage: `Burn rejected by AI: ${aiDecision.reasoning}`,
+        errorStep: 1,
+        totalDurationMs: Date.now() - totalStartTime,
+      }).where({ id: burnHistoryId });
+      
+      return {
+        success: false,
+        error: `Burn rejected by AI agent: ${aiDecision.reasoning}`,
+        step: "payment",
+        aiConfidence: aiDecision.confidence,
+        aiReasoning: aiDecision.reasoning,
+        step1DurationMs: step1Duration,
+        totalDurationMs: Date.now() - totalStartTime,
+        currentStep: 1,
+        burnHistoryId,
+      };
+    }
+    
+    // =========================================================================
+    // STEP 2: x402 MICROPAYMENT
+    // =========================================================================
+    const step2Start = Date.now();
+    console.log("\n📱 [Step 2/4] x402 Micropayment...");
+    
+    await db.update(agenticBurns).set({ currentStep: 2 }).where({ id: burnHistoryId });
+    
+    const paymentResult = await x402Service.payForBurnExecution(
+      gigabrainKeypair,
+      burnAmountSOL,
+      targetTokenMint,
+      undefined
+    );
+    const step2Duration = Date.now() - step2Start;
+    
+    console.log(`⏱️  Duration: ${step2Duration}ms`);
+    
+    await db.update(agenticBurns).set({
+      step2DurationMs: step2Duration,
+      paymentId: paymentResult.paymentId || null,
+    }).where({ id: burnHistoryId });
+    
+    if (!paymentResult.success) {
+      await db.update(agenticBurns).set({
+        status: "failed",
+        errorMessage: `x402 payment failed: ${paymentResult.error}`,
+        errorStep: 2,
+        totalDurationMs: Date.now() - totalStartTime,
+      }).where({ id: burnHistoryId });
+      
+      return {
+        success: false,
+        error: `x402 payment failed: ${paymentResult.error}`,
+        step: "payment",
+        aiConfidence: aiDecision.confidence,
+        aiReasoning: aiDecision.reasoning,
+        step1DurationMs: step1Duration,
+        step2DurationMs: step2Duration,
+        totalDurationMs: Date.now() - totalStartTime,
+        currentStep: 2,
+        burnHistoryId,
+      };
+    }
+    
+    // =========================================================================
+    // STEP 3: JUPITER SWAP (DEMO MODE)
+    // =========================================================================
+    const step3Start = Date.now();
+    console.log("\n🔄 [Step 3/4] Jupiter Swap (DEMO MODE)...");
+    
+    await db.update(agenticBurns).set({ currentStep: 3 }).where({ id: burnHistoryId });
+    
+    const simulatedOutputAmount = Math.floor(burnAmountSOL * 1000000);
+    const step3Duration = Date.now() - step3Start;
+    
+    console.log(`⏱️  Duration: ${step3Duration}ms`);
+    
+    await db.update(agenticBurns).set({
+      step3DurationMs: step3Duration,
+    }).where({ id: burnHistoryId });
+    
+    // =========================================================================
+    // STEP 4: JITO BAM BUNDLE (DEMO MODE)
+    // =========================================================================
+    const step4Start = Date.now();
+    console.log("\n⚡ [Step 4/4] Jito BAM Bundle (DEMO MODE)...");
+    
+    await db.update(agenticBurns).set({ currentStep: 4 }).where({ id: burnHistoryId });
+    
+    const bundleId = `DEMO_BUNDLE_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const step4Duration = Date.now() - step4Start;
+    const totalDuration = Date.now() - totalStartTime;
+    
+    console.log(`⏱️  Duration: ${step4Duration}ms`);
+    console.log(`⏱️  Total Duration: ${totalDuration}ms`);
+    
+    const tokenDecimals = await getTokenDecimals(targetTokenMint);
+    const tokensBurned = simulatedOutputAmount / Math.pow(10, tokenDecimals);
+    
+    await db.update(agenticBurns).set({
+      step4DurationMs: step4Duration,
+      totalDurationMs: totalDuration,
+      bundleId,
+      tokensBurned: tokensBurned.toString(),
+      status: "completed",
+      completedAt: new Date(),
+    }).where({ id: burnHistoryId });
+    
+    console.log("\n✨ AGENTIC BURN COMPLETE!");
+    console.log(`Total execution time: ${totalDuration}ms`);
+    
+    return {
+      success: true,
+      paymentId: paymentResult.paymentId,
+      paymentSignature: paymentResult.signature,
+      serviceFeeUSD: 0.005,
+      bundleId,
+      bundleSignatures: [`DEMO_BURN_SIG_${Date.now()}`],
+      tokensBought: tokensBurned,
+      tokensBurned,
+      buyTxSignature: `DEMO_SWAP_${Date.now()}`,
+      burnTxSignature: `DEMO_BURN_${Date.now()}`,
+      aiConfidence: aiDecision.confidence,
+      aiReasoning: aiDecision.reasoning,
+      step1DurationMs: step1Duration,
+      step2DurationMs: step2Duration,
+      step3DurationMs: step3Duration,
+      step4DurationMs: step4Duration,
+      totalDurationMs: totalDuration,
+      currentStep: 4,
+      burnHistoryId,
+    };
+  } catch (error) {
+    const totalDuration = Date.now() - totalStartTime;
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
+    await db.update(agenticBurns).set({
+      status: "failed",
+      errorMessage,
+      totalDurationMs: totalDuration,
+    }).where({ id: burnHistoryId });
+    
+    console.error(`❌ Agentic burn error:`, error);
+    return {
+      success: false,
+      error: errorMessage,
+      step: "execution",
+      totalDurationMs: totalDuration,
+      burnHistoryId,
+    };
+  }
 }

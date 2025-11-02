@@ -3317,7 +3317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Demo endpoint for testing agentic burn (with DeepSeek decision-making)
   app.post("/api/agentic-burn/demo", async (req, res) => {
     try {
-      const { tokenMint, burnAmountSOL } = req.body;
+      const { tokenMint, burnAmountSOL, criteria } = req.body;
 
       if (!tokenMint || !burnAmountSOL) {
         return res.status(400).json({
@@ -3339,7 +3339,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await demoAgenticBurn(
         demoPrivateKey,
         tokenMint,
-        parseFloat(burnAmountSOL)
+        parseFloat(burnAmountSOL),
+        criteria // Pass user-configurable criteria
       );
 
       if (result.success) {
@@ -3358,6 +3359,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error: any) {
       console.error("Demo agentic burn error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get cumulative agentic burn stats for a wallet
+  app.get("/api/agentic-burn/stats/:walletAddress", async (req, res) => {
+    try {
+      const { walletAddress } = req.params;
+      const { db } = await import("./db");
+      const { agenticBurns } = await import("../shared/schema");
+      const { eq, sql } = await import("drizzle-orm");
+      
+      // Get all burns for this wallet
+      const burns = await db.select().from(agenticBurns).where(eq(agenticBurns.ownerWalletAddress, walletAddress));
+      
+      // Calculate aggregate stats
+      const totalBurns = burns.length;
+      const completedBurns = burns.filter(b => b.status === "completed");
+      const failedBurns = burns.filter(b => b.status === "failed");
+      
+      const totalTokensBurned = completedBurns.reduce((sum, b) => {
+        return sum + (b.tokensBurned ? parseFloat(b.tokensBurned) : 0);
+      }, 0);
+      
+      const totalSOLSpent = completedBurns.reduce((sum, b) => {
+        return sum + parseFloat(b.burnAmountSOL);
+      }, 0);
+      
+      // Calculate total x402 payments (assuming $0.005 per burn)
+      const totalX402Payments = completedBurns.length;
+      const totalPaidUSDC = totalX402Payments * 0.005;
+      
+      const avgConfidence = completedBurns.reduce((sum, b) => {
+        return sum + (b.aiConfidence || 0);
+      }, 0) / (completedBurns.length || 1);
+      
+      const avgDuration = completedBurns.reduce((sum, b) => {
+        return sum + (b.totalDurationMs || 0);
+      }, 0) / (completedBurns.length || 1);
+      
+      res.json({
+        totalBurns,
+        completedBurns: completedBurns.length,
+        failedBurns: failedBurns.length,
+        successRate: totalBurns > 0 ? (completedBurns.length / totalBurns) * 100 : 0,
+        totalTokensBurned,
+        totalSOLSpent,
+        totalX402Payments,
+        totalPaidUSDC,
+        avgAIConfidence: Math.round(avgConfidence),
+        avgDurationMs: Math.round(avgDuration),
+        recentBurns: burns.slice(-10).reverse(), // Last 10 burns
+      });
+    } catch (error: any) {
+      console.error("Error fetching agentic burn stats:", error);
       res.status(500).json({ message: error.message });
     }
   });

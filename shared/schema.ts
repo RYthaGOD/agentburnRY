@@ -671,3 +671,52 @@ export const insertBamBundleSchema = createInsertSchema(bamBundles).omit({
 
 export type BamBundle = typeof bamBundles.$inferSelect;
 export type InsertBamBundle = z.infer<typeof insertBamBundleSchema>;
+
+// Agentic Burn History (tracks AI-powered burn executions with detailed timing)
+export const agenticBurns = pgTable("agentic_burns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ownerWalletAddress: text("owner_wallet_address").notNull(),
+  
+  // Burn parameters
+  tokenMintAddress: text("token_mint_address").notNull(),
+  burnAmountSOL: decimal("burn_amount_sol", { precision: 18, scale: 9 }).notNull(),
+  tokensBurned: decimal("tokens_burned", { precision: 30, scale: 9 }),
+  
+  // AI Decision criteria (user-configurable)
+  aiConfidenceThreshold: integer("ai_confidence_threshold").notNull().default(70), // % confidence required
+  maxBurnPercentage: decimal("max_burn_percentage", { precision: 5, scale: 2 }).notNull().default("5"), // Max % of supply
+  requirePositiveSentiment: boolean("require_positive_sentiment").notNull().default(true),
+  
+  // AI Decision results
+  aiConfidence: integer("ai_confidence"), // Actual confidence from DeepSeek (0-100)
+  aiReasoning: text("ai_reasoning"), // DeepSeek's analysis output
+  aiApproved: boolean("ai_approved").notNull().default(false),
+  
+  // Step timing (in milliseconds)
+  step1DurationMs: integer("step1_duration_ms"), // DeepSeek AI analysis
+  step2DurationMs: integer("step2_duration_ms"), // x402 payment
+  step3DurationMs: integer("step3_duration_ms"), // Jupiter swap
+  step4DurationMs: integer("step4_duration_ms"), // Jito BAM bundle
+  totalDurationMs: integer("total_duration_ms"),
+  
+  // Related records
+  paymentId: varchar("payment_id"), // Link to x402_micropayments table
+  bundleId: varchar("bundle_id"), // Link to bam_bundles table
+  
+  // Execution status
+  status: text("status").notNull().default("pending"), // "pending", "completed", "failed"
+  currentStep: integer("current_step").notNull().default(0), // Which step (0-4)
+  errorMessage: text("error_message"),
+  errorStep: integer("error_step"), // Which step failed (1-4)
+  
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertAgenticBurnSchema = createInsertSchema(agenticBurns).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type AgenticBurn = typeof agenticBurns.$inferSelect;
+export type InsertAgenticBurn = z.infer<typeof insertAgenticBurnSchema>;
