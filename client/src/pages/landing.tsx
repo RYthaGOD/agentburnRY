@@ -57,20 +57,20 @@ export default function Landing() {
         <div className="container mx-auto px-6 lg:px-8">
           <div className="text-center space-y-6">
             <Badge variant="outline" className="mb-4 bg-green-500/20 border-green-500/40 text-green-500 font-semibold">
-              <Zap className="h-3 w-3 mr-1" />
-              NEW: 3x More Token Variety • 4x Faster Discovery • Improved Win Rate
+              <Brain className="h-3 w-3 mr-1" />
+              Powered by DeepSeek V3 AI • Free Tier • Superior Reasoning
             </Badge>
             
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight max-w-5xl mx-auto leading-tight">
               <span className="bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
-                AI Trading Bot
+                DeepSeek AI Trading
               </span>
               <br />
               <span className="text-foreground">That Never Sleeps</span>
             </h1>
             
             <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
-              GigaBrain uses a 12-model AI hivemind with 4-team rotation to trade Solana tokens 24/7. Scans 100+ tokens every 5 minutes for maximum opportunities.
+              GigaBrain uses DeepSeek V3, the world's most advanced open-source AI, to trade Solana tokens 24/7. Scans 100+ tokens every 5 minutes with free API access.
             </p>
 
             {/* Live Stats Preview */}
@@ -164,8 +164,8 @@ export default function Landing() {
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium">12-model hivemind AI</p>
-                      <p className="text-sm text-muted-foreground">Same AI system as paid users</p>
+                      <p className="font-medium">DeepSeek V3 AI</p>
+                      <p className="text-sm text-muted-foreground">Advanced reasoning & free tier</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -213,8 +213,8 @@ export default function Landing() {
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="font-medium">Full hivemind AI access</p>
-                      <p className="text-sm text-muted-foreground">All 12 AI models working for you</p>
+                      <p className="font-medium">Full DeepSeek AI access</p>
+                      <p className="text-sm text-muted-foreground">Advanced AI reasoning 24/7</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3">
@@ -439,7 +439,7 @@ export default function Landing() {
                     <div>
                       <h4 className="font-bold mb-1">Independent AI Decisions</h4>
                       <p className="text-sm text-muted-foreground">
-                        The 12-model hivemind (4 teams × 3 models) analyzes and executes trades independently for your wallet address. Each decision is tailored to your positions.
+                        DeepSeek V3 AI analyzes and executes trades independently for your wallet address. Each decision is tailored to your positions and portfolio.
                       </p>
                     </div>
                   </div>
