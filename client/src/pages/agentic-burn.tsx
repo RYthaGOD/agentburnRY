@@ -16,13 +16,13 @@ export default function AgenticBurnPage() {
 
   // Fetch x402 payment stats
   const { data: x402Stats, isLoading: x402Loading, refetch: refetchX402 } = useQuery<any>({
-    queryKey: ["/api/x402/stats", demoWallet],
+    queryKey: [`/api/x402/stats/${demoWallet}`],
     enabled: !!demoWallet,
   });
 
   // Fetch BAM bundle stats
   const { data: bamStats, isLoading: bamLoading, refetch: refetchBam } = useQuery<any>({
-    queryKey: ["/api/bam/stats", demoWallet],
+    queryKey: [`/api/bam/stats/${demoWallet}`],
     enabled: !!demoWallet,
   });
 
@@ -33,7 +33,9 @@ export default function AgenticBurnPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          walletPrivateKey: "demo_wallet_key_for_testing", // Demo key for testing
+          // Use a properly formatted base58 devnet keypair for demo
+          // This is a throwaway devnet wallet generated for demo purposes only
+          walletPrivateKey: "5JuSWTQ4EKzh7FGxUwkCNNWM6rJcgd7WLJXVBw8n4k8KCYNEo7zR8KFQZvZoKMLTkVAh2dJPNPPm3oQGj6vUxqZC",
           tokenMint: "So11111111111111111111111111111111111111112", // Wrapped SOL for demo
           burnAmountSOL: 0.01,
         }),
