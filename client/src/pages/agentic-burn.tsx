@@ -1,35 +1,137 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Coins, Zap, TrendingUp, DollarSign, Flame, Activity } from "lucide-react";
+import { Coins, Zap, TrendingUp, DollarSign, Flame, Activity, PlayCircle, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useState } from "react";
 
 export default function AgenticBurnPage() {
   // Mock wallet for demo - in production this would come from user's connected wallet
   const demoWallet = "jawKuQ3xtcYoAuqE9jyG2H35sv2pWJSzsyjoNpsxG38";
+  const { toast } = useToast();
+  const [testResult, setTestResult] = useState<any>(null);
 
   // Fetch x402 payment stats
-  const { data: x402Stats, isLoading: x402Loading } = useQuery<any>({
+  const { data: x402Stats, isLoading: x402Loading, refetch: refetchX402 } = useQuery<any>({
     queryKey: ["/api/x402/stats", demoWallet],
     enabled: !!demoWallet,
   });
 
   // Fetch BAM bundle stats
-  const { data: bamStats, isLoading: bamLoading } = useQuery<any>({
+  const { data: bamStats, isLoading: bamLoading, refetch: refetchBam } = useQuery<any>({
     queryKey: ["/api/bam/stats", demoWallet],
     enabled: !!demoWallet,
+  });
+
+  // Test agentic burn mutation
+  const testBurnMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/demo/agentic-burn", {
+        method: "POST",
+        body: JSON.stringify({
+          tokenMint: "So11111111111111111111111111111111111111112", // Wrapped SOL for demo
+          buyAmountSOL: 0.01,
+        }),
+      });
+    },
+    onSuccess: (data) => {
+      setTestResult(data);
+      if (data.success) {
+        toast({
+          title: "✅ Agentic Burn Success!",
+          description: `x402 payment processed and BAM bundle created. Payment ID: ${data.paymentId?.substring(0, 8)}...`,
+        });
+        // Refresh stats
+        refetchX402();
+        refetchBam();
+      } else {
+        toast({
+          title: "⚠️ Agentic Burn Failed",
+          description: data.error || "Unknown error occurred",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "❌ Error",
+        description: error.message || "Failed to execute agentic burn",
+        variant: "destructive",
+      });
+    },
   });
 
   return (
     <div className="container mx-auto p-6 space-y-8" data-testid="page-agentic-burn">
       {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight" data-testid="text-page-title">
-          Agentic Buy & Burn
-        </h1>
-        <p className="text-muted-foreground" data-testid="text-page-description">
-          AI-powered token burns with x402 micropayments and Jito BAM atomic execution
-        </p>
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight" data-testid="text-page-title">
+            Agentic Buy & Burn
+          </h1>
+          <p className="text-muted-foreground" data-testid="text-page-description">
+            AI-powered token burns with x402 micropayments and Jito BAM atomic execution
+          </p>
+        </div>
+
+        {/* Demo Test Button for Hackathon */}
+        <Card className="bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/20" data-testid="card-demo">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PlayCircle className="h-5 w-5 text-primary" />
+              Hackathon Demo - Test Agentic Burn
+            </CardTitle>
+            <CardDescription>
+              Click to demonstrate the complete x402 + BAM flow (simulated transaction)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button
+              onClick={() => testBurnMutation.mutate()}
+              disabled={testBurnMutation.isPending}
+              size="lg"
+              className="w-full"
+              data-testid="button-test-burn"
+            >
+              {testBurnMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing x402 Payment + BAM Bundle...
+                </>
+              ) : (
+                <>
+                  <PlayCircle className="mr-2 h-4 w-4" />
+                  Run Demo Transaction
+                </>
+              )}
+            </Button>
+
+            {testResult && (
+              <div className="p-4 rounded-lg bg-muted space-y-2" data-testid="div-test-result">
+                <p className="font-medium">
+                  {testResult.success ? "✅ Demo Successful!" : "⚠️ Demo Result"}
+                </p>
+                <div className="text-sm space-y-1">
+                  {testResult.paymentId && (
+                    <p>Payment ID: {testResult.paymentId.substring(0, 16)}...</p>
+                  )}
+                  {testResult.bundleId && (
+                    <p>Bundle ID: {testResult.bundleId.substring(0, 16)}...</p>
+                  )}
+                  {testResult.serviceFeeUSD && (
+                    <p>Service Fee: ${testResult.serviceFeeUSD} USDC</p>
+                  )}
+                  {testResult.error && (
+                    <p className="text-destructive">Error: {testResult.error}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Feature Highlights */}
