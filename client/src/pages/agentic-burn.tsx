@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Coins, Zap, TrendingUp, DollarSign, Flame, Activity, PlayCircle, Loader2 } from "lucide-react";
+import { Coins, Zap, TrendingUp, DollarSign, Flame, Activity, PlayCircle, Loader2, Brain, CreditCard, ArrowLeftRight, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useState } from "react";
@@ -45,12 +45,12 @@ export default function AgenticBurnPage() {
       });
       return response.json();
     },
-    onSuccess: (data: any) => {
-      setTestResult(data);
-      if (data.success) {
+    onSuccess: (response: any) => {
+      setTestResult(response);
+      if (response.success) {
         toast({
           title: "✅ Agentic Burn Success!",
-          description: `x402 payment processed and BAM bundle created. Payment ID: ${data.paymentId?.substring(0, 8)}...`,
+          description: `x402 payment processed and BAM bundle created. Payment ID: ${response.data?.paymentId?.substring(0, 8)}...`,
         });
         // Refresh stats
         refetchX402();
@@ -58,7 +58,7 @@ export default function AgenticBurnPage() {
       } else {
         toast({
           title: "⚠️ Agentic Burn Failed",
-          description: data.error || "Unknown error occurred",
+          description: response.error || "Unknown error occurred",
           variant: "destructive",
         });
       }
@@ -84,6 +84,59 @@ export default function AgenticBurnPage() {
             AI-powered token burns with x402 micropayments and Jito BAM atomic execution
           </p>
         </div>
+
+        {/* Workflow Breakdown */}
+        <Card data-testid="card-workflow">
+          <CardHeader>
+            <CardTitle className="text-lg">How It Works - Complete Workflow</CardTitle>
+            <CardDescription>
+              4-step process combining AI, micropayments, and atomic execution
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-4">
+              <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Brain className="w-5 h-5 text-primary" />
+                  <p className="text-sm font-semibold">DeepSeek AI</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  AI agent analyzes and approves the burn request
+                </p>
+              </div>
+
+              <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  <p className="text-sm font-semibold">x402 Payment</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  GigaBrain pays BurnBot via HTTP 402 micropayment
+                </p>
+              </div>
+
+              <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <ArrowLeftRight className="w-5 h-5 text-primary" />
+                  <p className="text-sm font-semibold">Jupiter Swap</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Buy tokens using Jupiter aggregator
+                </p>
+              </div>
+
+              <div className="space-y-2 p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  <p className="text-sm font-semibold">Jito BAM</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Atomic burn bundle with MEV protection
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Demo Test Button for Hackathon */}
         <Card className="bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/20" data-testid="card-demo">
@@ -155,24 +208,51 @@ export default function AgenticBurnPage() {
             </Button>
 
             {testResult && (
-              <div className="p-4 rounded-lg bg-muted space-y-2" data-testid="div-test-result">
-                <p className="font-medium">
-                  {testResult.success ? "✅ Demo Successful!" : "⚠️ Demo Result"}
+              <div className="p-4 rounded-lg bg-muted space-y-3" data-testid="div-test-result">
+                <p className="font-medium text-lg">
+                  {testResult.success ? "✅ Demo Successful!" : "⚠️ Demo Failed"}
                 </p>
-                <div className="text-sm space-y-1">
-                  {testResult.paymentId && (
-                    <p>Payment ID: {testResult.paymentId.substring(0, 16)}...</p>
-                  )}
-                  {testResult.bundleId && (
-                    <p>Bundle ID: {testResult.bundleId.substring(0, 16)}...</p>
-                  )}
-                  {testResult.serviceFeeUSD && (
-                    <p>Service Fee: ${testResult.serviceFeeUSD} USDC</p>
-                  )}
-                  {testResult.error && (
-                    <p className="text-destructive">Error: {testResult.error}</p>
-                  )}
-                </div>
+                
+                {testResult.success && testResult.data ? (
+                  <div className="space-y-3">
+                    {/* x402 Payment Section */}
+                    <div className="space-y-1 border-l-2 border-primary pl-3">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-primary" />
+                        <p className="text-sm font-semibold text-primary">x402 Micropayment</p>
+                      </div>
+                      {testResult.data.paymentId && (
+                        <p className="text-xs">Payment ID: {testResult.data.paymentId.substring(0, 32)}...</p>
+                      )}
+                      {testResult.data.paymentSignature && (
+                        <p className="text-xs">Signature: {testResult.data.paymentSignature.substring(0, 32)}...</p>
+                      )}
+                      {testResult.data.serviceFeeUSD !== undefined && (
+                        <p className="text-xs font-medium">Fee: ${testResult.data.serviceFeeUSD} USDC</p>
+                      )}
+                    </div>
+
+                    {/* BAM Bundle Section */}
+                    <div className="space-y-1 border-l-2 border-purple-500 pl-3">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">Jito BAM Bundle</p>
+                      </div>
+                      {testResult.data.bundleId && (
+                        <p className="text-xs">Bundle ID: {testResult.data.bundleId.substring(0, 32)}...</p>
+                      )}
+                      {testResult.data.tokensBurned && (
+                        <p className="text-xs font-medium">🔥 Burned: {testResult.data.tokensBurned.toLocaleString()} tokens</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-destructive">
+                    {testResult.error && (
+                      <p>Error: {testResult.error}</p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

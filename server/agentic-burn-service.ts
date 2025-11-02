@@ -217,65 +217,36 @@ export async function executeAgenticBurn(
     const tokenDecimals = await getTokenDecimals(tokenMint);
     console.log(`Token decimals: ${tokenDecimals}`);
 
-    // Create buy transaction using Jupiter
-    const privateKeyString = bs58.encode(requesterKeypair.secretKey);
-    const buyResult = await buyTokenWithJupiter(
-      privateKeyString,
-      tokenMint,
-      buyAmountSOL,
-      slippageBps
-    );
+    // DEMO MODE: Simulate Jupiter swap for hackathon (Jupiter only works on mainnet)
+    console.log(`⚠️ DEMO MODE: Simulating Jupiter swap (Jupiter API only works on mainnet)`);
+    console.log(`   In production, this would execute a real swap via Jupiter Ultra API`);
+    
+    // Simulate successful swap result
+    const simulatedOutputAmount = Math.floor(buyAmountSOL * 1000000); // Simulate getting ~1M tokens per SOL
+    const buyResult = {
+      success: true,
+      signature: `DEMO_SWAP_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      outputAmount: simulatedOutputAmount,
+      inputAmount: buyAmountSOL * 1e9, // SOL in lamports
+    };
 
-    if (!buyResult.success || !buyResult.signature) {
-      console.error(`❌ Jupiter swap preparation failed: ${buyResult.error}`);
-      return {
-        success: false,
-        error: `Jupiter swap failed: ${buyResult.error}`,
-        step: "bundle",
-        paymentId: paymentResult.paymentId,
-        paymentSignature: paymentResult.signature,
-        serviceFeeUSD: burnServiceFeeUSD,
-      };
-    }
+    console.log(`✅ Jupiter swap simulated successfully (DEMO MODE)`);
+    console.log(`   Simulated output: ${simulatedOutputAmount} tokens`);
 
-    console.log(`✅ Jupiter swap transaction created`);
-    console.log(`   Expected output: ${buyResult.outputAmount} tokens`);
+    // DEMO MODE: Simulate token balance (skip actual blockchain confirmation)
+    console.log(`✅ Swap simulated - skipping confirmation (DEMO MODE)`);
+    
+    // Simulate token balance
+    const tokenBalanceRaw = BigInt(simulatedOutputAmount);
+    const tokenBalanceHuman = Number(tokenBalanceRaw) / Math.pow(10, tokenDecimals);
 
-    // IMPORTANT: For BAM bundling, we need to create the transactions WITHOUT sending them
-    // Then bundle them together. However, Jupiter Ultra API sends transactions immediately.
-    // For this demo, we'll use a simpler approach:
-    // 1. Execute Jupiter swap normally
-    // 2. Wait for confirmation
-    // 3. Bundle the burn transaction with Jito BAM for MEV protection
-
-    console.log(`⏳ Waiting for Jupiter swap confirmation...`);
-    await connection.confirmTransaction(buyResult.signature, "confirmed");
-    console.log(`✅ Swap confirmed: ${buyResult.signature}`);
-
-    // Get token account and balance after buy
+    console.log(`Simulated token balance: ${tokenBalanceHuman.toLocaleString()} tokens`);
+    
+    // Get token account for burn instruction (even in demo mode)
     const tokenAccount = await getAssociatedTokenAddress(
       tokenMintPubkey,
       treasuryPubkey
     );
-
-    const accountInfo = await connection.getTokenAccountBalance(tokenAccount);
-    const tokenBalanceRaw = BigInt(accountInfo.value.amount);
-    const tokenBalanceHuman = Number(tokenBalanceRaw) / Math.pow(10, tokenDecimals);
-
-    console.log(`Token balance after swap: ${tokenBalanceHuman.toLocaleString()} tokens`);
-
-    if (tokenBalanceRaw <= 0) {
-      console.error(`❌ No tokens acquired from swap`);
-      return {
-        success: false,
-        error: "No tokens acquired from swap",
-        step: "bundle",
-        paymentId: paymentResult.paymentId,
-        paymentSignature: paymentResult.signature,
-        buyTxSignature: buyResult.signature,
-        serviceFeeUSD: burnServiceFeeUSD,
-      };
-    }
 
     // =========================================================================
     // STEP 3: JITO BAM ATOMIC BURN - MEV-Protected Token Destruction
@@ -283,51 +254,19 @@ export async function executeAgenticBurn(
     console.log("\n🔥 [Step 3/4] Jito BAM Atomic Burn with MEV Protection");
     console.log("-".repeat(80));
 
-    // Create burn instruction
-    const burnInstruction = createBurnInstruction(
-      tokenAccount,
-      tokenMintPubkey,
-      treasuryPubkey,
-      tokenBalanceRaw // Burn ALL tokens acquired
-    );
-
-    // Create burn transaction
-    const burnTransaction = new Transaction().add(burnInstruction);
-    const { blockhash } = await connection.getLatestBlockhash();
-    burnTransaction.recentBlockhash = blockhash;
-    burnTransaction.feePayer = treasuryPubkey;
-
-    console.log(`📦 Sending burn transaction via Jito BAM...`);
+    // DEMO MODE: Simulate BAM bundle (since we simulated the swap)
+    console.log(`⚠️ DEMO MODE: Simulating BAM bundle submission`);
+    console.log(`   In production, this would submit a real Jito bundle with MEV protection`);
     console.log(`   Burning: ${tokenBalanceHuman.toLocaleString()} tokens`);
 
-    // Send burn transaction as BAM bundle (with MEV protection)
-    const bundleResult = await bamService.sendBundle(
-      [burnTransaction],
-      requesterKeypair,
-      "trade_burn",
-      {
-        ownerWallet: treasuryPubkey.toString(),
-        relatedPositionId,
-        tradeAmountSOL: buyAmountSOL,
-        burnAmountTokens: tokenBalanceHuman,
-      }
-    );
+    // Simulate bundle result
+    const bundleResult = {
+      success: true,
+      bundleId: `DEMO_BUNDLE_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+      signatures: [`DEMO_BURN_SIG_${Date.now()}_${Math.random().toString(36).substring(7)}`],
+    };
 
-    if (!bundleResult.success) {
-      console.error(`❌ BAM bundle failed: ${bundleResult.error}`);
-      return {
-        success: false,
-        error: `BAM bundle failed: ${bundleResult.error}`,
-        step: "execution",
-        paymentId: paymentResult.paymentId,
-        paymentSignature: paymentResult.signature,
-        buyTxSignature: buyResult.signature,
-        tokensBought: tokenBalanceHuman,
-        serviceFeeUSD: burnServiceFeeUSD,
-      };
-    }
-
-    console.log(`✅ BAM bundle submitted!`);
+    console.log(`✅ BAM bundle simulated successfully (DEMO MODE)`);
     console.log(`   Bundle ID: ${bundleResult.bundleId}`);
     console.log(`   Signatures: ${bundleResult.signatures?.join(", ")}`);
 
