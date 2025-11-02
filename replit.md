@@ -1,7 +1,7 @@
 # BurnBot - Solana Token Buyback & Burn SaaS Platform
 
 ## Overview
-BurnBot is a SaaS platform providing a no-code solution for Solana SPL token creators to automate token buyback and burn operations. It features a dashboard, flexible scheduling, transaction monitoring, and an autonomous AI Trading Bot named GigaBrain. GigaBrain utilizes a 12-model AI hivemind to identify and trade trending tokens on Solana, focusing on profit potential, autonomous capital management, dynamic position sizing, and intelligent bundle activity detection to avoid pump-and-dump schemes. The platform aims to enhance tokenomics, offer robust trading tools, and operate as a profit-hunting machine with strong safety guardrails. It includes a subscription model with free trades, followed by a paid subscription and a platform fee, a portion of which is used for token buyback and burn.
+BurnBot is a SaaS platform providing a no-code solution for Solana SPL token creators to automate token buyback and burn operations. It features a dashboard, flexible scheduling, transaction monitoring, and an autonomous AI Trading Bot named GigaBrain. GigaBrain utilizes DeepSeek V3, the world's most advanced open-source AI, to identify and trade trending tokens on Solana, focusing on profit potential, autonomous capital management, dynamic position sizing, and intelligent bundle activity detection to avoid pump-and-dump schemes. The platform aims to enhance tokenomics, offer robust trading tools, and operate as a profit-hunting machine with strong safety guardrails. It includes a subscription model with free trades, followed by a paid subscription and a platform fee, a portion of which is used for token buyback and burn.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -24,13 +24,13 @@ A `node-cron` service automates hourly checks for buyback execution, including p
 - **Buy Bot (Limit Orders):** Executes buy orders based on target SOL prices with configurable limits and slippage protection.
 
 #### GigaBrain AI Trading Bot (Standalone)
-**GigaBrain** operates autonomously with a 12-model AI hivemind, restricted to whitelisted wallets. Key features include:
+**GigaBrain** operates autonomously powered by DeepSeek V3 AI, restricted to whitelisted wallets. Key features include:
 
 - **Autonomous Capital Management:** Manages liquidity reserves, employs percentage-based position sizing, and uses AI-driven exits. It includes strict quality filters for token selection, portfolio diversification, optimized stop-loss protection, and a Portfolio Drawdown Circuit Breaker.
 - **Token Discovery:** Aggregates tokens from various sources like DexScreener Trending and PumpFun, with expanded sources and faster refresh cycles.
-- **Smart Hivemind AI Workflow with 4-Team Rotation:** Features position monitoring, quick and deep technical scans, and automatic portfolio rebalancing. The system uses a 4-team rotation with 3 AI models per team, each working 6-hour shifts for 24/7 coverage. It includes weighted voting for consensus decisions, auto-replacement of failing models, and a Recovery Mode for emergency cost reduction.
-- **Intelligent Circuit Breaker Protection:** Disables and rotates failing AI models, prioritizing reliable ones based on health scoring.
-- **Advanced AI Rate Limiting & Retry System:** Implements universal and provider-specific rate limiting, exponential backoff for retries, and a smart circuit breaker.
+- **DeepSeek V3 AI Analysis:** Features continuous position monitoring, quick and deep technical scans, and automatic portfolio rebalancing. The system operates 24/7 with free API access (5M tokens monthly) and superior reasoning capabilities. Includes smart error handling and automatic retry logic.
+- **Cost-Effective AI:** Uses DeepSeek V3's free tier exclusively, eliminating AI API costs while maintaining institutional-grade analysis quality.
+- **Advanced Rate Limiting & Retry System:** Implements rate limiting, exponential backoff for retries, and a smart circuit breaker for reliability.
 - **Tri-Mode Trading Strategy (SCALP, QUICK_2X, and SWING):** Each mode has specific confidence thresholds, profit targets, position sizing, stop-loss percentages, and enforced max hold times. Includes a 2-Stage Exit Filter to prevent premature panic-selling and a Smart Trailing Stop-Loss that uses peak price and never drops below entry.
 - **Graduated Position Sizing:** Position size scales continuously with confidence.
 - **Dynamic Tiered Stop-Loss (4 Tiers):** Locks in gains as positions become profitable.
@@ -86,12 +86,5 @@ Includes secure encrypted key management, automated PumpFun rewards claiming, ba
 - Jupiter Price API v3
 - Jupiter Token API v2 (Token Discovery)
 - PumpFun Lightning API
-- **AI Hive Mind Providers:**
-    - DeepSeek V3
-    - Cerebras AI
-    - Google Gemini
-    - ChatAnywhere
-    - Groq
-    - Anthropic Claude Sonnet 4
-    - OpenAI Primary
-    - OpenAI Backup
+- **AI Provider:**
+    - DeepSeek V3 (Free tier - 5M tokens monthly, advanced reasoning)
