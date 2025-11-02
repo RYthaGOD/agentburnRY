@@ -14,7 +14,8 @@
 
 **Technical Implementation:**
 ```typescript
-// server/deepseek-analysis.ts
+// server/grok-analysis.ts - DeepSeek V3 Integration
+// Multi-provider AI system with DeepSeek as primary model
 async function analyzeWithDeepSeek(tokenData: TokenData): Promise<AIAnalysis> {
   const client = new OpenAI({
     baseURL: "https://api.deepseek.com",

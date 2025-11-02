@@ -78,7 +78,7 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Add DATABASE_URL and DEEPSEEK_API_KEY
+# Add required variables (see below)
 
 # Setup database
 npm run db:push
@@ -91,23 +91,35 @@ Access at: `http://localhost:5000`
 
 ### Environment Variables
 
+**Required:**
 ```bash
 # Database
 DATABASE_URL=postgresql://username:password@localhost:5432/gigabrain
-
-# Solana
-SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
-TREASURY_WALLET_PUBLIC_KEY=your-treasury-wallet
 
 # AI (DeepSeek V3 - Free Tier)
 DEEPSEEK_API_KEY=sk-your-deepseek-key
 
 # Session Security
 SESSION_SECRET=your-random-secret-min-32-chars
+```
+
+**Optional (with defaults):**
+```bash
+# Solana (defaults to devnet)
+SOLANA_RPC_URL=https://api.mainnet-beta.solana.com
+TREASURY_WALLET_PUBLIC_KEY=your-treasury-wallet
+
+# Encryption (required for production, optional for dev)
+ENCRYPTION_MASTER_KEY=generate-with-crypto-randomBytes-32-hex
 
 # Server
 PORT=5000
 NODE_ENV=production
+```
+
+**Generate encryption key for production:**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ---

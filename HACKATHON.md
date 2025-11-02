@@ -219,13 +219,22 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Add DATABASE_URL and DEEPSEEK_API_KEY
+# Add required variables:
+# - DATABASE_URL
+# - DEEPSEEK_API_KEY
+# - SESSION_SECRET (32+ random characters)
+# - ENCRYPTION_MASTER_KEY (64+ chars hex for production, optional for dev)
 
 # Setup database
 npm run db:push
 
 # Start development server
 npm run dev
+```
+
+**Note:** In development mode, ENCRYPTION_MASTER_KEY is optional. For production, generate one with:
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ### Access Application

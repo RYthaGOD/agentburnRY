@@ -307,9 +307,15 @@ DEEPSEEK_API_KEY=sk-your-deepseek-key
 
 # Security
 SESSION_SECRET=random-32-char-minimum-secret
+ENCRYPTION_MASTER_KEY=64-char-hex-key-see-generation-below
 
 # Solana
 TREASURY_WALLET_PUBLIC_KEY=your-wallet-address
+```
+
+**Generate ENCRYPTION_MASTER_KEY:**
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ### Optional
@@ -324,10 +330,9 @@ NODE_ENV=production
 
 # Demo Trading (optional)
 DEMO_WALLET_PRIVATE_KEY=base58-encoded-private-key
-
-# Encryption (for production)
-ENCRYPTION_MASTER_KEY=32-byte-hex-key
 ```
+
+**Note:** ENCRYPTION_MASTER_KEY is optional in development mode but required for production. Generate a secure 64-character hex string using the command above.
 
 ---
 
