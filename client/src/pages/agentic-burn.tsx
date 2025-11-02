@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Coins, Zap, TrendingUp, DollarSign, Flame, Activity, PlayCircle, Loader2, Brain, CreditCard, ArrowLeftRight, Shield } from "lucide-react";
+import { Coins, Zap, TrendingUp, DollarSign, Flame, Activity, PlayCircle, Loader2, Brain, CreditCard, ArrowLeftRight, Shield, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useState, useEffect } from "react";
@@ -269,9 +269,21 @@ export default function AgenticBurnPage() {
 
             {testResult && (
               <div className="p-4 rounded-lg bg-muted space-y-3" data-testid="div-test-result">
-                <p className="font-medium text-lg">
-                  {testResult.success ? "✅ Demo Successful!" : "⚠️ Demo Failed"}
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-lg">
+                    {testResult.success ? "✅ Demo Successful!" : "⚠️ Demo Failed"}
+                  </p>
+                  {testResult.success && (
+                    <Badge variant="outline" className="text-xs">
+                      Devnet Demo
+                    </Badge>
+                  )}
+                </div>
+                {testResult.success && (
+                  <p className="text-xs text-muted-foreground">
+                    📝 Note: Click the <ExternalLink className="w-3 h-3 inline" /> icons to verify transactions on Solscan (devnet)
+                  </p>
+                )}
                 
                 {testResult.success && testResult.data ? (
                   <div className="space-y-3">
@@ -302,7 +314,18 @@ export default function AgenticBurnPage() {
                         <p className="text-xs">Payment ID: {testResult.data.paymentId.substring(0, 32)}...</p>
                       )}
                       {testResult.data.paymentSignature && (
-                        <p className="text-xs">Signature: {testResult.data.paymentSignature.substring(0, 32)}...</p>
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs">Signature: {testResult.data.paymentSignature.substring(0, 16)}...</p>
+                          <a
+                            href={`https://solscan.io/tx/${testResult.data.paymentSignature}?cluster=devnet`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary/80"
+                            data-testid="link-payment-tx"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
                       )}
                       {testResult.data.serviceFeeUSD !== undefined && (
                         <p className="text-xs font-medium">Fee: ${testResult.data.serviceFeeUSD} USDC</p>
@@ -317,8 +340,22 @@ export default function AgenticBurnPage() {
                       <div className="space-y-1 border-l-2 border-green-500 pl-3">
                         <div className="flex items-center gap-2">
                           <ArrowLeftRight className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          <p className="text-sm font-semibold text-green-600 dark:text-green-400">Jupiter Swap</p>
+                          <p className="text-sm font-semibold text-green-600 dark:text-green-400">Jupiter Swap (Buy)</p>
                         </div>
+                        {testResult.data.buyTxSignature && (
+                          <div className="flex items-center gap-1">
+                            <p className="text-xs">Buy Tx: {testResult.data.buyTxSignature.substring(0, 16)}...</p>
+                            <a
+                              href={`https://solscan.io/tx/${testResult.data.buyTxSignature}?cluster=devnet`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-green-600 dark:text-green-400 hover:opacity-80"
+                              data-testid="link-buy-tx"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
                         <p className="text-xs text-muted-foreground">⏱️ {testResult.data.step3DurationMs}ms</p>
                       </div>
                     )}
@@ -332,8 +369,22 @@ export default function AgenticBurnPage() {
                       {testResult.data.bundleId && (
                         <p className="text-xs">Bundle ID: {testResult.data.bundleId.substring(0, 32)}...</p>
                       )}
+                      {testResult.data.burnTxSignature && (
+                        <div className="flex items-center gap-1">
+                          <p className="text-xs">Burn Tx: {testResult.data.burnTxSignature.substring(0, 16)}...</p>
+                          <a
+                            href={`https://solscan.io/tx/${testResult.data.burnTxSignature}?cluster=devnet`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-purple-600 dark:text-purple-400 hover:opacity-80"
+                            data-testid="link-burn-tx"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
                       {testResult.data.tokensBurned && (
-                        <p className="text-xs font-medium">Burned: {testResult.data.tokensBurned.toLocaleString()} tokens</p>
+                        <p className="text-xs font-medium">🔥 Burned: {testResult.data.tokensBurned.toLocaleString()} tokens</p>
                       )}
                       {testResult.data.step4DurationMs && (
                         <p className="text-xs text-muted-foreground">⏱️ {testResult.data.step4DurationMs}ms</p>
