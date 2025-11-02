@@ -106,28 +106,37 @@ export async function triggerGracefulShutdown() {
 }
 
 (async () => {
-  server = await registerRoutes(app);
+  try {
+    console.log("🚀 Starting BurnBot GigaBrain server...");
+    console.log("Environment:", process.env.NODE_ENV || "development");
+    console.log("Port:", process.env.PORT || "5000");
+    
+    server = await registerRoutes(app);
+    console.log("✅ Routes registered");
 
-  // Initialize WebSocket real-time service
-  realtimeService.initialize(server);
+    // Initialize WebSocket real-time service
+    realtimeService.initialize(server);
+    console.log("✅ WebSocket service initialized");
 
-  // Initialize scheduler
-  await scheduler.initialize();
+    // Initialize scheduler
+    await scheduler.initialize();
+    console.log("✅ Scheduler initialized");
 
-  // Initialize AI trading bot scheduler
-  startAITradingBotScheduler();
-  
-  // Initialize position monitoring scheduler (free Cerebras API)
-  startPositionMonitoringScheduler();
-  
-  // Initialize portfolio rebalancing scheduler (every 30 minutes with OpenAI)
-  startPortfolioRebalancingScheduler();
-  
-  // Initialize wallet synchronization scheduler (every 5 minutes)
-  startWalletSyncScheduler();
-  
-  // Initialize database cleanup scheduler (daily at 3 AM + startup)
-  startDatabaseCleanupScheduler();
+    // Initialize AI trading bot scheduler
+    startAITradingBotScheduler();
+    
+    // Initialize position monitoring scheduler (free Cerebras API)
+    startPositionMonitoringScheduler();
+    
+    // Initialize portfolio rebalancing scheduler (every 30 minutes with OpenAI)
+    startPortfolioRebalancingScheduler();
+    
+    // Initialize wallet synchronization scheduler (every 5 minutes)
+    startWalletSyncScheduler();
+    
+    // Initialize database cleanup scheduler (daily at 3 AM + startup)
+    startDatabaseCleanupScheduler();
+    console.log("✅ All schedulers initialized");
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -157,6 +166,7 @@ export async function triggerGracefulShutdown() {
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
+    console.log(`✅ Server successfully started!`);
     log(`serving on port ${port}`);
   });
 
@@ -229,4 +239,14 @@ export async function triggerGracefulShutdown() {
     clearTimeout(forceExitTimer);
     process.exit(1);
   });
+  } catch (error) {
+    console.error("❌ FATAL ERROR during server startup:");
+    console.error(error);
+    if (error instanceof Error) {
+      console.error("Error message:", error.message);
+      console.error("Stack trace:", error.stack);
+    }
+    console.error("\n⚠️ Server failed to start. Exiting...");
+    process.exit(1);
+  }
 })();

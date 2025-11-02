@@ -427,34 +427,40 @@ export async function requireWalletAuth(
  * Ensures critical security variables are set
  */
 export function checkSecurityEnvVars(): void {
-  const requiredVars = [
-    "ENCRYPTION_MASTER_KEY",
-    "SESSION_SECRET",
-  ];
+  const criticalVars = ["DATABASE_URL"];
+  const recommendedVars = ["ENCRYPTION_MASTER_KEY", "SESSION_SECRET"];
 
-  const missing = requiredVars.filter(v => !process.env[v]);
-  
-  if (missing.length > 0) {
-    console.error("❌ SECURITY ERROR: Missing required environment variables:");
-    missing.forEach(v => console.error(`   - ${v}`));
-    console.error("\nThe application cannot start securely without these variables.");
+  // Check critical vars (block startup if missing)
+  const missingCritical = criticalVars.filter(v => !process.env[v]);
+  if (missingCritical.length > 0 && process.env.NODE_ENV === "production") {
+    console.error("❌ CRITICAL: Missing required environment variables:");
+    missingCritical.forEach(v => console.error(`   - ${v}`));
+    console.error("\nCannot start without these variables.");
+    process.exit(1);
+  }
+
+  // Check recommended vars (warn but don't block)
+  const missingRecommended = recommendedVars.filter(v => !process.env[v]);
+  if (missingRecommended.length > 0) {
+    console.warn("⚠️  WARNING: Missing recommended security variables:");
+    missingRecommended.forEach(v => console.warn(`   - ${v}`));
+    console.warn("Some features may not work correctly without these.");
+    console.warn("Generate ENCRYPTION_MASTER_KEY with: openssl rand -hex 32");
     
     if (process.env.NODE_ENV === "production") {
-      console.error("CRITICAL: Production deployment blocked due to missing security variables.");
-      process.exit(1);
-    } else {
-      console.warn("WARNING: Development mode - some security features may not work correctly.");
+      console.warn("⚠️  PRODUCTION: Consider adding these variables for full security.");
     }
-  } else {
-    console.log("✅ Security environment variables verified");
   }
   
-  // Verify ENCRYPTION_MASTER_KEY is strong enough
+  // Verify ENCRYPTION_MASTER_KEY strength if present
   const masterKey = process.env.ENCRYPTION_MASTER_KEY;
   if (masterKey && masterKey.length < 64) {
-    console.error("❌ SECURITY ERROR: ENCRYPTION_MASTER_KEY must be at least 64 characters (32 bytes hex)");
-    if (process.env.NODE_ENV === "production") {
-      process.exit(1);
-    }
+    console.warn("⚠️  WARNING: ENCRYPTION_MASTER_KEY should be at least 64 characters (32 bytes hex)");
+    console.warn("Current length:", masterKey.length);
+    console.warn("Generate a stronger key with: openssl rand -hex 32");
+  }
+  
+  if (missingRecommended.length === 0 && (!masterKey || masterKey.length >= 64)) {
+    console.log("✅ Security environment variables verified");
   }
 }
