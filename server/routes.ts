@@ -3159,6 +3159,196 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // x402 Micropayment & BAM Bundle API Endpoints (Hackathon Features)
+  // ============================================================================
+
+  // Get x402 payment statistics for a wallet
+  app.get("/api/x402/stats/:walletAddress", async (req, res) => {
+    try {
+      const { walletAddress } = req.params;
+      const { x402Service } = await import("./x402-service");
+      
+      const stats = await x402Service.getPaymentStats(walletAddress);
+      res.json(stats);
+    } catch (error: any) {
+      console.error("x402 stats error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get BAM bundle statistics for a wallet
+  app.get("/api/bam/stats/:walletAddress", async (req, res) => {
+    try {
+      const { walletAddress } = req.params;
+      const { bamService } = await import("./jito-bam-service");
+      
+      const stats = await bamService.getBundleStats(walletAddress);
+      res.json(stats);
+    } catch (error: any) {
+      console.error("BAM stats error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Execute agentic activated buy-and-burn
+  app.post("/api/agentic-burn/execute", async (req, res) => {
+    try {
+      const {
+        walletPrivateKey,
+        tokenMint,
+        buyAmountSOL,
+        slippageBps,
+        burnServiceFeeUSD,
+        relatedPositionId,
+      } = req.body;
+
+      // Validation
+      if (!walletPrivateKey || !tokenMint || !buyAmountSOL) {
+        return res.status(400).json({
+          message: "Missing required fields: walletPrivateKey, tokenMint, buyAmountSOL",
+        });
+      }
+
+      if (buyAmountSOL < 0.001) {
+        return res.status(400).json({
+          message: "Buy amount must be at least 0.001 SOL",
+        });
+      }
+
+      const { executeAgenticBurn } = await import("./agentic-burn-service");
+      const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
+
+      const requesterKeypair = loadKeypairFromPrivateKey(walletPrivateKey);
+
+      const result = await executeAgenticBurn({
+        requesterKeypair,
+        tokenMint,
+        buyAmountSOL: parseFloat(buyAmountSOL),
+        slippageBps: slippageBps ? parseInt(slippageBps) : 1000,
+        burnServiceFeeUSD: burnServiceFeeUSD ? parseFloat(burnServiceFeeUSD) : 0.005,
+        relatedPositionId,
+      });
+
+      if (result.success) {
+        res.json({
+          success: true,
+          data: result,
+          message: "Agentic burn executed successfully",
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+          step: result.step,
+          data: result,
+        });
+      }
+    } catch (error: any) {
+      console.error("Agentic burn error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Demo endpoint for testing agentic burn
+  app.post("/api/agentic-burn/demo", async (req, res) => {
+    try {
+      const { walletPrivateKey, tokenMint, burnAmountSOL } = req.body;
+
+      if (!walletPrivateKey || !tokenMint || !burnAmountSOL) {
+        return res.status(400).json({
+          message: "Missing required fields: walletPrivateKey, tokenMint, burnAmountSOL",
+        });
+      }
+
+      const { demoAgenticBurn } = await import("./agentic-burn-service");
+
+      const result = await demoAgenticBurn(
+        walletPrivateKey,
+        tokenMint,
+        parseFloat(burnAmountSOL)
+      );
+
+      if (result.success) {
+        res.json({
+          success: true,
+          data: result,
+          message: "Demo agentic burn completed",
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+          step: result.step,
+          data: result,
+        });
+      }
+    } catch (error: any) {
+      console.error("Demo agentic burn error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Pay for data API access (x402)
+  app.post("/api/x402/pay-data-api", async (req, res) => {
+    try {
+      const { walletPrivateKey, apiEndpoint, priceUSD, relatedTradeId } = req.body;
+
+      if (!walletPrivateKey || !apiEndpoint) {
+        return res.status(400).json({
+          message: "Missing required fields: walletPrivateKey, apiEndpoint",
+        });
+      }
+
+      const { x402Service } = await import("./x402-service");
+      const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
+
+      const agentKeypair = loadKeypairFromPrivateKey(walletPrivateKey);
+
+      const result = await x402Service.payForDataAPI(
+        agentKeypair,
+        apiEndpoint,
+        priceUSD ? parseFloat(priceUSD) : 0.001,
+        relatedTradeId
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("x402 data API payment error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Pay for AI analysis (x402)
+  app.post("/api/x402/pay-ai-analysis", async (req, res) => {
+    try {
+      const { walletPrivateKey, analysisType, priceUSD, relatedTradeId } = req.body;
+
+      if (!walletPrivateKey || !analysisType) {
+        return res.status(400).json({
+          message: "Missing required fields: walletPrivateKey, analysisType",
+        });
+      }
+
+      const { x402Service } = await import("./x402-service");
+      const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
+
+      const agentKeypair = loadKeypairFromPrivateKey(walletPrivateKey);
+
+      const result = await x402Service.payForAIAnalysis(
+        agentKeypair,
+        analysisType,
+        priceUSD ? parseFloat(priceUSD) : 0.01,
+        relatedTradeId
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("x402 AI analysis payment error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
