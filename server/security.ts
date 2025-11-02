@@ -442,25 +442,25 @@ export function checkSecurityEnvVars(): void {
   // Check recommended vars (warn but don't block)
   const missingRecommended = recommendedVars.filter(v => !process.env[v]);
   if (missingRecommended.length > 0) {
-    console.warn("⚠️  WARNING: Missing recommended security variables:");
+    console.warn("\n⚠️  Optional security variables not configured (app will continue):");
     missingRecommended.forEach(v => console.warn(`   - ${v}`));
-    console.warn("Some features may not work correctly without these.");
-    console.warn("Generate ENCRYPTION_MASTER_KEY with: openssl rand -hex 32");
-    
-    if (process.env.NODE_ENV === "production") {
-      console.warn("⚠️  PRODUCTION: Consider adding these variables for full security.");
-    }
+    console.warn("\n→ Application starting normally - these are optional");
+    console.warn("→ Encryption and session features may have reduced security");
+    console.warn("→ To enable full security, add these environment variables:");
+    console.warn("   ENCRYPTION_MASTER_KEY: openssl rand -hex 32");
+    console.warn("   SESSION_SECRET: openssl rand -base64 32\n");
   }
   
   // Verify ENCRYPTION_MASTER_KEY strength if present
   const masterKey = process.env.ENCRYPTION_MASTER_KEY;
   if (masterKey && masterKey.length < 64) {
-    console.warn("⚠️  WARNING: ENCRYPTION_MASTER_KEY should be at least 64 characters (32 bytes hex)");
-    console.warn("Current length:", masterKey.length);
-    console.warn("Generate a stronger key with: openssl rand -hex 32");
+    console.warn("\n⚠️  ENCRYPTION_MASTER_KEY is too short (app will continue)");
+    console.warn(`   Current length: ${masterKey.length} characters`);
+    console.warn(`   Recommended: 64+ characters`);
+    console.warn(`   Generate with: openssl rand -hex 32\n`);
   }
   
   if (missingRecommended.length === 0 && (!masterKey || masterKey.length >= 64)) {
-    console.log("✅ Security environment variables verified");
+    console.log("✅ All security environment variables properly configured");
   }
 }
