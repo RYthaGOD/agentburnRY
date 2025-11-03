@@ -387,7 +387,16 @@ export interface EnhancedAgentBurnResult extends AgentBurnResult {
   aiConfidence?: number;
   aiReasoning?: string;
   
+  // Switchboard Oracle data
+  oracleData?: {
+    solPriceUSD?: number;
+    tokenLiquidityUSD?: number;
+    token24hVolumeUSD?: number;
+    feedConfidence?: number;
+  };
+  
   // Step timing (milliseconds)
+  step0DurationMs?: number; // Switchboard Oracle
   step1DurationMs?: number; // DeepSeek AI
   step2DurationMs?: number; // x402 payment
   step3DurationMs?: number; // Jupiter swap
@@ -456,14 +465,30 @@ export async function demoAgentBurn(
     // =========================================================================
     // STEP 0: FETCH ORACLE DATA (x402 Payment #1)
     // =========================================================================
+    const step0Start = Date.now();
     console.log("\n🔮 [Step 0/5] Fetching Switchboard Oracle Data...");
     console.log("💰 AI Agent pays x402 for premium data feeds ($0.005 USDC per feed)");
     
     const { getTokenOracleMetrics } = await import("./switchboard-oracle-service");
     const oracleMetrics = await getTokenOracleMetrics(targetTokenMint);
+    const step0Duration = Date.now() - step0Start;
     
     console.log(`✅ Oracle data fetched successfully`);
+    console.log(`   SOL Price: $${oracleMetrics.solPriceUSD?.toFixed(2) || 'N/A'}`);
+    console.log(`   Token Liquidity: $${oracleMetrics.tokenLiquidityUSD?.toLocaleString() || 'N/A'}`);
+    console.log(`   24h Volume: $${oracleMetrics.token24hVolumeUSD?.toLocaleString() || 'N/A'}`);
     console.log(`   Total x402 cost: $${oracleMetrics.totalX402Paid.toFixed(3)} USDC`);
+    console.log(`⏱️  Duration: ${step0Duration}ms`);
+    
+    // Save oracle data to database
+    await db.update(agentBurns).set({
+      oracleSolPriceUSD: oracleMetrics.solPriceUSD?.toString() || null,
+      oracleTokenLiquidityUSD: oracleMetrics.tokenLiquidityUSD?.toString() || null,
+      oracleToken24hVolumeUSD: oracleMetrics.token24hVolumeUSD?.toString() || null,
+      oracleFeedIds: oracleMetrics.feedIds || [],
+      oracleX402CostUSD: oracleMetrics.totalX402Paid.toString(),
+      step0DurationMs: step0Duration,
+    }).where(eq(agentBurns.id, burnHistoryId));
     
     // =========================================================================
     // STEP 1: DeepSeek AI DECISION (Enhanced with Oracle Data)
@@ -613,8 +638,15 @@ export async function demoAgentBurn(
       tokensBurned,
       buyTxSignature: `DEMO_SWAP_${Date.now()}`,
       burnTxSignature: `DEMO_BURN_${Date.now()}`,
+      oracleData: {
+        solPriceUSD: oracleMetrics.solPriceUSD,
+        tokenLiquidityUSD: oracleMetrics.tokenLiquidityUSD,
+        token24hVolumeUSD: oracleMetrics.token24hVolumeUSD,
+        feedConfidence: oracleMetrics.feedConfidence,
+      },
       aiConfidence: aiDecision.confidence,
       aiReasoning: aiDecision.reasoning,
+      step0DurationMs: step0Duration,
       step1DurationMs: step1Duration,
       step2DurationMs: step2Duration,
       step3DurationMs: step3Duration,
