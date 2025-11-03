@@ -474,18 +474,22 @@ export async function demoAgentBurn(
     const step0Duration = Date.now() - step0Start;
     
     console.log(`✅ Oracle data fetched successfully`);
-    console.log(`   SOL Price: $${oracleMetrics.solPriceUSD?.toFixed(2) || 'N/A'}`);
-    console.log(`   Token Liquidity: $${oracleMetrics.tokenLiquidityUSD?.toLocaleString() || 'N/A'}`);
-    console.log(`   24h Volume: $${oracleMetrics.token24hVolumeUSD?.toLocaleString() || 'N/A'}`);
+    console.log(`   SOL Price: $${oracleMetrics.solPriceUSD.value.toFixed(2)}`);
+    if (oracleMetrics.tokenLiquidityUSD) {
+      console.log(`   Token Liquidity: $${oracleMetrics.tokenLiquidityUSD.value.toLocaleString()}`);
+    }
+    if (oracleMetrics.token24hVolume) {
+      console.log(`   24h Volume: $${oracleMetrics.token24hVolume.value.toLocaleString()}`);
+    }
     console.log(`   Total x402 cost: $${oracleMetrics.totalX402Paid.toFixed(3)} USDC`);
     console.log(`⏱️  Duration: ${step0Duration}ms`);
     
     // Save oracle data to database
     await db.update(agentBurns).set({
-      oracleSolPriceUSD: oracleMetrics.solPriceUSD?.toString() || null,
-      oracleTokenLiquidityUSD: oracleMetrics.tokenLiquidityUSD?.toString() || null,
-      oracleToken24hVolumeUSD: oracleMetrics.token24hVolumeUSD?.toString() || null,
-      oracleFeedIds: oracleMetrics.feedIds || [],
+      oracleSolPriceUSD: oracleMetrics.solPriceUSD.value.toString(),
+      oracleTokenLiquidityUSD: oracleMetrics.tokenLiquidityUSD?.value.toString() || null,
+      oracleToken24hVolumeUSD: oracleMetrics.token24hVolume?.value.toString() || null,
+      oracleFeedIds: [],
       oracleX402CostUSD: oracleMetrics.totalX402Paid.toString(),
       step0DurationMs: step0Duration,
     }).where(eq(agentBurns.id, burnHistoryId));
@@ -639,10 +643,10 @@ export async function demoAgentBurn(
       buyTxSignature: `DEMO_SWAP_${Date.now()}`,
       burnTxSignature: `DEMO_BURN_${Date.now()}`,
       oracleData: {
-        solPriceUSD: oracleMetrics.solPriceUSD,
-        tokenLiquidityUSD: oracleMetrics.tokenLiquidityUSD,
-        token24hVolumeUSD: oracleMetrics.token24hVolumeUSD,
-        feedConfidence: oracleMetrics.feedConfidence,
+        solPriceUSD: oracleMetrics.solPriceUSD.value,
+        tokenLiquidityUSD: oracleMetrics.tokenLiquidityUSD?.value,
+        token24hVolumeUSD: oracleMetrics.token24hVolume?.value,
+        feedConfidence: oracleMetrics.solPriceUSD.confidence,
       },
       aiConfidence: aiDecision.confidence,
       aiReasoning: aiDecision.reasoning,
