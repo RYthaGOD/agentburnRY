@@ -4,7 +4,7 @@ import {
   projectSecrets,
   x402Micropayments,
   bamBundles,
-  agenticBurns,
+  agentBurns,
   type Project,
   type InsertProject,
   type Transaction,

@@ -17,7 +17,7 @@ import Whitepaper from "@/pages/whitepaper";
 import PublicStats from "@/pages/public-stats";
 import TokenAnalyzer from "@/pages/token-analyzer";
 import HowItWorks from "@/pages/how-it-works";
-import AgenticBurn from "@/pages/agentic-burn";
+import AgenticBurn from "@/pages/agent-burn";
 import DashboardLayout from "@/pages/dashboard-layout";
 import NotFound from "@/pages/not-found";
 
@@ -59,7 +59,7 @@ function Router() {
           <Blacklist />
         </DashboardLayout>
       </Route>
-      <Route path="/dashboard/agentic-burn">
+      <Route path="/dashboard/agent-burn">
         <DashboardLayout>
           <AgenticBurn />
         </DashboardLayout>

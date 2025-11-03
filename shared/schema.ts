@@ -108,8 +108,8 @@ export const bamBundles = pgTable("bam_bundles", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// Agentic Burn History (CRITICAL FOR HACKATHON - tracks AI-powered burn executions)
-export const agenticBurns = pgTable("agentic_burns", {
+// Agent Burn History (CRITICAL FOR HACKATHON - tracks AI-powered burn executions)
+export const agentBurns = pgTable("agent_burns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ownerWalletAddress: text("owner_wallet_address").notNull(),
   
@@ -128,9 +128,17 @@ export const agenticBurns = pgTable("agentic_burns", {
   aiReasoning: text("ai_reasoning"), // DeepSeek's analysis output
   aiApproved: boolean("ai_approved").notNull().default(false),
   
-  // Step timing (in milliseconds) - showcases 4-step agent economy
+  // Switchboard Oracle data (accessed via x402)
+  oracleSolPriceUSD: decimal("oracle_sol_price_usd", { precision: 18, scale: 6 }), // SOL price from oracle
+  oracleTokenLiquidityUSD: decimal("oracle_token_liquidity_usd", { precision: 18, scale: 2 }), // Token liquidity
+  oracleToken24hVolumeUSD: decimal("oracle_token_24h_volume_usd", { precision: 18, scale: 2 }), // 24h volume
+  oracleFeedIds: text("oracle_feed_ids").array(), // Switchboard feed IDs used
+  oracleX402CostUSD: decimal("oracle_x402_cost_usd", { precision: 10, scale: 6 }), // Cost to access oracle data
+  
+  // Step timing (in milliseconds) - showcases 5-step agent economy
+  step0DurationMs: integer("step0_duration_ms"), // Switchboard oracle data fetch
   step1DurationMs: integer("step1_duration_ms"), // DeepSeek AI analysis
-  step2DurationMs: integer("step2_duration_ms"), // x402 micropayment
+  step2DurationMs: integer("step2_duration_ms"), // x402 micropayment (burn service)
   step3DurationMs: integer("step3_duration_ms"), // Jupiter swap
   step4DurationMs: integer("step4_duration_ms"), // Jito BAM bundle
   totalDurationMs: integer("total_duration_ms"),
@@ -141,9 +149,9 @@ export const agenticBurns = pgTable("agentic_burns", {
   
   // Execution status
   status: text("status").notNull().default("pending"), // "pending", "completed", "failed"
-  currentStep: integer("current_step").notNull().default(0), // Which step (0-4)
+  currentStep: integer("current_step").notNull().default(0), // Which step (0-5)
   errorMessage: text("error_message"),
-  errorStep: integer("error_step"), // Which step failed (1-4)
+  errorStep: integer("error_step"), // Which step failed (0-5)
   
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
@@ -217,10 +225,10 @@ export const insertBamBundleSchema = createInsertSchema(bamBundles).omit({
 export type BamBundle = typeof bamBundles.$inferSelect;
 export type InsertBamBundle = z.infer<typeof insertBamBundleSchema>;
 
-export const insertAgenticBurnSchema = createInsertSchema(agenticBurns).omit({
+export const insertAgentBurnSchema = createInsertSchema(agentBurns).omit({
   id: true,
   createdAt: true,
 });
 
-export type AgenticBurn = typeof agenticBurns.$inferSelect;
-export type InsertAgenticBurn = z.infer<typeof insertAgenticBurnSchema>;
+export type AgentBurn = typeof agentBurns.$inferSelect;
+export type InsertAgentBurn = z.infer<typeof insertAgentBurnSchema>;

@@ -3,47 +3,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { WalletButton } from "@/components/wallet-button";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Sparkles, TrendingUp, Search, Brain, Shield, Zap, BarChart3, CheckCircle2, AlertCircle, Wallet, Flame, Lock, Users } from "lucide-react";
+import { Sparkles, Brain, Shield, Zap, Database, DollarSign, Flame, Lock, GitFork, CheckCircle2 } from "lucide-react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-
-interface PublicStats {
-  totalTrades: number;
-  winRate: string;
-  avgROI: string;
-  totalProfit: string;
-}
 
 export default function Landing() {
-  const { data: stats } = useQuery<PublicStats>({
-    queryKey: ["/api/public/stats"],
-  });
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-border backdrop-blur-xl bg-background/80">
         <div className="container mx-auto flex h-16 items-center justify-between px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2 hover-elevate">
-            <Sparkles className="h-8 w-8 text-primary" />
+            <Flame className="h-8 w-8 text-primary" />
             <span className="text-2xl font-bold">GigaBrain</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6">
-            <Link href="/stats">
-              <span className="text-sm font-medium hover-elevate px-3 py-2 rounded-md cursor-pointer" data-testid="link-stats">
-                Live Stats
-              </span>
-            </Link>
-            <Link href="/analyze">
-              <span className="text-sm font-medium hover-elevate px-3 py-2 rounded-md cursor-pointer" data-testid="link-analyze">
-                Token Analyzer
-              </span>
-            </Link>
-            <Link href="/learn">
-              <span className="text-sm font-medium hover-elevate px-3 py-2 rounded-md cursor-pointer" data-testid="link-learn">
-                How It Works
-              </span>
-            </Link>
+            <a href="#features" className="text-sm font-medium hover-elevate px-3 py-2 rounded-md cursor-pointer">
+              Features
+            </a>
+            <a href="#how-it-works" className="text-sm font-medium hover-elevate px-3 py-2 rounded-md cursor-pointer">
+              How It Works
+            </a>
+            <a href="#tech-stack" className="text-sm font-medium hover-elevate px-3 py-2 rounded-md cursor-pointer">
+              Tech Stack
+            </a>
           </nav>
           <div className="flex items-center gap-4">
             <ThemeToggle />
@@ -55,579 +37,442 @@ export default function Landing() {
       {/* Hero Section */}
       <section className="py-20 md:py-32">
         <div className="container mx-auto px-6 lg:px-8">
-          <div className="text-center space-y-6">
-            <Badge variant="outline" className="mb-4 bg-green-500/20 border-green-500/40 text-green-500 font-semibold">
-              <Brain className="h-3 w-3 mr-1" />
-              Powered by DeepSeek V3 AI • Free Tier • Superior Reasoning
+          <div className="text-center space-y-8">
+            {/* Hackathon Badge */}
+            <Badge variant="outline" className="mb-4 bg-primary/20 border-primary/40 text-primary font-semibold px-6 py-2">
+              <Sparkles className="h-4 w-4 mr-2" />
+              Solana x402 Hackathon Submission
             </Badge>
             
             <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight max-w-5xl mx-auto leading-tight">
-              <span className="bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
-                DeepSeek AI Trading
+              <span className="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 bg-clip-text text-transparent">
+                Agent Burn System
               </span>
               <br />
-              <span className="text-foreground">That Never Sleeps</span>
+              <span className="text-foreground">Powered by x402 Agent Economy</span>
             </h1>
             
-            <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
-              GigaBrain uses DeepSeek V3, the world's most advanced open-source AI, to trade Solana tokens 24/7. Scans 100+ tokens every 5 minutes with free API access.
+            <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+              Autonomous deflationary token burns using <span className="text-primary font-semibold">Switchboard Oracle</span>, <span className="text-primary font-semibold">x402 micropayments</span>, and <span className="text-primary font-semibold">Jito BAM</span>. AI agents pay for premium data feeds and execute trustless burns.
             </p>
 
-            {/* Live Stats Preview */}
-            {stats && stats.totalTrades > 0 ? (
-              <div className="flex items-center justify-center gap-8 py-6">
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-green-500">{stats.winRate}%</p>
-                  <p className="text-sm text-muted-foreground">Win Rate</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-primary">+{stats.avgROI}%</p>
-                  <p className="text-sm text-muted-foreground">Avg ROI</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-blue-500">{stats.totalTrades}</p>
-                  <p className="text-sm text-muted-foreground">Total Trades</p>
-                </div>
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto py-8">
+              <div className="text-center p-6 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                <Database className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-3xl font-bold text-primary">$0.005</p>
+                <p className="text-sm text-muted-foreground">x402 Cost Per Oracle Feed</p>
               </div>
-            ) : (
-              <div className="py-6 px-8 rounded-lg bg-gradient-to-br from-green-500/10 to-primary/10 border border-green-500/30 max-w-2xl mx-auto">
-                <div className="flex items-center justify-center gap-3 mb-2">
-                  <Sparkles className="h-5 w-5 text-green-500" />
-                  <p className="text-lg font-bold text-green-500">Fresh Start - Latest Improvements Active</p>
-                </div>
-                <p className="text-sm text-muted-foreground text-center">
-                  System upgraded with enhanced token discovery (100+ tokens scanned), 5-minute refresh cycles, and smarter exit strategies. All metrics tracking fresh performance data.
-                </p>
+              <div className="text-center p-6 rounded-lg bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
+                <Brain className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-green-500">DeepSeek V3</p>
+                <p className="text-sm text-muted-foreground">AI Decision Engine</p>
               </div>
-            )}
+              <div className="text-center p-6 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20">
+                <Shield className="h-8 w-8 text-purple-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-purple-500">100%</p>
+                <p className="text-sm text-muted-foreground">MEV Protected (Jito BAM)</p>
+              </div>
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <Link href="/dashboard">
-                <Button size="lg" className="text-lg px-8 h-12" data-testid="button-start-trading">
-                  Start Trading Free
+              <Link href="/agent-burn">
+                <Button size="lg" className="text-lg px-8 h-12 gap-2" data-testid="button-start-burn">
+                  <Flame className="h-5 w-5" />
+                  Try Agent Burn Demo
                 </Button>
               </Link>
-              <Link href="/analyze">
-                <Button size="lg" variant="outline" className="text-lg px-8 h-12" data-testid="button-try-analyzer">
-                  Try Free Analyzer
+              <a href="#how-it-works">
+                <Button size="lg" variant="outline" className="text-lg px-8 h-12" data-testid="button-learn-more">
+                  Learn How It Works
                 </Button>
-              </Link>
+              </a>
             </div>
             
-            <div className="space-y-1">
-              <p className="text-base font-semibold text-green-500">
-                ✓ First 20 trades completely free
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Then 0.15 SOL for 2 weeks unlimited access • 1% fee per trade • No credit card required
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Subscription Pricing */}
-      <section className="py-16 bg-gradient-to-br from-primary/10 to-background border-y">
-        <div className="container mx-auto px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold mb-4">Simple, Transparent Pricing</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Start free, upgrade when ready. Pay with SOL, no credit card required.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {/* Free Trial Card */}
-            <Card className="border-2 border-green-500/30 bg-gradient-to-br from-green-500/10 to-background relative">
-              <CardHeader className="pb-4">
-                <Badge className="w-fit bg-green-500/20 border-green-500/40 text-green-500 mb-2">
-                  Start Free
-                </Badge>
-                <CardTitle className="text-3xl">20 Free Trades</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="text-4xl font-bold mb-2">
-                    <span className="text-green-500">FREE</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">No payment required</p>
-                </div>
-                
-                <div className="space-y-3 pt-4">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">20 AI-powered trades</p>
-                      <p className="text-sm text-muted-foreground">Full access to all features</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">DeepSeek V3 AI</p>
-                      <p className="text-sm text-muted-foreground">Advanced reasoning & free tier</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">1% trading fee applies</p>
-                      <p className="text-sm text-muted-foreground">Standard platform fee</p>
-                    </div>
-                  </div>
-                </div>
-
-                <Link href="/dashboard">
-                  <Button size="lg" className="w-full mt-4" data-testid="button-start-free">
-                    Start Free Trial
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* Subscription Card */}
-            <Card className="border-2 border-primary bg-gradient-to-br from-primary/20 to-background relative">
-              <CardHeader className="pb-4">
-                <Badge className="w-fit bg-primary/30 border-primary text-primary mb-2">
-                  Unlimited Access
-                </Badge>
-                <CardTitle className="text-3xl">2-Week Subscription</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="text-4xl font-bold mb-2 flex items-baseline gap-2">
-                    <span className="text-primary">0.15 SOL</span>
-                    <span className="text-lg font-normal text-muted-foreground">/ 2 weeks</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Unlimited trades for 14 days</p>
-                </div>
-                
-                <div className="space-y-3 pt-4">
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">Unlimited AI trades</p>
-                      <p className="text-sm text-muted-foreground">Trade 24/7 for 2 full weeks</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">Full DeepSeek AI access</p>
-                      <p className="text-sm text-muted-foreground">Advanced AI reasoning 24/7</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">Auto portfolio rebalancing</p>
-                      <p className="text-sm text-muted-foreground">AI optimizes positions every 15min</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">1% trading fee applies</p>
-                      <p className="text-sm text-muted-foreground">Same low platform fee</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <Flame className="h-5 w-5 text-orange-500 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium text-orange-500">33% used for buyback & burn</p>
-                      <p className="text-sm text-muted-foreground">Deflationary tokenomics</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-muted/50 rounded-md p-3 mt-4">
-                  <p className="text-xs text-muted-foreground text-center">
-                    Payment via Solana blockchain • Instant activation
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Additional Free Tools */}
-          <div className="mt-12 pt-12 border-t">
-            <h3 className="text-2xl font-bold text-center mb-8">Always Free Tools</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-              <Card className="bg-background/80 backdrop-blur">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Search className="h-6 w-6 text-blue-500" />
-                    <h3 className="font-semibold">Token Analyzer</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Unlimited AI analysis on any token. No wallet, no signup required.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card className="bg-background/80 backdrop-blur">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <TrendingUp className="h-6 w-6 text-green-500" />
-                    <h3 className="font-semibold">Live Stats Dashboard</h3>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Real-time performance data. See how GigaBrain trades in real-time.
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Tokenomics - Buyback & Burn */}
-      <section className="py-16 bg-gradient-to-br from-orange-500/10 via-primary/10 to-background border-y border-orange-500/20">
-        <div className="container mx-auto px-6 lg:px-8">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
-              <Badge className="mb-4 bg-orange-500/20 border-orange-500/40 text-orange-500">
-                <Flame className="h-3 w-3 mr-1" />
-                Deflationary Tokenomics
-              </Badge>
-              <h2 className="text-4xl font-bold mb-4">Automatic Buyback & Burn</h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Every subscription purchase directly supports the token ecosystem
-              </p>
-            </div>
-
-            <Card className="border-2 border-orange-500/30 bg-gradient-to-br from-orange-500/5 to-background">
-              <CardContent className="pt-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-                  <div className="text-center">
-                    <div className="h-16 w-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
-                      <TrendingUp className="h-8 w-8 text-orange-500" />
-                    </div>
-                    <h3 className="font-bold text-2xl mb-2">33%</h3>
-                    <p className="text-sm text-muted-foreground">Of every subscription</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                      <Sparkles className="h-8 w-8 text-primary" />
-                    </div>
-                    <h3 className="font-bold text-2xl mb-2">Auto</h3>
-                    <p className="text-sm text-muted-foreground">Buyback from market</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="h-16 w-16 rounded-full bg-orange-500/20 flex items-center justify-center mx-auto mb-4">
-                      <Flame className="h-8 w-8 text-orange-500" />
-                    </div>
-                    <h3 className="font-bold text-2xl mb-2">Burn</h3>
-                    <p className="text-sm text-muted-foreground">Permanently removed</p>
-                  </div>
-                </div>
-
-                <div className="bg-muted/50 rounded-lg p-6 border border-orange-500/20">
-                  <div className="flex items-start gap-4">
-                    <Flame className="h-6 w-6 text-orange-500 flex-shrink-0 mt-1" />
-                    <div>
-                      <h4 className="font-bold mb-2">How It Works</h4>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        When you purchase a 2-week subscription (0.15 SOL), one-third (0.05 SOL) is automatically used to buy back tokens from the market and burn them forever. This creates constant buying pressure and reduces supply, supporting long-term token value.
-                      </p>
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mt-4 p-3 bg-background/50 rounded-md">
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          <span className="text-xs font-medium">Token:</span>
-                        </div>
-                        <code className="text-xs bg-muted px-2 py-1 rounded break-all">
-                          FQptMsS3tnyPbK68rTZm3n3R4NHBX5r9edshyyvxpump
-                        </code>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Security Advisory */}
-      <section className="py-12 bg-gradient-to-br from-blue-500/10 to-background">
-        <div className="container mx-auto px-6 lg:px-8">
-          <Card className="max-w-4xl mx-auto border-2 border-blue-500/30 bg-gradient-to-br from-blue-500/5 to-background">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-4">
-                <div className="flex-shrink-0">
-                  <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-                    <Shield className="h-6 w-6 text-blue-500" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
-                    <Wallet className="h-5 w-5 text-blue-500" />
-                    Security Best Practice: Use a Fresh Wallet
-                  </h3>
-                  <p className="text-muted-foreground mb-4">
-                    We strongly recommend creating a new Solana wallet specifically for AI trading. This keeps your main wallet safe and helps you track trading performance separately.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-sm">Isolated Risk</p>
-                        <p className="text-xs text-muted-foreground">Protect your main holdings</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-sm">Clear Tracking</p>
-                        <p className="text-xs text-muted-foreground">Easy performance monitoring</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-sm">Non-Custodial</p>
-                        <p className="text-xs text-muted-foreground">You always control your funds</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-md">
-                    <p className="text-sm text-muted-foreground flex items-start gap-2">
-                      <AlertCircle className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
-                      <span>Transfer only the amount you want to trade (e.g., 0.5-2 SOL) to your new trading wallet. You can always add more later.</span>
-                    </p>
-                  </div>
-                </div>
+            <div className="flex items-center justify-center gap-8 pt-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span>Devnet Ready</span>
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* Complete Trade Isolation */}
-      <section className="py-16 bg-gradient-to-br from-green-500/10 to-background">
-        <div className="container mx-auto px-6 lg:px-8">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-12">
-              <Badge className="mb-4 bg-green-500/20 border-green-500/40 text-green-500">
-                <Lock className="h-3 w-3 mr-1" />
-                100% Isolated Trading
-              </Badge>
-              <h2 className="text-4xl font-bold mb-4">Your Capital, Your Trades Only</h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Complete isolation between users - other traders never affect your positions or capital
-              </p>
-            </div>
-
-            <Card className="border-2 border-green-500/30 bg-gradient-to-br from-green-500/5 to-background">
-              <CardContent className="pt-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                      <Wallet className="h-5 w-5 text-green-500" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold mb-1">Your SOL, Your Control</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Your wallet balance and token positions are completely separate from all other users. No shared pools, no interference.
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                      <Brain className="h-5 w-5 text-green-500" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold mb-1">Independent AI Decisions</h4>
-                      <p className="text-sm text-muted-foreground">
-                        DeepSeek V3 AI analyzes and executes trades independently for your wallet address. Each decision is tailored to your positions and portfolio.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                      <TrendingUp className="h-5 w-5 text-green-500" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold mb-1">Separate Performance Tracking</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Your win rate, profit/loss, and trade history are tracked privately. Other users' wins or losses don't affect your stats.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                      <Lock className="h-5 w-5 text-green-500" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold mb-1">Zero Capital Mixing</h4>
-                      <p className="text-sm text-muted-foreground">
-                        Think of it like separate bank accounts - everyone uses the same AI system, but your funds never mix with other users.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-muted/50 rounded-lg p-6 border border-green-500/20">
-                  <div className="flex items-start gap-4">
-                    <Users className="h-6 w-6 text-green-500 flex-shrink-0 mt-1" />
-                    <div>
-                      <h4 className="font-bold mb-2">Real-World Example</h4>
-                      <p className="text-sm text-muted-foreground">
-                        If you have 1 SOL and another user has 10 SOL trading at the same time:
-                      </p>
-                      <ul className="text-sm text-muted-foreground mt-2 space-y-1 ml-4">
-                        <li>• You trade with YOUR 1 SOL budget independently</li>
-                        <li>• They trade with THEIR 10 SOL budget independently</li>
-                        <li>• Both can buy the same token - positions are separate</li>
-                        <li>• Your profits and losses are tracked separately</li>
-                        <li>• Their account activity has zero impact on yours</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Trust Signals */}
-      <section className="py-12 bg-muted/30">
-        <div className="container mx-auto px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto mb-2" />
-              <p className="font-semibold">100% On-Chain</p>
-              <p className="text-sm text-muted-foreground">Verifiable trades</p>
-            </div>
-            <div>
-              <Shield className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-              <p className="font-semibold">Non-Custodial</p>
-              <p className="text-sm text-muted-foreground">You control funds</p>
-            </div>
-            <div>
-              <Brain className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-              <p className="font-semibold">12 AI Models</p>
-              <p className="text-sm text-muted-foreground">4-team rotation</p>
-            </div>
-            <div>
-              <Zap className="h-8 w-8 text-orange-500 mx-auto mb-2" />
-              <p className="font-semibold">24/7 Trading</p>
-              <p className="text-sm text-muted-foreground">Never miss opportunities</p>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span>No Private Keys</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <span>Open Source</span>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
-      <section className="py-20">
+      {/* Features Section */}
+      <section id="features" className="py-20 bg-muted/40">
         <div className="container mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Everything You Need</h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Powerful tools for Solana token trading and management
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+              Complete x402 Agent Economy
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              Demonstrating autonomous AI agents paying for premium services with x402 micropayments
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="border-primary/50 bg-gradient-to-br from-primary/10 to-primary/5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Feature 1: Switchboard Oracle */}
+            <Card className="hover-elevate">
               <CardHeader>
-                <Sparkles className="h-12 w-12 text-primary mb-4" />
-                <CardTitle>GigaBrain AI Trading</CardTitle>
+                <Database className="h-12 w-12 text-primary mb-4" />
+                <CardTitle className="text-2xl">Switchboard Oracle</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <p className="text-muted-foreground">Autonomous 24/7 trading with 12-model hivemind and 4-team rotation</p>
-                <ul className="space-y-1 text-sm">
-                  <li>✓ Tri-mode strategy (SCALP, QUICK_2X, SWING)</li>
-                  <li>✓ Graduated position sizing (1-3%)</li>
-                  <li>✓ Dynamic trailing stop-loss (4 tiers)</li>
-                  <li>✓ AI loss prevention system</li>
-                  <li>✓ 15-min portfolio rebalancing</li>
-                  <li>✓ Conviction hold & accumulate</li>
+                <p className="text-muted-foreground">
+                  AI agents access premium on-chain data feeds via x402 micropayments
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>SOL/USD price from multiple sources</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Token liquidity & 24h volume metrics</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Cryptographically verified on-chain data</span>
+                  </li>
                 </ul>
-                <Link href="/learn" className="text-sm text-primary hover:underline">
-                  Learn More →
-                </Link>
               </CardContent>
             </Card>
 
-            <Card>
+            {/* Feature 2: x402 Micropayments */}
+            <Card className="hover-elevate">
               <CardHeader>
-                <Search className="h-12 w-12 text-blue-500 mb-4" />
-                <CardTitle>Token Analyzer</CardTitle>
+                <DollarSign className="h-12 w-12 text-green-500 mb-4" />
+                <CardTitle className="text-2xl">x402 Micropayments</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <p className="text-muted-foreground">Free AI analysis on any Solana token without wallet connection</p>
-                <ul className="space-y-1 text-sm">
-                  <li>✓ Organic score detection</li>
-                  <li>✓ Quality metrics</li>
-                  <li>✓ Risk assessment</li>
+                <p className="text-muted-foreground">
+                  HTTP 402 payment protocol enables AI-to-AI service payments
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>$0.005 USDC per premium oracle feed</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>$0.005 USDC for burn execution service</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>All payments tracked in database</span>
+                  </li>
                 </ul>
-                <Link href="/analyze" className="text-sm text-primary hover:underline">
-                  Try Now →
-                </Link>
               </CardContent>
             </Card>
 
-            <Card>
+            {/* Feature 3: DeepSeek AI */}
+            <Card className="hover-elevate">
               <CardHeader>
-                <BarChart3 className="h-12 w-12 text-green-500 mb-4" />
-                <CardTitle>Buyback & Burn</CardTitle>
+                <Brain className="h-12 w-12 text-purple-500 mb-4" />
+                <CardTitle className="text-2xl">DeepSeek V3 AI</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <p className="text-muted-foreground">Automated token buyback and burn for deflationary tokenomics</p>
-                <ul className="space-y-1 text-sm">
-                  <li>✓ Flexible scheduling</li>
-                  <li>✓ Jupiter integration</li>
-                  <li>✓ Real-time monitoring</li>
+                <p className="text-muted-foreground">
+                  Advanced AI analyzes burn requests with oracle data and configurable criteria
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Confidence threshold analysis (0-100%)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Liquidity & volume risk assessment</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Autonomous approve/reject decisions</span>
+                  </li>
                 </ul>
-                <Link href="/dashboard" className="text-sm text-primary hover:underline">
-                  Get Started →
-                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Feature 4: Jito BAM */}
+            <Card className="hover-elevate">
+              <CardHeader>
+                <Shield className="h-12 w-12 text-blue-500 mb-4" />
+                <CardTitle className="text-2xl">Jito BAM Bundles</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-muted-foreground">
+                  Atomic swap + burn execution with full MEV protection
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Both transactions succeed or fail together</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Protected from front-running attacks</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Guaranteed atomic execution</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Feature 5: On-Chain Programs */}
+            <Card className="hover-elevate">
+              <CardHeader>
+                <GitFork className="h-12 w-12 text-orange-500 mb-4" />
+                <CardTitle className="text-2xl">Anchor/Rust Programs</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-muted-foreground">
+                  Trustless on-chain burn execution with verified program logic
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Immutable burn logic on Solana</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Multi-signature authorization support</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Auditable transaction history</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Feature 6: No-Code Dashboard */}
+            <Card className="hover-elevate">
+              <CardHeader>
+                <Zap className="h-12 w-12 text-yellow-500 mb-4" />
+                <CardTitle className="text-2xl">No-Code Dashboard</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-muted-foreground">
+                  Configure burn criteria without writing a single line of code
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Set AI confidence thresholds</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Configure max burn percentages</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Real-time analytics & monitoring</span>
+                  </li>
+                </ul>
               </CardContent>
             </Card>
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-20 bg-gradient-to-br from-primary/10 to-background">
-        <div className="container mx-auto px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold mb-4">Start Trading in 60 Seconds</h2>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Connect your wallet, configure settings, and let GigaBrain trade for you
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/dashboard">
-              <Button size="lg" className="text-lg px-8 h-12">
-                Start Free (20 Trades)
-              </Button>
-            </Link>
-            <Link href="/stats">
-              <Button size="lg" variant="outline" className="text-lg px-8 h-12">
-                View Live Stats
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20">
+        <div className="container mx-auto px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+              How It Works
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              Complete x402 agent economy workflow in 5 autonomous steps
+            </p>
+          </div>
+
+          <div className="max-w-4xl mx-auto space-y-8">
+            {/* Step 0 */}
+            <div className="flex gap-6 items-start">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary">
+                <span className="text-xl font-bold text-primary">0</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold mb-2">Fetch Oracle Data (x402 Payment #1)</h3>
+                <p className="text-muted-foreground mb-3">
+                  AI agent pays <span className="text-primary font-semibold">$0.005 USDC</span> to access Switchboard oracle feeds (SOL/USD price, token liquidity, 24h volume). Data is cryptographically verified on-chain.
+                </p>
+                <Badge variant="outline" className="bg-primary/10 border-primary/40">
+                  <Database className="h-3 w-3 mr-1" />
+                  Switchboard Oracle
+                </Badge>
+              </div>
+            </div>
+
+            {/* Step 1 */}
+            <div className="flex gap-6 items-start">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center border-2 border-purple-500">
+                <span className="text-xl font-bold text-purple-500">1</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold mb-2">AI Analysis with Oracle Data</h3>
+                <p className="text-muted-foreground mb-3">
+                  DeepSeek V3 analyzes burn request using verifiable oracle metrics. Evaluates liquidity risk, volume trends, and user-configured criteria (confidence threshold, max burn %, sentiment requirements).
+                </p>
+                <Badge variant="outline" className="bg-purple-500/10 border-purple-500/40">
+                  <Brain className="h-3 w-3 mr-1" />
+                  DeepSeek V3
+                </Badge>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="flex gap-6 items-start">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center border-2 border-green-500">
+                <span className="text-xl font-bold text-green-500">2</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold mb-2">x402 Burn Service Payment (Payment #2)</h3>
+                <p className="text-muted-foreground mb-3">
+                  If AI approves, GigaBrain AI pays BurnBot <span className="text-green-500 font-semibold">$0.005 USDC</span> for burn execution service. This demonstrates the x402 agent economy: AI-to-AI service payments.
+                </p>
+                <Badge variant="outline" className="bg-green-500/10 border-green-500/40">
+                  <DollarSign className="h-3 w-3 mr-1" />
+                  x402 Protocol
+                </Badge>
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex gap-6 items-start">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center border-2 border-blue-500">
+                <span className="text-xl font-bold text-blue-500">3</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold mb-2">Jupiter Swap Execution</h3>
+                <p className="text-muted-foreground mb-3">
+                  BurnBot swaps SOL for target token using Jupiter's aggregated liquidity. Optimizes routing across all Solana DEXs for best execution price.
+                </p>
+                <Badge variant="outline" className="bg-blue-500/10 border-blue-500/40">
+                  Jupiter Aggregator
+                </Badge>
+              </div>
+            </div>
+
+            {/* Step 4 */}
+            <div className="flex gap-6 items-start">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center border-2 border-orange-500">
+                <span className="text-xl font-bold text-orange-500">4</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold mb-2">Atomic Burn via Jito BAM</h3>
+                <p className="text-muted-foreground mb-3">
+                  Swap + burn bundled atomically in Jito BAM. Both transactions succeed together or fail together. Complete MEV protection prevents front-running attacks.
+                </p>
+                <Badge variant="outline" className="bg-orange-500/10 border-orange-500/40">
+                  <Shield className="h-3 w-3 mr-1" />
+                  Jito BAM
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center mt-12">
+            <p className="text-lg text-muted-foreground mb-4">
+              Total x402 Cost: <span className="text-primary font-bold">$0.01 USDC</span> (2 micropayments)
+            </p>
+            <Link href="/agent-burn">
+              <Button size="lg" className="gap-2" data-testid="button-try-demo">
+                <Flame className="h-5 w-5" />
+                Try Demo on Devnet
               </Button>
             </Link>
           </div>
-          <p className="text-sm text-muted-foreground mt-4">
-            After 20 free trades, continue for 0.15 SOL per 2 weeks • 1% fee per trade
-          </p>
+        </div>
+      </section>
+
+      {/* Tech Stack Section */}
+      <section id="tech-stack" className="py-20 bg-muted/40">
+        <div className="container mx-auto px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+              Tech Stack
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
+              Built on cutting-edge Solana infrastructure for the x402 hackathon
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            {[
+              { name: "Switchboard", desc: "Decentralized Oracle" },
+              { name: "x402 Protocol", desc: "HTTP Micropayments" },
+              { name: "DeepSeek V3", desc: "AI Decision Engine" },
+              { name: "Jito BAM", desc: "MEV Protection" },
+              { name: "Jupiter", desc: "DEX Aggregator" },
+              { name: "Anchor", desc: "Solana Framework" },
+              { name: "Rust", desc: "On-Chain Programs" },
+              { name: "React + TypeScript", desc: "Frontend Dashboard" },
+            ].map((tech) => (
+              <Card key={tech.name} className="text-center hover-elevate">
+                <CardContent className="pt-6">
+                  <h4 className="font-bold text-lg mb-1">{tech.name}</h4>
+                  <p className="text-sm text-muted-foreground">{tech.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20">
+        <div className="container mx-auto px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto text-center space-y-8 p-12 rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background border border-primary/20">
+            <h2 className="text-4xl md:text-5xl font-bold">
+              Ready to See the x402 Agent Economy?
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Connect your Solana wallet (on devnet) and try an autonomous agentic burn with real Switchboard oracle data and x402 micropayments.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link href="/agent-burn">
+                <Button size="lg" className="text-lg px-8 h-12 gap-2" data-testid="button-cta-burn">
+                  <Flame className="h-5 w-5" />
+                  Start Agent Burn
+                </Button>
+              </Link>
+              <Link href="/dashboard">
+                <Button size="lg" variant="outline" className="text-lg px-8 h-12" data-testid="button-cta-dashboard">
+                  View Dashboard
+                </Button>
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-12">
+      <footer className="border-t border-border py-12 bg-muted/40">
         <div className="container mx-auto px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-6 w-6 text-primary" />
-              <span className="text-lg font-bold">GigaBrain</span>
+              <Flame className="h-6 w-6 text-primary" />
+              <span className="font-bold text-lg">GigaBrain</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2025 GigaBrain. All trades verifiable on Solana blockchain.
+              Solana x402 Hackathon Submission • Built with Switchboard, x402, DeepSeek, and Jito
             </p>
+            <div className="flex items-center gap-4">
+              <Badge variant="outline">Devnet</Badge>
+              <Badge variant="outline">Open Source</Badge>
+            </div>
           </div>
         </div>
       </footer>

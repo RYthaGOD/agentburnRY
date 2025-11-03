@@ -137,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ================================================
   
   // Execute agentic burn with DeepSeek AI decision-making
-  app.post("/api/agentic-burn/execute", async (req, res) => {
+  app.post("/api/agent-burn/execute", async (req, res) => {
     try {
       const {
         requesterPrivateKey,
@@ -154,12 +154,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { executeAgenticBurn } = await import("./agentic-burn-service");
+      const { executeAgentBurn } = await import("./agent-burn-service");
       const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
       
       const requesterKeypair = loadKeypairFromPrivateKey(requesterPrivateKey);
 
-      const result = await executeAgenticBurn({
+      const result = await executeAgentBurn({
         requesterKeypair,
         tokenMint,
         buyAmountSOL: parseFloat(buyAmountSOL),
@@ -187,7 +187,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Demo agentic burn endpoint (simplified for testing)
-  app.post("/api/agentic-burn/demo", async (req, res) => {
+  app.post("/api/agent-burn/demo", async (req, res) => {
     try {
       const {
         tokenMint,
@@ -211,9 +211,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { demoAgenticBurn } = await import("./agentic-burn-service");
+      const { demoAgentBurn } = await import("./agent-burn-service");
 
-      const result = await demoAgenticBurn(
+      const result = await demoAgentBurn(
         demoPrivateKey,
         tokenMint,
         parseFloat(buyAmountSOL),
@@ -236,12 +236,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get agentic burn stats for a wallet
-  app.get("/api/agentic-burn/stats/:walletAddress", async (req, res) => {
+  app.get("/api/agent-burn/stats/:walletAddress", async (req, res) => {
     try {
       const { walletAddress } = req.params;
-      const { agenticBurns } = await import("../shared/schema");
+      const { agentBurns } = await import("../shared/schema");
       
-      const burns = await db.select().from(agenticBurns).where(eq(agenticBurns.ownerWalletAddress, walletAddress));
+      const burns = await db.select().from(agentBurns).where(eq(agentBurns.ownerWalletAddress, walletAddress));
       
       // Calculate aggregate stats
       const totalBurns = burns.length;

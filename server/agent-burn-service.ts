@@ -124,7 +124,7 @@ When oracle data is provided, use it to assess:
  * - Agent Economy: GigaBrain pays BurnBot, BurnBot provides burn-as-a-service
  */
 
-export interface AgenticBurnRequest {
+export interface AgentBurnRequest {
   // Who's requesting the burn (GigaBrain AI)
   requesterKeypair: Keypair;
   
@@ -147,7 +147,7 @@ export interface AgenticBurnRequest {
   };
 }
 
-export interface AgenticBurnResult {
+export interface AgentBurnResult {
   success: boolean;
   
   // x402 payment details
@@ -181,9 +181,9 @@ export interface AgenticBurnResult {
  * 5. Bundle BOTH swap + burn atomically via Jito BAM
  * 6. Track everything in database with timing metrics
  */
-export async function executeAgenticBurn(
-  request: AgenticBurnRequest
-): Promise<AgenticBurnResult> {
+export async function executeAgentBurn(
+  request: AgentBurnRequest
+): Promise<AgentBurnResult> {
   const {
     requesterKeypair,
     tokenMint,
@@ -376,13 +376,13 @@ export async function executeAgenticBurn(
   }
 }
 
-export interface AgenticBurnCriteria {
+export interface AgentBurnCriteria {
   confidenceThreshold?: number;
   maxBurnPercentage?: number;
   requirePositiveSentiment?: boolean;
 }
 
-export interface EnhancedAgenticBurnResult extends AgenticBurnResult {
+export interface EnhancedAgentBurnResult extends AgentBurnResult {
   // AI Decision details
   aiConfidence?: number;
   aiReasoning?: string;
@@ -408,12 +408,12 @@ export interface EnhancedAgenticBurnResult extends AgenticBurnResult {
  * - BurnBot executes atomic BUY+BURN via Jito BAM (full MEV protection)
  * - Both buy and burn transactions bundled atomically
  */
-export async function demoAgenticBurn(
+export async function demoAgentBurn(
   gigabrainPrivateKey: string,
   targetTokenMint: string,
   burnAmountSOL: number,
-  criteria?: AgenticBurnCriteria
-): Promise<EnhancedAgenticBurnResult> {
+  criteria?: AgentBurnCriteria
+): Promise<EnhancedAgentBurnResult> {
   console.log("\n🎮 DEMO MODE: Agentic Burn with Switchboard Oracle + x402 + BAM");
   console.log("This demonstrates the complete x402 agent economy:\n");
   console.log("0. AI pays x402 for Switchboard oracle data (premium feeds)");
@@ -434,11 +434,11 @@ export async function demoAgenticBurn(
   
   // Import database
   const { db } = await import("./db");
-  const { agenticBurns } = await import("../shared/schema");
+  const { agentBurns } = await import("../shared/schema");
   const { eq } = await import("drizzle-orm");
   
   // Create burn history record
-  const [burnRecord] = await db.insert(agenticBurns).values({
+  const [burnRecord] = await db.insert(agentBurns).values({
     ownerWalletAddress: ownerWallet,
     tokenMintAddress: targetTokenMint,
     burnAmountSOL: burnAmountSOL.toString(),
@@ -471,7 +471,7 @@ export async function demoAgenticBurn(
     const step1Start = Date.now();
     console.log("\n🧠 [Step 1/5] DeepSeek AI Analysis (with oracle data)...");
     
-    await db.update(agenticBurns).set({ currentStep: 1 }).where(eq(agenticBurns.id, burnHistoryId));
+    await db.update(agentBurns).set({ currentStep: 1 }).where(eq(agentBurns.id, burnHistoryId));
     
     // Pass oracle metrics to DeepSeek for enhanced analysis
     const aiDecision = await analyzeWithDeepSeek(targetTokenMint, burnAmountSOL, criteriaConfig, oracleMetrics);
@@ -482,20 +482,20 @@ export async function demoAgenticBurn(
     console.log(`💭 Reasoning: ${aiDecision.reasoning}`);
     console.log(`⏱️  Duration: ${step1Duration}ms`);
     
-    await db.update(agenticBurns).set({
+    await db.update(agentBurns).set({
       aiConfidence: aiDecision.confidence,
       aiReasoning: aiDecision.reasoning,
       aiApproved: aiDecision.approved,
       step1DurationMs: step1Duration,
-    }).where(eq(agenticBurns.id, burnHistoryId));
+    }).where(eq(agentBurns.id, burnHistoryId));
     
     if (!aiDecision.approved) {
-      await db.update(agenticBurns).set({
+      await db.update(agentBurns).set({
         status: "failed",
         errorMessage: `Burn rejected by AI: ${aiDecision.reasoning}`,
         errorStep: 1,
         totalDurationMs: Date.now() - totalStartTime,
-      }).where(eq(agenticBurns.id, burnHistoryId));
+      }).where(eq(agentBurns.id, burnHistoryId));
       
       return {
         success: false,
@@ -516,7 +516,7 @@ export async function demoAgenticBurn(
     const step2Start = Date.now();
     console.log("\n📱 [Step 2/5] x402 Micropayment (Burn Service Fee)...");
     
-    await db.update(agenticBurns).set({ currentStep: 2 }).where(eq(agenticBurns.id, burnHistoryId));
+    await db.update(agentBurns).set({ currentStep: 2 }).where(eq(agentBurns.id, burnHistoryId));
     
     const paymentResult = await x402Service.payForBurnExecution(
       gigabrainKeypair,
@@ -528,18 +528,18 @@ export async function demoAgenticBurn(
     
     console.log(`⏱️  Duration: ${step2Duration}ms`);
     
-    await db.update(agenticBurns).set({
+    await db.update(agentBurns).set({
       step2DurationMs: step2Duration,
       paymentId: paymentResult.paymentId || null,
-    }).where(eq(agenticBurns.id, burnHistoryId));
+    }).where(eq(agentBurns.id, burnHistoryId));
     
     if (!paymentResult.success) {
-      await db.update(agenticBurns).set({
+      await db.update(agentBurns).set({
         status: "failed",
         errorMessage: `x402 payment failed: ${paymentResult.error}`,
         errorStep: 2,
         totalDurationMs: Date.now() - totalStartTime,
-      }).where(eq(agenticBurns.id, burnHistoryId));
+      }).where(eq(agentBurns.id, burnHistoryId));
       
       return {
         success: false,
@@ -561,16 +561,16 @@ export async function demoAgenticBurn(
     const step3Start = Date.now();
     console.log("\n🔄 [Step 3/5] Jupiter Swap (DEMO MODE)...");
     
-    await db.update(agenticBurns).set({ currentStep: 3 }).where(eq(agenticBurns.id, burnHistoryId));
+    await db.update(agentBurns).set({ currentStep: 3 }).where(eq(agentBurns.id, burnHistoryId));
     
     const simulatedOutputAmount = Math.floor(burnAmountSOL * 1000000);
     const step3Duration = Date.now() - step3Start;
     
     console.log(`⏱️  Duration: ${step3Duration}ms`);
     
-    await db.update(agenticBurns).set({
+    await db.update(agentBurns).set({
       step3DurationMs: step3Duration,
-    }).where(eq(agenticBurns.id, burnHistoryId));
+    }).where(eq(agentBurns.id, burnHistoryId));
     
     // =========================================================================
     // STEP 4: JITO BAM BUNDLE (DEMO MODE)
@@ -578,7 +578,7 @@ export async function demoAgenticBurn(
     const step4Start = Date.now();
     console.log("\n⚡ [Step 4/5] Jito BAM Bundle (DEMO MODE)...");
     
-    await db.update(agenticBurns).set({ currentStep: 4 }).where(eq(agenticBurns.id, burnHistoryId));
+    await db.update(agentBurns).set({ currentStep: 4 }).where(eq(agentBurns.id, burnHistoryId));
     
     const bundleId = `DEMO_BUNDLE_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const step4Duration = Date.now() - step4Start;
@@ -590,14 +590,14 @@ export async function demoAgenticBurn(
     const tokenDecimals = await getTokenDecimals(targetTokenMint);
     const tokensBurned = simulatedOutputAmount / Math.pow(10, tokenDecimals);
     
-    await db.update(agenticBurns).set({
+    await db.update(agentBurns).set({
       step4DurationMs: step4Duration,
       totalDurationMs: totalDuration,
       bundleId,
       tokensBurned: tokensBurned.toString(),
       status: "completed",
       completedAt: new Date(),
-    }).where(eq(agenticBurns.id, burnHistoryId));
+    }).where(eq(agentBurns.id, burnHistoryId));
     
     console.log("\n✨ AGENTIC BURN COMPLETE!");
     console.log(`Total execution time: ${totalDuration}ms`);
@@ -627,11 +627,11 @@ export async function demoAgenticBurn(
     const totalDuration = Date.now() - totalStartTime;
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     
-    await db.update(agenticBurns).set({
+    await db.update(agentBurns).set({
       status: "failed",
       errorMessage,
       totalDurationMs: totalDuration,
-    }).where(eq(agenticBurns.id, burnHistoryId));
+    }).where(eq(agentBurns.id, burnHistoryId));
     
     console.error(`❌ Agentic burn error:`, error);
     return {

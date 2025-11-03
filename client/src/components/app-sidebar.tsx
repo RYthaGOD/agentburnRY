@@ -38,8 +38,8 @@ const menuItems = [
     icon: Brain,
   },
   {
-    title: "Agentic Burn",
-    url: "/dashboard/agentic-burn",
+    title: "Agent Burn",
+    url: "/dashboard/agent-burn",
     icon: Zap,
   },
   {

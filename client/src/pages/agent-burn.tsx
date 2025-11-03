@@ -27,7 +27,7 @@ export default function AgenticBurnPage() {
 
   // Fetch cumulative agentic burn stats
   const { data: agenticStats, isLoading: statsLoading, refetch: refetchStats } = useQuery<any>({
-    queryKey: [`/api/agentic-burn/stats/${demoWallet}`],
+    queryKey: [`/api/agent-burn/stats/${demoWallet}`],
     enabled: !!demoWallet,
   });
 
@@ -46,7 +46,7 @@ export default function AgenticBurnPage() {
   // Test agentic burn mutation
   const testBurnMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch("/api/agentic-burn/demo", {
+      const response = await fetch("/api/agent-burn/demo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -63,7 +63,7 @@ export default function AgenticBurnPage() {
       setTestResult(response);
       if (response.success) {
         toast({
-          title: "✅ Agentic Burn Success!",
+          title: "✅ Agent Burn Success!",
           description: `x402 payment processed and BAM bundle created. Payment ID: ${response.data?.paymentId?.substring(0, 8)}...`,
         });
         // Refresh all stats
@@ -72,7 +72,7 @@ export default function AgenticBurnPage() {
         refetchBam();
       } else {
         toast({
-          title: "⚠️ Agentic Burn Failed",
+          title: "⚠️ Agent Burn Failed",
           description: response.error || "Unknown error occurred",
           variant: "destructive",
         });
@@ -88,7 +88,7 @@ export default function AgenticBurnPage() {
   });
 
   return (
-    <div className="container mx-auto p-6 space-y-8" data-testid="page-agentic-burn">
+    <div className="container mx-auto p-6 space-y-8" data-testid="page-agent-burn">
       {/* Header */}
       <div className="space-y-4">
         <div className="space-y-2">
@@ -158,7 +158,7 @@ export default function AgenticBurnPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PlayCircle className="h-5 w-5 text-primary" />
-              Hackathon Demo - Test Agentic Burn
+              Hackathon Demo - Test Agent Burn
             </CardTitle>
             <CardDescription>
               Configure your burn parameters and test the complete x402 + BAM flow
@@ -412,12 +412,12 @@ export default function AgenticBurnPage() {
         </Card>
       </div>
 
-      {/* Cumulative Agentic Burn Stats */}
+      {/* Cumulative Agent Burn Stats */}
       <Card data-testid="card-cumulative-stats">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            Cumulative Agentic Burn Statistics
+            Cumulative Agent Burn Statistics
           </CardTitle>
           <CardDescription>
             Total tokens burned and x402 payments made through AI-powered burns
@@ -771,7 +771,7 @@ export default function AgenticBurnPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            How Agentic Burn Works
+            How Agent Burn Works
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">

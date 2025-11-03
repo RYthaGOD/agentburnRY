@@ -1,4 +1,4 @@
-# GigaBrain Agentic Burn System - Solana x402 Hackathon Submission
+# GigaBrain Agent Burn System - Solana x402 Hackathon Submission
 
 ## Overview
 GigaBrain is an autonomous deflationary token burn system built for the Solana x402 Hackathon. It leverages x402 micropayments ($0.005 USDC per premium data feed) to enable AI-powered decision-making for token burn operations. The system features on-chain Anchor/Rust programs, DeepSeek V3 AI analysis, Jito BAM (Bundle Auction Market) for MEV protection, and a no-code configuration dashboard.
@@ -11,14 +11,14 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture (Refactored for x402 Hackathon)
 
 ### Frontend
-Built with React 18+, TypeScript, Vite, Wouter for routing, shadcn/ui (New York variant) on Radix UI, and Tailwind CSS (dark mode). Uses TanStack Query for server state management and React Hook Form with Zod for validation. Features a streamlined dashboard focused on agentic burn configuration and monitoring.
+Built with React 18+, TypeScript, Vite, Wouter for routing, shadcn/ui (New York variant) on Radix UI, and Tailwind CSS (dark mode). Uses TanStack Query for server state management and React Hook Form with Zod for validation. Features a streamlined dashboard focused on agent burn configuration and monitoring.
 
 ### Backend
-Express.js server in TypeScript with ESM module system, RESTful API, centralized error handling, Zod schema validation, storage abstraction layer, and repository pattern. Simplified to support only agentic burn operations.
+Express.js server in TypeScript with ESM module system, RESTful API, centralized error handling, Zod schema validation, storage abstraction layer, and repository pattern. Simplified to support only agent burn operations.
 
 ### Core Hackathon Features
 
-#### 1. Agentic Burn System
+#### 1. Agent Burn System
 - **AI Decision-Making**: DeepSeek V3 analyzes token metrics (market cap, liquidity, sentiment, volume trends) to determine optimal burn percentage
 - **x402 Micropayments**: Premium data feeds (DexScreener, Jupiter, PumpFun) accessed via $0.005 USDC x402 payments
 - **On-Chain Programs**: Anchor/Rust programs on Solana for trustless burn execution
@@ -43,7 +43,7 @@ Express.js server in TypeScript with ESM module system, RESTful API, centralized
 - `transactions`: Burn history (swap, burn, claim operations)
 - `x402Micropayments`: x402 payment tracking (premium data feed access logs)
 - `bamBundles`: Jito BAM bundle tracking (bundleId, status, tipAmount, transactionSignatures)
-- `agenticBurns`: Complete agentic burn execution logs (AI decisions, execution results, profitability metrics)
+- `agenticBurns`: Complete agent burn execution logs (AI decisions, execution results, profitability metrics)
 - `projectSecrets`: Encrypted private keys for automated execution
 
 **Removed Tables** (Legacy trading bot functionality removed for hackathon focus):
@@ -96,10 +96,10 @@ Defense-in-depth security: rate limiting, DDoS protection, security headers (Hel
 **Removed ALL Legacy Trading Bot Code:**
 - Deleted 8 server files: ai-bot-scheduler, grok-analysis, hivemind-strategy, volume-bot, trading-bot, etc.
 - Removed 6 database tables related to trading bot functionality
-- Simplified server/routes.ts from 3,586 lines to ~350 lines (agentic burn endpoints only)
+- Simplified server/routes.ts from 3,586 lines to ~350 lines (agent burn endpoints only)
 - Removed frontend pages: ai-bot.tsx, trading-bot.tsx, volume-bot.tsx
 - Updated App.tsx to remove trading bot routes
-- Focused exclusively on x402 agentic burn hackathon demo
+- Focused exclusively on x402 agent burn hackathon demo
 
 **Hackathon Demo Focus:**
 The system now exclusively demonstrates the x402 agent economy through autonomous burn operations:
