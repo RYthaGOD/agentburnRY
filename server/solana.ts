@@ -4,7 +4,7 @@
 import { TREASURY_WALLET_ADDRESS, SOLANA_INCINERATOR_ADDRESS } from "@shared/config";
 import { PublicKey } from "@solana/web3.js";
 
-const SOLANA_RPC_ENDPOINT = "https://api.mainnet-beta.solana.com";
+const SOLANA_RPC_ENDPOINT = "https://api.devnet.solana.com";
 
 interface SolanaTransaction {
   signature: string;

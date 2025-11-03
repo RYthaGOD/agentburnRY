@@ -22,8 +22,8 @@ import {
 import bs58 from "bs58";
 import nacl from "tweetnacl";
 
-// Solana RPC endpoint
-const SOLANA_RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "https://api.mainnet-beta.solana.com";
+// Solana RPC endpoint - using devnet for hackathon demo
+const SOLANA_RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "https://api.devnet.solana.com";
 const connection = new Connection(SOLANA_RPC_ENDPOINT, "confirmed");
 
 /**

@@ -74,7 +74,7 @@ export async function deductTransactionFee(
   try {
     // Send fee to payment address
     const connection = new Connection(
-      process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
+      process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com"
     );
 
     const transaction = new Transaction().add(
@@ -146,7 +146,7 @@ export async function deductPlatformFee(
   try {
     // Send fee to treasury address
     const connection = new Connection(
-      process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
+      process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com"
     );
 
     const transaction = new Transaction().add(

@@ -51,12 +51,10 @@ export default function AgenticBurnPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tokenMint: tokenMint,
-          burnAmountSOL: parseFloat(burnAmount),
-          criteria: {
-            confidenceThreshold,
-            maxBurnPercentage,
-            requirePositiveSentiment,
-          },
+          buyAmountSOL: parseFloat(burnAmount),
+          confidenceThreshold,
+          maxBurnPercentage,
+          requirePositiveSentiment,
         }),
       });
       return response.json();

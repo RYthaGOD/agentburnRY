@@ -5,7 +5,7 @@ import { db } from "./db";
 import { bamBundles, type InsertBamBundle } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
-const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 const connection = new Connection(RPC_ENDPOINT, "confirmed");
 
 // Jito Block Engine URLs (regional endpoints for lower latency)

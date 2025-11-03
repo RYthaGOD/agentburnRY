@@ -6,7 +6,7 @@ import { Connection, VersionedTransaction, Keypair } from "@solana/web3.js";
 import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token";
 
 const PUMPFUN_API_URL = "https://pumpportal.fun/api/trade-local";
-const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
 
 interface ClaimCreatorFeeRequest {
   publicKey: string; // Creator's Solana wallet address

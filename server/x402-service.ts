@@ -8,9 +8,9 @@ import { eq } from "drizzle-orm";
 export const NETWORK = (process.env.NODE_ENV === "production" ? "solana-mainnet" : "solana-devnet") as "solana-mainnet" | "solana-devnet";
 
 // RPC Endpoints
-const RPC_ENDPOINT_MAINNET = "https://api.mainnet-beta.solana.com";
 const RPC_ENDPOINT_DEVNET = "https://api.devnet.solana.com";
-const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || (NETWORK === "solana-mainnet" ? RPC_ENDPOINT_MAINNET : RPC_ENDPOINT_DEVNET);
+const RPC_ENDPOINT_DEVNET = "https://api.devnet.solana.com";
+const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || (NETWORK === "solana-mainnet" ? RPC_ENDPOINT_DEVNET : RPC_ENDPOINT_DEVNET);
 const connection = new Connection(RPC_ENDPOINT, "confirmed");
 
 // USDC Mint Addresses

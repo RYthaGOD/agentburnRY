@@ -468,7 +468,7 @@ export async function getTokenDecimals(mintAddress: string): Promise<number> {
     const { getMint } = await import("@solana/spl-token");
     
     const connection = new Connection(
-      process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com"
+      process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com"
     );
     
     const mintPubkey = new PublicKey(mintAddress);
