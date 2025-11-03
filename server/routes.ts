@@ -203,9 +203,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Get demo wallet private key from environment
+      const demoPrivateKey = process.env.DEMO_WALLET_PRIVATE_KEY;
+      if (!demoPrivateKey) {
+        return res.status(500).json({ 
+          message: "DEMO_WALLET_PRIVATE_KEY not configured in environment" 
+        });
+      }
+
       const { demoAgenticBurn } = await import("./agentic-burn-service");
 
       const result = await demoAgenticBurn(
+        demoPrivateKey,
         tokenMint,
         parseFloat(buyAmountSOL),
         {
