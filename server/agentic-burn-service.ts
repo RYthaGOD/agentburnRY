@@ -4,10 +4,12 @@ import { x402Service, X402PaymentService } from "./x402-service";
 import { bamService } from "./jito-bam-service";
 import { buyTokenWithJupiter, getTokenDecimals } from "./jupiter";
 import { getConnection, loadKeypairFromPrivateKey } from "./solana-sdk";
+import { TokenOracleMetrics, formatOracleDataForAI } from "./switchboard-oracle-service";
 import bs58 from "bs58";
 
 /**
  * DeepSeek AI decision-making for burn execution
+ * Enhanced with Switchboard oracle data for verifiable on-chain metrics
  */
 async function analyzeWithDeepSeek(
   tokenMint: string,
@@ -16,9 +18,21 @@ async function analyzeWithDeepSeek(
     confidenceThreshold: number;
     maxBurnPercentage: number;
     requirePositiveSentiment: boolean;
-  }
+  },
+  oracleMetrics?: TokenOracleMetrics
 ): Promise<{ approved: boolean; reasoning: string; confidence: number }> {
   try {
+    // Build AI prompt with optional oracle data
+    let userPrompt = `Analyze this burn request:\nToken Mint: ${tokenMint}\nBuy Amount: ${buyAmountSOL} SOL\n`;
+    
+    // If oracle data is available, include it in the prompt
+    if (oracleMetrics) {
+      userPrompt += formatOracleDataForAI(oracleMetrics);
+      userPrompt += `\nConsider the oracle data in your analysis. Higher liquidity and volume suggest lower slippage risk.`;
+    }
+    
+    userPrompt += `\n\nShould this burn be executed? Provide your confidence level (0-100) and reasoning.`;
+    
     const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -35,15 +49,20 @@ async function analyzeWithDeepSeek(
 Criteria:
 - Minimum confidence threshold: ${criteriaConfig.confidenceThreshold}%
 - Maximum burn as % of supply: ${criteriaConfig.maxBurnPercentage}%
-- Require positive sentiment: ${criteriaConfig.requirePositiveSentiment}`
+- Require positive sentiment: ${criteriaConfig.requirePositiveSentiment}
+
+When oracle data is provided, use it to assess:
+- Liquidity risk (low liquidity = higher slippage = lower confidence)
+- Trading volume (higher volume = more active market = higher confidence)
+- SOL price volatility (for accurate burn value calculation)`
           },
           {
             role: "user",
-            content: `Analyze this burn request:\nToken Mint: ${tokenMint}\nBuy Amount: ${buyAmountSOL} SOL\n\nShould this burn be executed? Provide your confidence level (0-100) and reasoning.`
+            content: userPrompt
           }
         ],
         temperature: 0.7,
-        max_tokens: 200,
+        max_tokens: 300,
       }),
     });
 
@@ -395,9 +414,10 @@ export async function demoAgenticBurn(
   burnAmountSOL: number,
   criteria?: AgenticBurnCriteria
 ): Promise<EnhancedAgenticBurnResult> {
-  console.log("\n🎮 DEMO MODE: Agentic Burn with x402 + BAM");
-  console.log("This demonstrates the full hackathon integration:\n");
-  console.log("1. DeepSeek AI analyzes burn request");
+  console.log("\n🎮 DEMO MODE: Agentic Burn with Switchboard Oracle + x402 + BAM");
+  console.log("This demonstrates the complete x402 agent economy:\n");
+  console.log("0. AI pays x402 for Switchboard oracle data (premium feeds)");
+  console.log("1. DeepSeek AI analyzes burn with verifiable on-chain metrics");
   console.log("2. GigaBrain AI pays BurnBot for service (x402 micropayment)");
   console.log("3. BurnBot executes atomic trade+burn (Jito BAM)");
   console.log("4. MEV protection ensures guaranteed execution\n");
@@ -434,14 +454,27 @@ export async function demoAgenticBurn(
   
   try {
     // =========================================================================
-    // STEP 1: DeepSeek AI DECISION
+    // STEP 0: FETCH ORACLE DATA (x402 Payment #1)
+    // =========================================================================
+    console.log("\n🔮 [Step 0/5] Fetching Switchboard Oracle Data...");
+    console.log("💰 AI Agent pays x402 for premium data feeds ($0.005 USDC per feed)");
+    
+    const { getTokenOracleMetrics } = await import("./switchboard-oracle-service");
+    const oracleMetrics = await getTokenOracleMetrics(targetTokenMint);
+    
+    console.log(`✅ Oracle data fetched successfully`);
+    console.log(`   Total x402 cost: $${oracleMetrics.totalX402Paid.toFixed(3)} USDC`);
+    
+    // =========================================================================
+    // STEP 1: DeepSeek AI DECISION (Enhanced with Oracle Data)
     // =========================================================================
     const step1Start = Date.now();
-    console.log("\n🧠 [Step 1/4] DeepSeek AI Analysis...");
+    console.log("\n🧠 [Step 1/5] DeepSeek AI Analysis (with oracle data)...");
     
     await db.update(agenticBurns).set({ currentStep: 1 }).where(eq(agenticBurns.id, burnHistoryId));
     
-    const aiDecision = await analyzeWithDeepSeek(targetTokenMint, burnAmountSOL, criteriaConfig);
+    // Pass oracle metrics to DeepSeek for enhanced analysis
+    const aiDecision = await analyzeWithDeepSeek(targetTokenMint, burnAmountSOL, criteriaConfig, oracleMetrics);
     const step1Duration = Date.now() - step1Start;
     
     console.log(`✅ AI Decision: ${aiDecision.approved ? "APPROVED" : "REJECTED"}`);
@@ -478,10 +511,10 @@ export async function demoAgenticBurn(
     }
     
     // =========================================================================
-    // STEP 2: x402 MICROPAYMENT
+    // STEP 2: x402 MICROPAYMENT (for Burn Service)
     // =========================================================================
     const step2Start = Date.now();
-    console.log("\n📱 [Step 2/4] x402 Micropayment...");
+    console.log("\n📱 [Step 2/5] x402 Micropayment (Burn Service Fee)...");
     
     await db.update(agenticBurns).set({ currentStep: 2 }).where(eq(agenticBurns.id, burnHistoryId));
     
@@ -526,7 +559,7 @@ export async function demoAgenticBurn(
     // STEP 3: JUPITER SWAP (DEMO MODE)
     // =========================================================================
     const step3Start = Date.now();
-    console.log("\n🔄 [Step 3/4] Jupiter Swap (DEMO MODE)...");
+    console.log("\n🔄 [Step 3/5] Jupiter Swap (DEMO MODE)...");
     
     await db.update(agenticBurns).set({ currentStep: 3 }).where(eq(agenticBurns.id, burnHistoryId));
     
@@ -543,7 +576,7 @@ export async function demoAgenticBurn(
     // STEP 4: JITO BAM BUNDLE (DEMO MODE)
     // =========================================================================
     const step4Start = Date.now();
-    console.log("\n⚡ [Step 4/4] Jito BAM Bundle (DEMO MODE)...");
+    console.log("\n⚡ [Step 4/5] Jito BAM Bundle (DEMO MODE)...");
     
     await db.update(agenticBurns).set({ currentStep: 4 }).where(eq(agenticBurns.id, burnHistoryId));
     
