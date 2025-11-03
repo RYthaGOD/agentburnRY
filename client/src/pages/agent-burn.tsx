@@ -93,10 +93,10 @@ export default function AgentBurnPage() {
       <div className="space-y-4">
         <div className="space-y-2">
           <h1 className="text-4xl font-bold tracking-tight" data-testid="text-page-title">
-            Agent Buy Agentic Buy & Burn Burn
+            Agent Burn
           </h1>
           <p className="text-muted-foreground" data-testid="text-page-description">
-            AI-powered token burns with x402 micropayments and Jito BAM atomic execution
+            AI-powered token burns with Switchboard Oracle, x402 micropayments, and Jito BAM atomic execution
           </p>
         </div>
 
@@ -105,48 +105,58 @@ export default function AgentBurnPage() {
           <CardHeader>
             <CardTitle className="text-lg">How It Works - Complete Workflow</CardTitle>
             <CardDescription>
-              4-step process combining AI, micropayments, and atomic execution
+              5-step process: Oracle data → AI analysis → x402 payment → Swap → Atomic burn
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-5">
+              <div className="space-y-2 p-3 rounded-lg bg-primary/10 border border-primary/30">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-primary" />
+                  <p className="text-sm font-semibold">Step 0: Oracle</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Switchboard fetches SOL price, liquidity, volume via x402 ($0.005)
+                </p>
+              </div>
+
               <div className="space-y-2 p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2">
                   <Brain className="w-5 h-5 text-primary" />
-                  <p className="text-sm font-semibold">DeepSeek AI</p>
+                  <p className="text-sm font-semibold">Step 1: AI</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  AI agent analyzes and approves the burn request
+                  DeepSeek analyzes oracle data and approves burn
                 </p>
               </div>
 
               <div className="space-y-2 p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-primary" />
-                  <p className="text-sm font-semibold">x402 Payment</p>
+                  <p className="text-sm font-semibold">Step 2: x402</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  GigaBrain pays BurnBot via HTTP 402 micropayment
+                  GigaBrain pays BurnBot $0.005 for burn service
                 </p>
               </div>
 
               <div className="space-y-2 p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2">
                   <ArrowLeftRight className="w-5 h-5 text-primary" />
-                  <p className="text-sm font-semibold">Jupiter Swap</p>
+                  <p className="text-sm font-semibold">Step 3: Swap</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Buy tokens using Jupiter aggregator
+                  Jupiter aggregator swaps SOL for tokens
                 </p>
               </div>
 
               <div className="space-y-2 p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2">
                   <Shield className="w-5 h-5 text-primary" />
-                  <p className="text-sm font-semibold">Jito BAM</p>
+                  <p className="text-sm font-semibold">Step 4: Burn</p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Atomic burn bundle with MEV protection
+                  Jito BAM bundles swap+burn atomically
                 </p>
               </div>
             </div>
@@ -285,12 +295,33 @@ export default function AgentBurnPage() {
                 
                 {testResult.success && testResult.data ? (
                   <div className="space-y-3">
+                    {/* Switchboard Oracle Section */}
+                    {testResult.data.oracleData && (
+                      <div className="space-y-1 border-l-2 border-primary pl-3">
+                        <div className="flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-primary" />
+                          <p className="text-sm font-semibold text-primary">Step 0: Switchboard Oracle Data</p>
+                        </div>
+                        <p className="text-xs">SOL Price: ${testResult.data.oracleData.solPriceUSD?.toFixed(2) || 'N/A'}</p>
+                        {testResult.data.oracleData.tokenLiquidityUSD !== undefined && (
+                          <p className="text-xs">Token Liquidity: ${testResult.data.oracleData.tokenLiquidityUSD.toLocaleString()}</p>
+                        )}
+                        {testResult.data.oracleData.token24hVolumeUSD !== undefined && (
+                          <p className="text-xs">24h Volume: ${testResult.data.oracleData.token24hVolumeUSD.toLocaleString()}</p>
+                        )}
+                        <p className="text-xs font-medium text-primary">x402 Cost: $0.005 USDC</p>
+                        {testResult.data.step0DurationMs && (
+                          <p className="text-xs text-muted-foreground">⏱️ {testResult.data.step0DurationMs}ms</p>
+                        )}
+                      </div>
+                    )}
+
                     {/* AI Decision Section */}
                     {testResult.data.aiConfidence !== undefined && (
                       <div className="space-y-1 border-l-2 border-blue-500 pl-3">
                         <div className="flex items-center gap-2">
                           <Brain className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">DeepSeek AI Decision</p>
+                          <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Step 1: DeepSeek AI Decision</p>
                         </div>
                         <p className="text-xs">Confidence: {testResult.data.aiConfidence}%</p>
                         {testResult.data.aiReasoning && (
@@ -303,10 +334,10 @@ export default function AgentBurnPage() {
                     )}
 
                     {/* x402 Payment Section */}
-                    <div className="space-y-1 border-l-2 border-primary pl-3">
+                    <div className="space-y-1 border-l-2 border-green-500 pl-3">
                       <div className="flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-primary" />
-                        <p className="text-sm font-semibold text-primary">x402 Micropayment</p>
+                        <CreditCard className="w-4 h-4 text-green-600 dark:text-green-400" />
+                        <p className="text-sm font-semibold text-green-600 dark:text-green-400">Step 2: x402 Burn Service Payment</p>
                       </div>
                       {testResult.data.paymentId && (
                         <p className="text-xs">Payment ID: {testResult.data.paymentId.substring(0, 32)}...</p>
@@ -318,7 +349,7 @@ export default function AgentBurnPage() {
                             href={`https://solscan.io/tx/${testResult.data.paymentSignature}?cluster=devnet`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-primary hover:text-primary/80"
+                            className="text-green-600 dark:text-green-400 hover:opacity-80"
                             data-testid="link-payment-tx"
                           >
                             <ExternalLink className="w-3 h-3" />
@@ -335,10 +366,10 @@ export default function AgentBurnPage() {
 
                     {/* Jupiter Swap Section */}
                     {testResult.data.step3DurationMs && (
-                      <div className="space-y-1 border-l-2 border-green-500 pl-3">
+                      <div className="space-y-1 border-l-2 border-orange-500 pl-3">
                         <div className="flex items-center gap-2">
-                          <ArrowLeftRight className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          <p className="text-sm font-semibold text-green-600 dark:text-green-400">Jupiter Swap (Buy)</p>
+                          <ArrowLeftRight className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                          <p className="text-sm font-semibold text-orange-600 dark:text-orange-400">Step 3: Jupiter Swap</p>
                         </div>
                         {testResult.data.buyTxSignature && (
                           <div className="flex items-center gap-1">
@@ -347,7 +378,7 @@ export default function AgentBurnPage() {
                               href={`https://solscan.io/tx/${testResult.data.buyTxSignature}?cluster=devnet`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-green-600 dark:text-green-400 hover:opacity-80"
+                              className="text-orange-600 dark:text-orange-400 hover:opacity-80"
                               data-testid="link-buy-tx"
                             >
                               <ExternalLink className="w-3 h-3" />
@@ -362,7 +393,7 @@ export default function AgentBurnPage() {
                     <div className="space-y-1 border-l-2 border-purple-500 pl-3">
                       <div className="flex items-center gap-2">
                         <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">Jito BAM Bundle</p>
+                        <p className="text-sm font-semibold text-purple-600 dark:text-purple-400">Step 4: Jito BAM Bundle</p>
                       </div>
                       {testResult.data.bundleId && (
                         <p className="text-xs">Bundle ID: {testResult.data.bundleId.substring(0, 32)}...</p>
