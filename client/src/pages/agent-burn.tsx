@@ -303,10 +303,10 @@ export default function AgentBurnPage() {
                           <p className="text-sm font-semibold text-primary">Step 0: Switchboard Oracle Data</p>
                         </div>
                         <p className="text-xs">SOL Price: ${testResult.data.oracleData.solPriceUSD?.toFixed(2) || 'N/A'}</p>
-                        {testResult.data.oracleData.tokenLiquidityUSD !== undefined && (
+                        {testResult.data.oracleData.tokenLiquidityUSD !== undefined && testResult.data.oracleData.tokenLiquidityUSD !== null && (
                           <p className="text-xs">Token Liquidity: ${testResult.data.oracleData.tokenLiquidityUSD.toLocaleString()}</p>
                         )}
-                        {testResult.data.oracleData.token24hVolumeUSD !== undefined && (
+                        {testResult.data.oracleData.token24hVolumeUSD !== undefined && testResult.data.oracleData.token24hVolumeUSD !== null && !isNaN(testResult.data.oracleData.token24hVolumeUSD) && (
                           <p className="text-xs">24h Volume: ${testResult.data.oracleData.token24hVolumeUSD.toLocaleString()}</p>
                         )}
                         <p className="text-xs font-medium text-primary">x402 Cost: $0.005 USDC</p>
