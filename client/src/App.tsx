@@ -29,6 +29,7 @@ function Router() {
       <Route path="/analyze" component={TokenAnalyzer} />
       <Route path="/learn" component={HowItWorks} />
       <Route path="/whitepaper" component={Whitepaper} />
+      <Route path="/agent-burn" component={AgentBurn} />
       <Route path="/dashboard">
         <DashboardLayout>
           <Dashboard />
