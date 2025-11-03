@@ -124,9 +124,9 @@ class BuybackScheduler {
           console.log(`Project ${project.name} - owner wallet is whitelisted, bypassing payment check`);
         }
 
-        // For agenticBurn-focused system, execute buyback if enabled
-        if (project.agenticBurnEnabled) {
-          console.log(`Executing agentic burn for project: ${project.name}`);
+        // For agentBurn-focused system, execute buyback if enabled
+        if (project.agentBurnEnabled) {
+          console.log(`Executing agent burn for project: ${project.name}`);
           await this.executeBuyback(project.id);
         }
       }

@@ -106,7 +106,7 @@ export async function triggerGracefulShutdown() {
 
 (async () => {
   try {
-    console.log("🚀 Starting GigaBrain Agentic Burn System...");
+    console.log("🚀 Starting GigaBrain Agent Burn System...");
     console.log("Environment:", process.env.NODE_ENV || "development");
     console.log("Port:", process.env.PORT || "5000");
     
@@ -119,7 +119,7 @@ export async function triggerGracefulShutdown() {
 
     // Initialize scheduler for automated burns
     await scheduler.initialize();
-    console.log("✅ Agentic burn scheduler initialized");
+    console.log("✅ Agent burn scheduler initialized");
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

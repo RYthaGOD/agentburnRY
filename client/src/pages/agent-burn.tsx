@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useState, useEffect } from "react";
 
-export default function AgenticBurnPage() {
+export default function AgentBurnPage() {
   // Mock wallet for demo - in production this would come from user's connected wallet
   const demoWallet = "HYsXrquHabqWWdh35aGTQ4xWGV4eA4kUJ7PZZj9RCTVV";
   const { toast } = useToast();
@@ -25,8 +25,8 @@ export default function AgenticBurnPage() {
   const [maxBurnPercentage, setMaxBurnPercentage] = useState(5);
   const [requirePositiveSentiment, setRequirePositiveSentiment] = useState(true);
 
-  // Fetch cumulative agentic burn stats
-  const { data: agenticStats, isLoading: statsLoading, refetch: refetchStats } = useQuery<any>({
+  // Fetch cumulative agent burn stats
+  const { data: agentStats, isLoading: statsLoading, refetch: refetchStats } = useQuery<any>({
     queryKey: [`/api/agent-burn/stats/${demoWallet}`],
     enabled: !!demoWallet,
   });
@@ -43,7 +43,7 @@ export default function AgenticBurnPage() {
     enabled: !!demoWallet,
   });
 
-  // Test agentic burn mutation
+  // Test agent burn mutation
   const testBurnMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/agent-burn/demo", {
@@ -81,7 +81,7 @@ export default function AgenticBurnPage() {
     onError: (error: any) => {
       toast({
         title: "❌ Error",
-        description: error.message || "Failed to execute agentic burn",
+        description: error.message || "Failed to execute agent burn",
         variant: "destructive",
       });
     },
@@ -93,7 +93,7 @@ export default function AgenticBurnPage() {
       <div className="space-y-4">
         <div className="space-y-2">
           <h1 className="text-4xl font-bold tracking-tight" data-testid="text-page-title">
-            Agentic Buy & Burn
+            Agent Buy Agentic Buy & Burn Burn
           </h1>
           <p className="text-muted-foreground" data-testid="text-page-description">
             AI-powered token burns with x402 micropayments and Jito BAM atomic execution
@@ -426,60 +426,60 @@ export default function AgenticBurnPage() {
         <CardContent>
           {statsLoading ? (
             <div className="text-center text-muted-foreground">Loading stats...</div>
-          ) : agenticStats ? (
+          ) : agentStats ? (
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2 p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">Total Burns</p>
-                <p className="text-3xl font-bold">{agenticStats.totalBurns || 0}</p>
+                <p className="text-3xl font-bold">{agentStats.totalBurns || 0}</p>
                 <p className="text-xs text-green-600">
-                  {agenticStats.completedBurns || 0} completed
+                  {agentStats.completedBurns || 0} completed
                 </p>
               </div>
               <div className="space-y-2 p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">Tokens Burned</p>
-                <p className="text-3xl font-bold">{(agenticStats.totalTokensBurned || 0).toLocaleString()}</p>
+                <p className="text-3xl font-bold">{(agentStats.totalTokensBurned || 0).toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">
                   Total destroyed
                 </p>
               </div>
               <div className="space-y-2 p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">SOL Spent</p>
-                <p className="text-3xl font-bold">{(agenticStats.totalSOLSpent || 0).toFixed(4)}</p>
+                <p className="text-3xl font-bold">{(agentStats.totalSOLSpent || 0).toFixed(4)}</p>
                 <p className="text-xs text-muted-foreground">
                   Total buy amount
                 </p>
               </div>
               <div className="space-y-2 p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">x402 Payments</p>
-                <p className="text-3xl font-bold">${(agenticStats.totalPaidUSDC || 0).toFixed(3)}</p>
+                <p className="text-3xl font-bold">${(agentStats.totalPaidUSDC || 0).toFixed(3)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {agenticStats.totalX402Payments || 0} micropayments
+                  {agentStats.totalX402Payments || 0} micropayments
                 </p>
               </div>
               <div className="space-y-2 p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">Avg AI Confidence</p>
-                <p className="text-3xl font-bold">{agenticStats.avgAIConfidence || 0}%</p>
+                <p className="text-3xl font-bold">{agentStats.avgAIConfidence || 0}%</p>
                 <p className="text-xs text-muted-foreground">
                   Burn approval confidence
                 </p>
               </div>
               <div className="space-y-2 p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">Avg Duration</p>
-                <p className="text-3xl font-bold">{(agenticStats.avgDurationMs || 0).toLocaleString()}ms</p>
+                <p className="text-3xl font-bold">{(agentStats.avgDurationMs || 0).toLocaleString()}ms</p>
                 <p className="text-xs text-muted-foreground">
                   End-to-end execution
                 </p>
               </div>
               <div className="space-y-2 p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">Success Rate</p>
-                <p className="text-3xl font-bold">{(agenticStats.successRate || 0).toFixed(1)}%</p>
+                <p className="text-3xl font-bold">{(agentStats.successRate || 0).toFixed(1)}%</p>
                 <p className="text-xs text-muted-foreground">
                   Burn completion rate
                 </p>
               </div>
               <div className="space-y-2 p-4 rounded-lg bg-muted/50">
                 <p className="text-sm text-muted-foreground">Failed Burns</p>
-                <p className="text-3xl font-bold text-destructive">{agenticStats.failedBurns || 0}</p>
+                <p className="text-3xl font-bold text-destructive">{agentStats.failedBurns || 0}</p>
                 <p className="text-xs text-muted-foreground">
                   Rejected by AI or errors
                 </p>

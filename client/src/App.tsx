@@ -17,7 +17,7 @@ import Whitepaper from "@/pages/whitepaper";
 import PublicStats from "@/pages/public-stats";
 import TokenAnalyzer from "@/pages/token-analyzer";
 import HowItWorks from "@/pages/how-it-works";
-import AgenticBurn from "@/pages/agent-burn";
+import AgentBurn from "@/pages/agent-burn";
 import DashboardLayout from "@/pages/dashboard-layout";
 import NotFound from "@/pages/not-found";
 
@@ -61,7 +61,7 @@ function Router() {
       </Route>
       <Route path="/dashboard/agent-burn">
         <DashboardLayout>
-          <AgenticBurn />
+          <AgentBurn />
         </DashboardLayout>
       </Route>
       <Route component={NotFound} />
