@@ -9,8 +9,7 @@ export const NETWORK = (process.env.NODE_ENV === "production" ? "solana-mainnet"
 
 // RPC Endpoints
 const RPC_ENDPOINT_DEVNET = "https://api.devnet.solana.com";
-const RPC_ENDPOINT_DEVNET = "https://api.devnet.solana.com";
-const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || (NETWORK === "solana-mainnet" ? RPC_ENDPOINT_DEVNET : RPC_ENDPOINT_DEVNET);
+const RPC_ENDPOINT = process.env.SOLANA_RPC_URL || RPC_ENDPOINT_DEVNET;
 const connection = new Connection(RPC_ENDPOINT, "confirmed");
 
 // USDC Mint Addresses
