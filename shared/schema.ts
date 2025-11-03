@@ -14,8 +14,8 @@ export const projects = pgTable("projects", {
   burnAddress: text("burn_address").notNull(),
   ownerWalletAddress: text("owner_wallet_address").notNull(),
   
-  // Agentic Burn Configuration
-  agentBurnEnabled: boolean("agentic_burn_enabled").notNull().default(false),
+  // Agent Burn Configuration
+  agentBurnEnabled: boolean("agent_burn_enabled").notNull().default(false),
   aiConfidenceThreshold: integer("ai_confidence_threshold").notNull().default(70), // 0-100
   maxBurnPercentage: decimal("max_burn_percentage", { precision: 5, scale: 2 }).notNull().default("5"), // Max % of supply per burn
   requirePositiveSentiment: boolean("require_positive_sentiment").notNull().default(true),

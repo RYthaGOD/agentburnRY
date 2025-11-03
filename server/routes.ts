@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Health check
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", service: "GigaBrain Agentic Burn System" });
+    res.json({ status: "ok", service: "GigaBrain Agent Burn System" });
   });
 
   // ===================================
@@ -136,7 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AGENTIC BURN ROUTES (Core Hackathon Feature)
   // ================================================
   
-  // Execute agentic burn with DeepSeek AI decision-making
+  // Execute agent burn with DeepSeek AI decision-making
   app.post("/api/agent-burn/execute", async (req, res) => {
     try {
       const {
@@ -170,23 +170,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!result.success) {
         return res.status(400).json({
-          message: result.error || "Agentic burn failed",
+          message: result.error || "Agent burn failed",
           step: result.step,
         });
       }
 
       res.json({
         success: true,
-        message: "Agentic burn executed successfully",
+        message: "Agent burn executed successfully",
         data: result,
       });
     } catch (error: any) {
-      console.error("Agentic burn error:", error);
+      console.error("Agent burn error:", error);
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Demo agentic burn endpoint (simplified for testing)
+  // Demo agent burn endpoint (simplified for testing)
   app.post("/api/agent-burn/demo", async (req, res) => {
     try {
       const {
@@ -226,16 +226,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        message: "Demo agentic burn completed",
+        message: "Demo agent burn completed",
         data: result,
       });
     } catch (error: any) {
-      console.error("Demo agentic burn error:", error);
+      console.error("Demo agent burn error:", error);
       res.status(500).json({ message: error.message });
     }
   });
 
-  // Get agentic burn stats for a wallet
+  // Get agent burn stats for a wallet
   app.get("/api/agent-burn/stats/:walletAddress", async (req, res) => {
     try {
       const { walletAddress } = req.params;
@@ -270,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recentBurns: burns.slice(-5).reverse(), // Last 5 burns
       });
     } catch (error: any) {
-      console.error("Error fetching agentic burn stats:", error);
+      console.error("Error fetching agent burn stats:", error);
       res.status(500).json({ message: error.message });
     }
   });
