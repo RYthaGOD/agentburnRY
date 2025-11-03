@@ -152,8 +152,11 @@ async function simulateOracleFeed(feed: IOracleFeed): Promise<number> {
           throw new Error("HTTP task missing URL");
         }
         
+        // Convert OracleJob method enum to string
+        const method = task.httpTask.method === OracleJob.HttpTask.Method.METHOD_POST ? "POST" : "GET";
+        
         const response = await fetch(url, {
-          method: task.httpTask.method || "GET",
+          method,
           signal: AbortSignal.timeout(10000),
         });
         if (!response.ok) {
