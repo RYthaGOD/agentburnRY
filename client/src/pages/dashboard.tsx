@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Flame, Clock, Wallet as WalletIcon, Activity, TrendingUp, ArrowRight, Crown, RefreshCw, Settings, FileText, BarChart3, Brain, Zap, ExternalLink } from "lucide-react";
+import { Flame, Clock, Wallet as WalletIcon, Activity, TrendingUp, ArrowRight, Crown, RefreshCw, Settings, FileText, BarChart3, Brain, Zap, ExternalLink, DollarSign } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Project, Transaction } from "@shared/schema";
@@ -9,6 +9,18 @@ import { formatSchedule } from "@/lib/schedule-utils";
 import { WHITELISTED_WALLETS } from "@shared/config";
 import { useWallet } from '@solana/wallet-adapter-react';
 import { queryClient } from "@/lib/queryClient";
+
+interface AgentBurnStats {
+  totalBurns: number;
+  completedBurns: number;
+  failedBurns: number;
+  successRate: number;
+  totalTokensBurned: number;
+  totalSOLSpent: number;
+  avgAIConfidence: number;
+  totalX402Fees: number;
+  avgExecutionTimeMs: number;
+}
 
 export default function Dashboard() {
   const { publicKey } = useWallet();
@@ -29,37 +41,48 @@ export default function Dashboard() {
     queryKey: ["/api/transactions/recent"],
   });
 
+  const { data: agentBurnStats } = useQuery<AgentBurnStats>({
+    queryKey: ["/api/agent-burn/stats", walletAddress],
+    queryFn: async () => {
+      if (!walletAddress) return null;
+      const response = await fetch(`/api/agent-burn/stats/${walletAddress}`);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      return response.json();
+    },
+    enabled: !!walletAddress,
+  });
+
   const activeProjects = projects?.filter(p => p.isActive) || [];
   const allProjects = projects || [];
 
   const stats = [
     {
-      title: "Active Projects",
-      value: activeProjects.length,
+      title: "Agent Burns",
+      value: agentBurnStats?.totalBurns || 0,
       icon: Flame,
-      description: "Currently running",
+      description: `${agentBurnStats?.successRate?.toFixed(0) || 0}% success rate`,
       color: "text-primary",
     },
     {
-      title: "Next Burn",
-      value: "2h 34m",
-      icon: Clock,
-      description: "Scheduled execution",
-      color: "text-accent",
+      title: "x402 Payments",
+      value: `$${(agentBurnStats?.totalX402Fees || 0).toFixed(3)}`,
+      icon: DollarSign,
+      description: "Total micropayments spent",
+      color: "text-green-500",
     },
     {
-      title: "Total Burned",
-      value: "1.2M",
+      title: "AI Confidence",
+      value: `${agentBurnStats?.avgAIConfidence || 0}%`,
+      icon: Brain,
+      description: "Average AI decision score",
+      color: "text-purple-500",
+    },
+    {
+      title: "Tokens Burned",
+      value: agentBurnStats?.totalTokensBurned ? (agentBurnStats.totalTokensBurned / 1000000).toFixed(2) + "M" : "0",
       icon: TrendingUp,
-      description: "Tokens burned to date",
+      description: `${agentBurnStats?.totalSOLSpent?.toFixed(2) || 0} SOL spent`,
       color: "text-chart-5",
-    },
-    {
-      title: "Treasury Balance",
-      value: "5.8 SOL",
-      icon: WalletIcon,
-      description: "Available for buybacks",
-      color: "text-chart-2",
     },
   ];
 
@@ -104,31 +127,31 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* DeepSeek AI Banner */}
-      <Card className="border-2 border-blue-500/30 bg-gradient-to-br from-blue-500/10 to-background">
+      {/* x402 Agent Economy Banner */}
+      <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-background">
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
-            <div className="h-12 w-12 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-              <Brain className="h-6 w-6 text-blue-500" />
+            <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <DollarSign className="h-6 w-6 text-primary" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-bold text-blue-500 mb-2">Powered by DeepSeek V3 - Advanced AI Trading</h3>
+              <h3 className="text-lg font-bold text-primary mb-2">x402 Agent Economy - Autonomous AI Payments</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div>
+                  <p className="font-semibold mb-1">Switchboard Oracle</p>
+                  <p className="text-muted-foreground">$0.005 USDC per premium data feed</p>
+                </div>
+                <div>
                   <p className="font-semibold mb-1">DeepSeek V3 AI</p>
-                  <p className="text-muted-foreground">World's most advanced open-source AI model</p>
+                  <p className="text-muted-foreground">Autonomous decision-making & analysis</p>
                 </div>
                 <div>
-                  <p className="font-semibold mb-1">Free API Access</p>
-                  <p className="text-muted-foreground">5M tokens monthly, superior reasoning capabilities</p>
-                </div>
-                <div>
-                  <p className="font-semibold mb-1">24/7 Trading</p>
-                  <p className="text-muted-foreground">Continuous market analysis & execution</p>
+                  <p className="font-semibold mb-1">Jito BAM Bundles</p>
+                  <p className="text-muted-foreground">MEV-protected atomic execution</p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground mt-3">
-                DeepSeek V3 delivers institutional-grade AI analysis with cutting-edge reasoning. Scans 100+ tokens every 5 minutes for maximum opportunities.
+                GigaBrain demonstrates the x402 agent economy: AI agents autonomously pay for Switchboard oracle data, analyze burns with DeepSeek V3, and execute via Jito BAM. Built for Solana x402 Hackathon.
               </p>
             </div>
           </div>
@@ -137,10 +160,16 @@ export default function Dashboard() {
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold mb-2" data-testid="heading-dashboard">Dashboard</h1>
-          <p className="text-muted-foreground">Monitor your automated buyback and burn operations</p>
+          <h1 className="text-3xl font-bold mb-2" data-testid="heading-dashboard">Agent Burn Dashboard</h1>
+          <p className="text-muted-foreground">Monitor autonomous x402-powered token burn operations</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Link href="/agent-burn">
+            <Button size="sm" className="gap-2" data-testid="button-agent-burn-demo">
+              <Flame className="h-4 w-4" />
+              Try Agent Burn
+            </Button>
+          </Link>
           <Button variant="outline" size="sm" onClick={handleRefresh} data-testid="button-refresh">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
@@ -149,12 +178,6 @@ export default function Dashboard() {
             <Button variant="outline" size="sm" data-testid="button-how-it-works">
               <FileText className="h-4 w-4 mr-2" />
               How It Works
-            </Button>
-          </Link>
-          <Link href="/stats">
-            <Button variant="outline" size="sm" data-testid="button-stats">
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Live Stats
             </Button>
           </Link>
           <Link href="/dashboard/settings">
@@ -181,35 +204,35 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Quick Actions for GigaBrain AI Bot */}
+      {/* Quick Actions for Agent Burn */}
       <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-background">
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-                <Brain className="h-6 w-6 text-primary" />
+                <Flame className="h-6 w-6 text-primary" />
               </div>
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  GigaBrain AI Trading
-                  <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500">
-                    DeepSeek V3
+                  Agent Burn System
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary">
+                    x402 Demo
                   </Badge>
                 </CardTitle>
-                <CardDescription>Autonomous trading bot powered by advanced AI</CardDescription>
+                <CardDescription>Autonomous AI-powered token burns with Switchboard oracles</CardDescription>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Link href="/dashboard/ai-bot">
-                <Button size="sm" data-testid="button-ai-bot-dashboard">
-                  <Brain className="h-4 w-4 mr-2" />
-                  Open AI Bot
+              <Link href="/agent-burn">
+                <Button size="sm" data-testid="button-agent-burn-main">
+                  <Flame className="h-4 w-4 mr-2" />
+                  Launch Demo
                 </Button>
               </Link>
-              <Link href="/analyze">
-                <Button variant="outline" size="sm" data-testid="button-analyze-token">
-                  <Zap className="h-4 w-4 mr-2" />
-                  Analyze Token
+              <Link href="/learn">
+                <Button variant="outline" size="sm" data-testid="button-learn-more">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Learn More
                 </Button>
               </Link>
             </div>
@@ -218,20 +241,20 @@ export default function Dashboard() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 rounded-lg bg-background/50">
-              <p className="text-sm text-muted-foreground mb-1">AI Model</p>
-              <p className="text-lg font-bold text-blue-500">DeepSeek V3</p>
+              <p className="text-sm text-muted-foreground mb-1">Oracle Data</p>
+              <p className="text-lg font-bold text-green-500">Switchboard</p>
             </div>
             <div className="text-center p-4 rounded-lg bg-background/50">
-              <p className="text-sm text-muted-foreground mb-1">Trading Mode</p>
-              <p className="text-lg font-bold">Tri-Mode</p>
+              <p className="text-sm text-muted-foreground mb-1">x402 Cost</p>
+              <p className="text-lg font-bold text-primary">$0.01</p>
             </div>
             <div className="text-center p-4 rounded-lg bg-background/50">
-              <p className="text-sm text-muted-foreground mb-1">API Cost</p>
-              <p className="text-lg font-bold text-green-500">Free</p>
+              <p className="text-sm text-muted-foreground mb-1">AI Engine</p>
+              <p className="text-lg font-bold text-purple-500">DeepSeek V3</p>
             </div>
             <div className="text-center p-4 rounded-lg bg-background/50">
-              <p className="text-sm text-muted-foreground mb-1">Status</p>
-              <p className="text-lg font-bold text-green-500">Active</p>
+              <p className="text-sm text-muted-foreground mb-1">MEV Protection</p>
+              <p className="text-lg font-bold text-blue-500">Jito BAM</p>
             </div>
           </div>
         </CardContent>

@@ -53,25 +53,25 @@ export default function Landing() {
             </h1>
             
             <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              Autonomous deflationary token burns using <span className="text-primary font-semibold">Switchboard Oracle</span>, <span className="text-primary font-semibold">x402 micropayments</span>, and <span className="text-primary font-semibold">Jito BAM</span>. AI agents pay for premium data feeds and execute trustless burns.
+              Demonstrating the <span className="text-primary font-semibold">x402 agent economy</span>: AI agents autonomously pay for <span className="text-primary font-semibold">Switchboard oracle feeds</span>, analyze token metrics with <span className="text-primary font-semibold">DeepSeek V3</span>, and execute MEV-protected burns via <span className="text-primary font-semibold">Jito BAM bundles</span>. Built on Solana devnet for live hackathon demonstration.
             </p>
 
             {/* Key Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto py-8">
               <div className="text-center p-6 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
-                <Database className="h-8 w-8 text-primary mx-auto mb-2" />
-                <p className="text-3xl font-bold text-primary">$0.005</p>
-                <p className="text-sm text-muted-foreground">x402 Cost Per Oracle Feed</p>
+                <DollarSign className="h-8 w-8 text-primary mx-auto mb-2" />
+                <p className="text-3xl font-bold text-primary">$0.01</p>
+                <p className="text-sm text-muted-foreground">Total x402 Cost (2 Payments)</p>
               </div>
               <div className="text-center p-6 rounded-lg bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20">
-                <Brain className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-green-500">DeepSeek V3</p>
-                <p className="text-sm text-muted-foreground">AI Decision Engine</p>
+                <Database className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-green-500">Switchboard</p>
+                <p className="text-sm text-muted-foreground">Verifiable On-Chain Oracles</p>
               </div>
               <div className="text-center p-6 rounded-lg bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20">
-                <Shield className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-                <p className="text-3xl font-bold text-purple-500">100%</p>
-                <p className="text-sm text-muted-foreground">MEV Protected (Jito BAM)</p>
+                <Lock className="h-8 w-8 text-purple-500 mx-auto mb-2" />
+                <p className="text-3xl font-bold text-purple-500">Secured</p>
+                <p className="text-sm text-muted-foreground">Replay Attack Prevention</p>
               </div>
             </div>
 
@@ -255,7 +255,34 @@ export default function Landing() {
               </CardContent>
             </Card>
 
-            {/* Feature 6: No-Code Dashboard */}
+            {/* Feature 6: Security Infrastructure */}
+            <Card className="hover-elevate">
+              <CardHeader>
+                <Lock className="h-12 w-12 text-red-500 mb-4" />
+                <CardTitle className="text-2xl">Security Infrastructure</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="text-muted-foreground">
+                  Production-grade security following x402 template best practices
+                </p>
+                <ul className="space-y-2 text-sm">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Replay attack prevention (SHA-256 sig hashing)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>x402 payment caps & validation</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5" />
+                    <span>Rate limiting & DDoS protection</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Feature 7: No-Code Dashboard */}
             <Card className="hover-elevate">
               <CardHeader>
                 <Zap className="h-12 w-12 text-yellow-500 mb-4" />
