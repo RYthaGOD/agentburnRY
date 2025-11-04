@@ -43,6 +43,11 @@ export default function AgentBurnPage() {
     enabled: !!demoWallet,
   });
 
+  // Fetch user wallet balance for real burns
+  const { data: walletBalance, isLoading: walletLoading, refetch: refetchWallet } = useQuery<any>({
+    queryKey: ['/api/wallet/balance'],
+  });
+
   // Test agent burn mutation (demo mode)
   const testBurnMutation = useMutation({
     mutationFn: async () => {
@@ -207,6 +212,61 @@ export default function AgentBurnPage() {
           </CardContent>
         </Card>
 
+        {/* Agent Wallet Status Card */}
+        {walletBalance && (
+          <Card className={`border-2 ${walletBalance.ready ? 'bg-green-500/10 border-green-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}`} data-testid="card-wallet-status">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                🤖 Agent Wallet Status
+              </CardTitle>
+              <CardDescription>
+                This wallet autonomously pays for x402 services and executes burns
+                <br />
+                Agent Address: {walletBalance.wallet?.substring(0, 8)}...{walletBalance.wallet?.substring(walletBalance.wallet.length - 6)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">SOL Balance</p>
+                  <p className="text-xl font-bold">{walletBalance.balances?.sol?.toFixed(4) || '0.0000'} SOL</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {walletBalance.balances?.sol > 0.01 ? '✅ Sufficient' : '⚠️ Need 0.01+ SOL'}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">USDC Balance</p>
+                  <p className="text-xl font-bold">${walletBalance.balances?.usdc?.toFixed(4) || '0.0000'}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {walletBalance.balances?.usdc >= 0.01 ? '✅ Sufficient' : '⚠️ Need $0.01+ USDC'}
+                  </p>
+                </div>
+              </div>
+              
+              {!walletBalance.ready && (
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                  <p className="text-sm font-semibold mb-2">⚠️ Wallet needs funding</p>
+                  <p className="text-xs text-muted-foreground mb-2">Get free devnet tokens:</p>
+                  <div className="space-y-1 text-xs">
+                    <p>• SOL: <code className="bg-muted px-1 py-0.5 rounded">solana airdrop 1 {walletBalance.wallet} --url devnet</code></p>
+                    <p>• USDC: Visit <a href="https://spl-token-faucet.com/" target="_blank" className="text-primary underline">spl-token-faucet.com</a> (select devnet)</p>
+                  </div>
+                </div>
+              )}
+              
+              {walletBalance.ready && (
+                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                  <p className="text-sm font-semibold">✅ Agent ready for autonomous operations!</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    The agent will autonomously pay x402 fees ($0.005 USDC per service) and execute burns
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Demo Test Button for Hackathon */}
         <Card className="bg-gradient-to-r from-primary/10 to-purple-500/10 border-primary/20" data-testid="card-demo">
           <CardHeader>
@@ -343,7 +403,7 @@ export default function AgentBurnPage() {
             </div>
             
             <p className="text-xs text-muted-foreground text-center">
-              💡 <strong>Demo Mode</strong>: Mock transactions (free) • <strong>Real Burn</strong>: Actual devnet transactions (~$0.01 USDC + 0.01 SOL fees)
+              💡 <strong>Demo Mode</strong>: Mock transactions (free) • <strong>Real Burn</strong>: Agent autonomously pays x402 fees & executes burn (~$0.01 USDC + 0.01 SOL)
             </p>
 
             {testResult && (

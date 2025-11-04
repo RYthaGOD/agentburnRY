@@ -235,6 +235,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check wallet balance endpoint
+  app.get("/api/wallet/balance", async (req, res) => {
+    try {
+      const userPrivateKey = process.env.USER_WALLET_PRIVATE_KEY;
+      if (!userPrivateKey) {
+        return res.json({ 
+          success: false,
+          error: "USER_WALLET_PRIVATE_KEY not configured" 
+        });
+      }
+
+      const { loadKeypairFromPrivateKey } = await import("./solana-sdk");
+      const { Connection, PublicKey, LAMPORTS_PER_SOL } = await import("@solana/web3.js");
+      const { getAssociatedTokenAddress } = await import("@solana/spl-token");
+
+      const userKeypair = loadKeypairFromPrivateKey(userPrivateKey);
+      const connection = new Connection(process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com");
+      
+      // Get SOL balance
+      const solBalance = await connection.getBalance(userKeypair.publicKey);
+      
+      // Get USDC balance (devnet USDC mint)
+      const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"); // Devnet USDC
+      let usdcBalance = 0;
+      try {
+        const usdcTokenAccount = await getAssociatedTokenAddress(USDC_MINT, userKeypair.publicKey);
+        const usdcAccountInfo = await connection.getTokenAccountBalance(usdcTokenAccount);
+        usdcBalance = parseFloat(usdcAccountInfo.value.uiAmount || "0");
+      } catch (e) {
+        // No USDC account yet
+      }
+
+      return res.json({
+        success: true,
+        wallet: userKeypair.publicKey.toBase58(),
+        balances: {
+          sol: solBalance / LAMPORTS_PER_SOL,
+          usdc: usdcBalance,
+        },
+        ready: solBalance > 10000000 && usdcBalance >= 0.01, // 0.01 SOL + 0.01 USDC minimum
+      });
+    } catch (error: any) {
+      return res.status(500).json({ 
+        success: false,
+        error: error.message 
+      });
+    }
+  });
+
   // Real agent burn endpoint using user's funded devnet wallet
   app.post("/api/agent-burn/real", async (req, res) => {
     try {
