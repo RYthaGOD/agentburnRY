@@ -27,14 +27,45 @@ const SOLANA_RPC_ENDPOINT = process.env.SOLANA_RPC_ENDPOINT || "https://api.devn
 const connection = new Connection(SOLANA_RPC_ENDPOINT, "confirmed");
 
 /**
- * Load a keypair from a base58-encoded private key
+ * Load a keypair from a private key in various formats
+ * Supports: base58 string, JSON array string, hex string, or number array
  */
-export function loadKeypairFromPrivateKey(privateKeyBase58: string): Keypair {
+export function loadKeypairFromPrivateKey(privateKey: string | number[]): Keypair {
   try {
-    const privateKeyBytes = bs58.decode(privateKeyBase58);
-    return Keypair.fromSecretKey(privateKeyBytes);
+    // If it's already an array
+    if (Array.isArray(privateKey)) {
+      return Keypair.fromSecretKey(Uint8Array.from(privateKey));
+    }
+
+    const keyStr = privateKey.trim();
+
+    // Try JSON array format first: "[1,2,3,...]"
+    if (keyStr.startsWith('[')) {
+      const keyArray = JSON.parse(keyStr);
+      if (Array.isArray(keyArray)) {
+        return Keypair.fromSecretKey(Uint8Array.from(keyArray));
+      }
+    }
+
+    // Try base58 format (most common from Phantom/Solflare export)
+    try {
+      const privateKeyBytes = bs58.decode(keyStr);
+      if (privateKeyBytes.length === 64) {
+        return Keypair.fromSecretKey(privateKeyBytes);
+      }
+    } catch (e) {
+      // Not base58, try next format
+    }
+
+    // Try hex format
+    if (keyStr.match(/^[0-9a-fA-F]{128}$/)) {
+      const bytes = Buffer.from(keyStr, 'hex');
+      return Keypair.fromSecretKey(bytes);
+    }
+
+    throw new Error('Unsupported format. Expected: base58 string, JSON array "[1,2,3...]", or 128-char hex string');
   } catch (error) {
-    throw new Error(`Invalid private key format: ${error}`);
+    throw new Error(`Invalid private key format: ${error instanceof Error ? error.message : error}`);
   }
 }
 
