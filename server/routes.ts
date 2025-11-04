@@ -235,6 +235,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Real agent burn endpoint using connected wallet
+  app.post("/api/agent-burn/real", async (req, res) => {
+    try {
+      const {
+        walletAddress,
+        signature,
+        message,
+        tokenMint,
+        buyAmountSOL,
+        confidenceThreshold,
+        maxBurnPercentage,
+        requirePositiveSentiment,
+      } = req.body;
+
+      if (!walletAddress || !signature || !message) {
+        return res.status(400).json({ 
+          message: "Missing required authentication fields: walletAddress, signature, message" 
+        });
+      }
+
+      if (!tokenMint || !buyAmountSOL) {
+        return res.status(400).json({ 
+          message: "Missing required fields: tokenMint, buyAmountSOL" 
+        });
+      }
+
+      // Verify wallet signature for authentication
+      const nacl = await import("tweetnacl");
+      const bs58 = await import("bs58");
+      const { PublicKey } = await import("@solana/web3.js");
+      
+      const publicKey = new PublicKey(walletAddress);
+      const messageBytes = new TextEncoder().encode(message);
+      const signatureBytes = bs58.default.decode(signature);
+      
+      const verified = nacl.default.sign.detached.verify(
+        messageBytes,
+        signatureBytes,
+        publicKey.toBytes()
+      );
+
+      if (!verified) {
+        return res.status(401).json({ 
+          message: "Invalid wallet signature - authentication failed" 
+        });
+      }
+
+      // Check for replay attacks
+      const { usedSignatures } = await import("../shared/schema");
+      const crypto = await import("crypto");
+      const signatureHash = crypto.createHash("sha256").update(signature).digest("hex");
+      
+      const existingSignature = await db.select().from(usedSignatures).where(eq(usedSignatures.signatureHash, signatureHash));
+      
+      if (existingSignature.length > 0) {
+        return res.status(400).json({ 
+          message: "Signature already used - replay attack prevented" 
+        });
+      }
+
+      // Store signature to prevent replay
+      await db.insert(usedSignatures).values({
+        walletAddress,
+        signatureHash,
+        usedAt: new Date(),
+      });
+
+      console.log(`\n✅ Wallet authenticated: ${walletAddress}`);
+      console.log(`🔐 Starting REAL agent burn with connected wallet`);
+
+      const { realAgentBurnFromWallet } = await import("./agent-burn-service");
+
+      const result = await realAgentBurnFromWallet(
+        walletAddress,
+        tokenMint,
+        parseFloat(buyAmountSOL),
+        {
+          confidenceThreshold: confidenceThreshold ? parseInt(confidenceThreshold) : 70,
+          maxBurnPercentage: maxBurnPercentage ? parseFloat(maxBurnPercentage) : 5,
+          requirePositiveSentiment: requirePositiveSentiment !== false,
+        }
+      );
+
+      res.json({
+        success: true,
+        message: "Real agent burn executed on devnet",
+        data: result,
+      });
+    } catch (error: any) {
+      console.error("Real agent burn error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Get agent burn stats for a wallet
   app.get("/api/agent-burn/stats/:walletAddress", async (req, res) => {
     try {
