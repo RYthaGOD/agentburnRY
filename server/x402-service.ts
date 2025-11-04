@@ -17,6 +17,59 @@ const USDC_MINT_DEVNET = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 const USDC_MINT_MAINNET = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 export const USDC_MINT = NETWORK === "solana-mainnet" ? USDC_MINT_MAINNET : USDC_MINT_DEVNET;
 
+// x402 Configuration - Environment Variables with Defaults
+export const X402_CONFIG = {
+  FACILITATOR_URL: process.env.X402_FACILITATOR_URL || "",
+  MAX_PAYMENT_AMOUNT: parseFloat(process.env.X402_MAX_PAYMENT_AMOUNT || "1.0"), // Default: 1 USDC max
+  COOKIE_NAME: process.env.X402_COOKIE_NAME || "x402_session",
+  COOKIE_MAX_AGE: parseInt(process.env.X402_COOKIE_MAX_AGE || "86400"), // Default: 24 hours
+} as const;
+
+/**
+ * Validate x402 environment configuration
+ * Logs warnings for missing optional variables
+ * CRITICAL: Exits on invalid numeric values to prevent security bypass
+ */
+export function validateX402Config(): void {
+  // Validate MAX_PAYMENT_AMOUNT is a valid number
+  if (!Number.isFinite(X402_CONFIG.MAX_PAYMENT_AMOUNT) || Number.isNaN(X402_CONFIG.MAX_PAYMENT_AMOUNT)) {
+    console.error(`❌ CRITICAL: X402_MAX_PAYMENT_AMOUNT must be a valid number`);
+    console.error(`   Current value: "${process.env.X402_MAX_PAYMENT_AMOUNT || 'undefined'}"`);
+    console.error(`   Parsed as: ${X402_CONFIG.MAX_PAYMENT_AMOUNT}`);
+    console.error(`   This is a security issue - invalid values allow unlimited spending!`);
+    process.exit(1);
+  }
+  
+  if (!process.env.X402_MAX_PAYMENT_AMOUNT) {
+    console.warn(`⚠️  X402_MAX_PAYMENT_AMOUNT not set, using default: ${X402_CONFIG.MAX_PAYMENT_AMOUNT} USDC`);
+  }
+  
+  if (X402_CONFIG.MAX_PAYMENT_AMOUNT <= 0) {
+    console.error(`❌ CRITICAL: X402_MAX_PAYMENT_AMOUNT must be > 0 (current: ${X402_CONFIG.MAX_PAYMENT_AMOUNT})`);
+    process.exit(1);
+  }
+  
+  if (X402_CONFIG.MAX_PAYMENT_AMOUNT > 100) {
+    console.warn(`⚠️  X402_MAX_PAYMENT_AMOUNT is unusually high: ${X402_CONFIG.MAX_PAYMENT_AMOUNT} USDC`);
+    console.warn(`   Consider reducing for safety in agent-based payments`);
+  }
+  
+  // Validate COOKIE_MAX_AGE is a valid number
+  if (!Number.isFinite(X402_CONFIG.COOKIE_MAX_AGE) || Number.isNaN(X402_CONFIG.COOKIE_MAX_AGE) || X402_CONFIG.COOKIE_MAX_AGE <= 0) {
+    console.error(`❌ CRITICAL: X402_COOKIE_MAX_AGE must be a positive integer`);
+    console.error(`   Current value: "${process.env.X402_COOKIE_MAX_AGE || 'undefined'}"`);
+    console.error(`   Parsed as: ${X402_CONFIG.COOKIE_MAX_AGE}`);
+    process.exit(1);
+  }
+  
+  console.log(`✅ x402 Configuration:`);
+  console.log(`   Max Payment: ${X402_CONFIG.MAX_PAYMENT_AMOUNT} USDC`);
+  console.log(`   Cookie Max Age: ${X402_CONFIG.COOKIE_MAX_AGE}s`);
+  if (X402_CONFIG.FACILITATOR_URL) {
+    console.log(`   Facilitator: ${X402_CONFIG.FACILITATOR_URL}`);
+  }
+}
+
 /**
  * x402 Payment Service for AI Agent Economy
  * Enables micropayments for:
@@ -98,6 +151,15 @@ export class X402PaymentService {
     error?: string;
   }> {
     try {
+      // Validate payment amount against configured limit
+      if (amountUSD > X402_CONFIG.MAX_PAYMENT_AMOUNT) {
+        console.error(`[x402] Payment amount ${amountUSD} USDC exceeds maximum allowed ${X402_CONFIG.MAX_PAYMENT_AMOUNT} USDC`);
+        return {
+          success: false,
+          error: `Payment amount ${amountUSD} USDC exceeds maximum allowed ${X402_CONFIG.MAX_PAYMENT_AMOUNT} USDC`
+        };
+      }
+      
       const microUsdcAmount = X402PaymentService.usdToMicroUsdc(amountUSD);
       const payerPubkey = payerKeypair.publicKey;
       const treasuryPubkey = new PublicKey(this.treasuryAddress);

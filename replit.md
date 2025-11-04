@@ -39,12 +39,13 @@ Express.js server in TypeScript with ESM module system, RESTful API, centralized
 ### Database Schema (Simplified for Hackathon)
 
 **Core Tables:**
-- `projects`: Burn configurations with AI criteria (agenticBurnEnabled, aiConfidenceThreshold, maxBurnPercentage, requirePositiveSentiment)
+- `projects`: Burn configurations with AI criteria (agentBurnEnabled, aiConfidenceThreshold, maxBurnPercentage, requirePositiveSentiment)
 - `transactions`: Burn history (swap, burn, claim operations)
 - `x402Micropayments`: x402 payment tracking (premium data feed access logs)
 - `bamBundles`: Jito BAM bundle tracking (bundleId, status, tipAmount, transactionSignatures)
-- `agenticBurns`: Complete agent burn execution logs (AI decisions, execution results, profitability metrics)
+- `agentBurns`: Complete agent burn execution logs (AI decisions, execution results, profitability metrics)
 - `projectSecrets`: Encrypted private keys for automated execution
+- `usedSignatures`: Replay attack prevention (SHA-256 hashed signatures for wallet authentication)
 
 **Removed Tables** (Legacy trading bot functionality removed for hackathon focus):
 - ❌ aiBotConfigs
@@ -54,7 +55,6 @@ Express.js server in TypeScript with ESM module system, RESTful API, centralized
 - ❌ tradeJournal
 - ❌ aiRecoveryMode
 - ❌ payments (trial/subscription system)
-- ❌ usedSignatures
 
 ### Scheduling System
 `node-cron` service for automated burn execution checks (every 5 minutes in development, hourly in production). Checks `agenticBurnEnabled` flag and executes burns based on configured criteria.
@@ -66,7 +66,36 @@ PostgreSQL via Neon's serverless driver and Drizzle ORM, with UUID primary keys,
 Wallet-based authentication using cryptographic signature verification via tweetnacl and Solana Wallet Adapter.
 
 ### Security Infrastructure
-Defense-in-depth security: rate limiting, DDoS protection, security headers (Helmet.js), input validation, and audit logging.
+Defense-in-depth security: rate limiting, DDoS protection, security headers (Helmet.js), input validation, replay attack prevention (via `usedSignatures` table), and audit logging.
+
+### x402 Implementation Pattern
+
+**Agent-Pays Model** (Different from Traditional x402):
+GigaBrain implements the "agent-pays" x402 pattern, where AI agents autonomously pay for services, rather than the traditional "user-pays" HTTP 402 Payment Required flow.
+
+**Traditional x402 Flow** (User-Pays):
+1. User requests protected resource
+2. Server responds `HTTP 402 Payment Required` with payment requirements
+3. User makes payment and retries with `X-PAYMENT` header
+4. Server verifies payment and returns content
+
+**GigaBrain's Agent-Pays Flow** (Autonomous):
+1. AI agent needs premium data (oracle, data feeds, burn execution)
+2. Agent autonomously creates and signs USDC payment transaction
+3. Agent sends payment on-chain and tracks via `x402Micropayments` table
+4. Agent proceeds with operation using premium data
+
+**Key Differences:**
+- **No HTTP 402 responses**: Agent knows prices and pays proactively
+- **Server-side payments**: Agent wallet managed by backend for autonomy
+- **Batch tracking**: All x402 payments logged for analytics and cost tracking
+- **Safety limits**: `X402_MAX_PAYMENT_AMOUNT` prevents runaway costs
+
+**Configuration** (Environment Variables):
+- `X402_FACILITATOR_URL`: Optional facilitator for mainnet fee abstraction
+- `X402_MAX_PAYMENT_AMOUNT`: Maximum USDC per payment (default: 1.0)
+- `X402_COOKIE_NAME`: Session cookie name (default: x402_session)
+- `X402_COOKIE_MAX_AGE`: Cookie lifetime in seconds (default: 86400)
 
 ## External Dependencies
 

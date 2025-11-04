@@ -108,6 +108,13 @@ export const bamBundles = pgTable("bam_bundles", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Used signatures table for replay attack prevention
+export const usedSignatures = pgTable("used_signatures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  signatureHash: varchar("signature_hash", { length: 64 }).notNull().unique(),
+  usedAt: timestamp("used_at").notNull().defaultNow(),
+});
+
 // Agent Burn History (CRITICAL FOR HACKATHON - tracks AI-powered burn executions)
 export const agentBurns = pgTable("agent_burns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -5,6 +5,7 @@ import {
   x402Micropayments,
   bamBundles,
   agentBurns,
+  usedSignatures,
   type Project,
   type InsertProject,
   type Transaction,
@@ -37,6 +38,10 @@ export interface IStorage {
   setProjectSecrets(secrets: InsertProjectSecret): Promise<ProjectSecret>;
   updateProjectSecrets(projectId: string, secrets: Partial<InsertProjectSecret>): Promise<ProjectSecret | undefined>;
   deleteProjectSecrets(projectId: string): Promise<boolean>;
+  
+  // Replay attack prevention operations
+  isSignatureUsed(signatureHash: string): Promise<boolean>;
+  recordUsedSignature(data: { signatureHash: string }): Promise<void>;
 }
 
 class DbStorage implements IStorage {
@@ -159,6 +164,24 @@ class DbStorage implements IStorage {
   async deleteProjectSecrets(projectId: string): Promise<boolean> {
     const result = await db.delete(projectSecrets).where(eq(projectSecrets.projectId, projectId)).returning();
     return result.length > 0;
+  }
+
+  // ===================================
+  // REPLAY ATTACK PREVENTION OPERATIONS
+  // ===================================
+
+  async isSignatureUsed(signatureHash: string): Promise<boolean> {
+    const [result] = await db.select()
+      .from(usedSignatures)
+      .where(eq(usedSignatures.signatureHash, signatureHash))
+      .limit(1);
+    return result !== undefined;
+  }
+
+  async recordUsedSignature(data: { signatureHash: string }): Promise<void> {
+    await db.insert(usedSignatures).values({
+      signatureHash: data.signatureHash,
+    });
   }
 }
 

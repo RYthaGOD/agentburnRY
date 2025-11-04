@@ -11,9 +11,13 @@ import {
   checkSecurityEnvVars,
   requestSizeLimit,
 } from "./security";
+import { validateX402Config } from "./x402-service";
 
 // Check security environment variables on startup
 checkSecurityEnvVars();
+
+// Validate x402 configuration
+validateX402Config();
 
 const app = express();
 
