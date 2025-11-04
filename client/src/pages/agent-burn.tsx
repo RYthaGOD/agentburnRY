@@ -43,7 +43,7 @@ export default function AgentBurnPage() {
     enabled: !!demoWallet,
   });
 
-  // Test agent burn mutation
+  // Test agent burn mutation (demo mode)
   const testBurnMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/agent-burn/demo", {
@@ -63,8 +63,8 @@ export default function AgentBurnPage() {
       setTestResult(response);
       if (response.success) {
         toast({
-          title: "✅ Agent Burn Success!",
-          description: `x402 payment processed and BAM bundle created. Payment ID: ${response.data?.paymentId?.substring(0, 8)}...`,
+          title: "✅ Demo Burn Success!",
+          description: `Mock transactions created. This was a demo - no real USDC spent.`,
         });
         // Refresh all stats
         refetchStats();
@@ -72,7 +72,7 @@ export default function AgentBurnPage() {
         refetchBam();
       } else {
         toast({
-          title: "⚠️ Agent Burn Failed",
+          title: "⚠️ Demo Burn Failed",
           description: response.error || "Unknown error occurred",
           variant: "destructive",
         });
@@ -81,7 +81,51 @@ export default function AgentBurnPage() {
     onError: (error: any) => {
       toast({
         title: "❌ Error",
-        description: error.message || "Failed to execute agent burn",
+        description: error.message || "Failed to execute demo burn",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Real agent burn mutation (uses actual devnet transactions)
+  const realBurnMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/agent-burn/real", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tokenMint: tokenMint,
+          buyAmountSOL: parseFloat(burnAmount),
+          confidenceThreshold,
+          maxBurnPercentage,
+          requirePositiveSentiment,
+        }),
+      });
+      return response.json();
+    },
+    onSuccess: (response: any) => {
+      setTestResult(response);
+      if (response.success) {
+        toast({
+          title: "✅ Real Burn Success!",
+          description: `Real transactions executed on devnet! Check Solscan links below.`,
+        });
+        // Refresh all stats
+        refetchStats();
+        refetchX402();
+        refetchBam();
+      } else {
+        toast({
+          title: "⚠️ Real Burn Failed",
+          description: response.error || "Unknown error occurred",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "❌ Error",
+        description: error.message || "Failed to execute real burn",
         variant: "destructive",
       });
     },
@@ -255,25 +299,52 @@ export default function AgentBurnPage() {
 
             <Separator />
             
-            <Button
-              onClick={() => testBurnMutation.mutate()}
-              disabled={testBurnMutation.isPending || !tokenMint || !burnAmount}
-              size="lg"
-              className="w-full"
-              data-testid="button-test-burn"
-            >
-              {testBurnMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing x402 Payment + BAM Bundle...
-                </>
-              ) : (
-                <>
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  Run Demo Transaction
-                </>
-              )}
-            </Button>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Button
+                onClick={() => testBurnMutation.mutate()}
+                disabled={testBurnMutation.isPending || realBurnMutation.isPending || !tokenMint || !burnAmount}
+                size="lg"
+                variant="outline"
+                className="w-full"
+                data-testid="button-test-burn"
+              >
+                {testBurnMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Running Demo...
+                  </>
+                ) : (
+                  <>
+                    <PlayCircle className="mr-2 h-4 w-4" />
+                    Demo Mode (Mock)
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={() => realBurnMutation.mutate()}
+                disabled={testBurnMutation.isPending || realBurnMutation.isPending || !tokenMint || !burnAmount}
+                size="lg"
+                className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+                data-testid="button-real-burn"
+              >
+                {realBurnMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Executing Real Burn...
+                  </>
+                ) : (
+                  <>
+                    <Flame className="mr-2 h-4 w-4" />
+                    Real Burn (Devnet)
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            <p className="text-xs text-muted-foreground text-center">
+              💡 <strong>Demo Mode</strong>: Mock transactions (free) • <strong>Real Burn</strong>: Actual devnet transactions (~$0.01 USDC + 0.01 SOL fees)
+            </p>
 
             {testResult && (
               <div className="p-4 rounded-lg bg-muted space-y-3" data-testid="div-test-result">
